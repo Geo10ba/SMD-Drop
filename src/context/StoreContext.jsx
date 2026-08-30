@@ -143,10 +143,13 @@ export const StoreProvider = ({ children }) => {
   });
 
   const setUsers = (usrs) => {
-    setUsersState(usrs);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smd_users', JSON.stringify(usrs));
-    }
+    setUsersState((prev) => {
+      const next = typeof usrs === 'function' ? usrs(prev) : usrs;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_users', JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
   // Dynamic Categories State (Zerado para Produção)
@@ -155,7 +158,8 @@ export const StoreProvider = ({ children }) => {
       const saved = localStorage.getItem('smd_categories');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
         } catch (e) {}
       }
     }
@@ -163,10 +167,13 @@ export const StoreProvider = ({ children }) => {
   });
 
   const setCategories = (cats) => {
-    setCategoriesState(cats);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smd_categories', JSON.stringify(cats));
-    }
+    setCategoriesState((prev) => {
+      const next = typeof cats === 'function' ? cats(prev) : cats;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_categories', JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
   // Factory Materials Catalog (Official User Pricing Table Persisted in localStorage)
@@ -237,10 +244,13 @@ export const StoreProvider = ({ children }) => {
   });
 
   const setMaterials = (mats) => {
-    setMaterialsState(mats);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smd_materials', JSON.stringify(mats));
-    }
+    setMaterialsState((prev) => {
+      const next = typeof mats === 'function' ? mats(prev) : mats;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_materials', JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
   const addMaterial = (newMat) => {
@@ -277,7 +287,8 @@ export const StoreProvider = ({ children }) => {
       const saved = localStorage.getItem('smd_products');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
         } catch (e) {}
       }
     }
@@ -285,10 +296,13 @@ export const StoreProvider = ({ children }) => {
   });
 
   const setProducts = (prods) => {
-    setProductsState(prods);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smd_products', JSON.stringify(prods));
-    }
+    setProductsState((prev) => {
+      const next = typeof prods === 'function' ? prods(prev) : prods;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_products', JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
   // Reseller Suggested Products (Pending Approval by Admin)
@@ -297,7 +311,8 @@ export const StoreProvider = ({ children }) => {
       const saved = localStorage.getItem('smd_pending_products');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
         } catch (e) {}
       }
     }
@@ -305,10 +320,13 @@ export const StoreProvider = ({ children }) => {
   });
 
   const setPendingProducts = (pProds) => {
-    setPendingProductsState(pProds);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smd_pending_products', JSON.stringify(pProds));
-    }
+    setPendingProductsState((prev) => {
+      const next = typeof pProds === 'function' ? pProds(prev) : pProds;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_pending_products', JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
   // Reseller Cart
@@ -320,7 +338,8 @@ export const StoreProvider = ({ children }) => {
       const saved = localStorage.getItem('smd_orders');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
         } catch (e) {}
       }
     }
@@ -328,10 +347,13 @@ export const StoreProvider = ({ children }) => {
   });
 
   const setOrders = (ords) => {
-    setOrdersState(ords);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smd_orders', JSON.stringify(ords));
-    }
+    setOrdersState((prev) => {
+      const next = typeof ords === 'function' ? ords(prev) : ords;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_orders', JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
   const resetSystemForProduction = () => {
@@ -502,18 +524,29 @@ export const StoreProvider = ({ children }) => {
 
   // Category Operations
   const addCategory = (categoryName) => {
-    if (!categoryName || categories.includes(categoryName)) return;
-    setCategories((prev) => [...prev, categoryName]);
-    showNotification(`Categoria "${categoryName}" criada!`);
+    if (!categoryName) return;
+    const cleanName = categoryName.trim();
+    setCategories((prev) => {
+      if (prev.includes(cleanName)) return prev;
+      return [...prev, cleanName];
+    });
+    showNotification(`Categoria "${cleanName}" criada!`);
+
+    // Sync to Supabase
+    syncToSupabase('categories', {
+      name: cleanName,
+      slug: cleanName.toLowerCase().replace(/\s+/g, '-')
+    });
   };
 
   const editCategory = (oldName, newName) => {
-    if (!newName || categories.includes(newName)) return;
-    setCategories((prev) => prev.map((c) => (c === oldName ? newName : c)));
+    if (!newName) return;
+    const cleanName = newName.trim();
+    setCategories((prev) => prev.map((c) => (c === oldName ? cleanName : c)));
     setProducts((prev) =>
-      prev.map((p) => (p.category === oldName ? { ...p, category: newName } : p))
+      prev.map((p) => (p.category === oldName ? { ...p, category: cleanName } : p))
     );
-    showNotification(`Categoria renomeada para "${newName}"!`);
+    showNotification(`Categoria renomeada para "${cleanName}"!`);
   };
 
   const deleteCategory = (categoryName) => {
@@ -558,6 +591,16 @@ export const StoreProvider = ({ children }) => {
     setOrders((prev) => [newOrder, ...prev]);
     clearCart();
     showNotification(`Pedido ${newOrder.id} enviado para a fábrica!`, 'gold');
+
+    // Sync to Supabase
+    syncToSupabase('orders', {
+      id: newOrder.id,
+      reseller_email: newOrder.resellerEmail,
+      wholesale_total: newOrder.wholesaleTotal,
+      status: newOrder.status,
+      items: newOrder.items
+    });
+
     return newOrder;
   };
 
@@ -586,7 +629,7 @@ export const StoreProvider = ({ children }) => {
   // Add Product by Admin (Direct active publication)
   const addProduct = (productData) => {
     const newProduct = {
-      id: "prod-" + (products.length + 1),
+      id: "prod-" + Date.now(),
       inStock: true,
       mediaKit: {
         photos: [productData.image],
@@ -597,6 +640,18 @@ export const StoreProvider = ({ children }) => {
     };
     setProducts((prev) => [newProduct, ...prev]);
     showNotification(`Novo produto "${productData.title}" cadastrado no catálogo!`);
+
+    // Sync to Supabase
+    syncToSupabase('products', {
+      id: newProduct.id,
+      title: newProduct.title,
+      category: newProduct.category,
+      pricing_type: newProduct.pricingType,
+      wholesale_price: newProduct.wholesalePrice,
+      suggested_retail_price: newProduct.suggestedRetailPrice,
+      image: newProduct.image,
+      description: newProduct.description
+    });
   };
 
   // Suggest Product by Reseller (Requires Admin Approval)
