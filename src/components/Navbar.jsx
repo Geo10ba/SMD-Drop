@@ -208,26 +208,25 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
             </button>
           )}
 
-          {/* Reseller Order Cart Drawer Toggle */}
+          {/* Reseller Order Cart Drawer Toggle (ALWAYS VISIBLE IN RESELLER MODE) */}
           {viewMode === 'reseller' && (
             <button
               onClick={onOpenCart}
-              className="relative p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-main)] transition-all shadow-sm"
-              title="Ver Carrinho de Dropshipping"
+              className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-xs sm:text-sm py-2 px-3 sm:px-4 rounded-xl flex items-center gap-2 shadow-md transition-all shrink-0"
+              title="Ver Carrinho de Pedidos"
             >
-              <ShoppingBag size={20} />
-              {cart.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-[#C59B27] text-white text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md">
-                  {cart.length}
-                </span>
-              )}
+              <ShoppingBag size={18} />
+              <span>Carrinho</span>
+              <span className="bg-slate-900 text-amber-400 font-black text-xs px-2 py-0.5 rounded-full shadow-inner">
+                {cart.length}
+              </span>
             </button>
           )}
 
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-main)] transition-all shadow-sm"
+            className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-main)] transition-all shadow-sm shrink-0"
             title={`Mudar para modo ${theme === 'light' ? 'Escuro' : 'Claro'}`}
           >
             {theme === 'light' ? <Moon size={20} className="text-slate-700" /> : <Sun size={20} className="text-amber-400" />}
