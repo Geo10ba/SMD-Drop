@@ -52,29 +52,29 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
       </div>
 
       {/* Main Navbar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      <div className="max-w-[1650px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
         {/* Logo */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="h-12 flex items-center justify-center shrink-0">
             <img src="/logo.png" alt="SMD Drop Logo" className="h-11 w-auto max-h-12 object-contain rounded-lg shadow-sm" />
           </div>
-          <div>
+          <div className="shrink-0">
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xl tracking-tight text-[var(--text-main)] font-['Outfit']">
+              <span className="font-extrabold text-xl tracking-tight text-[var(--text-main)] font-['Outfit'] whitespace-nowrap">
                 SMD <span className="text-[#C59B27] font-light">DROP</span>
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-[var(--accent-gold-light)] text-[var(--accent-gold)] border border-[var(--accent-gold)]/20">
+              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-[var(--accent-gold-light)] text-[var(--accent-gold)] border border-[var(--accent-gold)]/20 whitespace-nowrap hidden sm:inline-block">
                 FABRICAÇÃO PRÓPRIA
               </span>
             </div>
-            <p className="text-xs text-[var(--text-muted)] font-medium">
+            <p className="text-xs text-[var(--text-muted)] font-medium hidden lg:block whitespace-nowrap">
               Plataforma Fabril de Dropshipping & Marketplaces
             </p>
           </div>
         </div>
 
         {/* Center View Mode Switcher */}
-        <div className="hidden md:flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-xl border border-[var(--border-color)]">
+        <div className="hidden md:flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-xl border border-[var(--border-color)] shrink-0">
           <button
             onClick={() => setViewMode('reseller')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
