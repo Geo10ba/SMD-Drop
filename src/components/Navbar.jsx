@@ -133,15 +133,6 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
           {viewMode === 'reseller' && (
             <>
               <button
-                onClick={onOpenCalculator}
-                className="btn-secondary text-xs sm:text-sm py-2 px-3"
-                title="Calculadora sob Medida R$/m²"
-              >
-                <Ruler size={16} className="text-amber-500" />
-                <span className="hidden md:inline">Calculadora m²</span>
-              </button>
-
-              <button
                 onClick={onOpenFaq}
                 className="btn-secondary text-xs sm:text-sm py-2 px-3"
                 title="Central de Ajuda & FAQ"
@@ -152,6 +143,15 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
 
               {currentUser ? (
                 <>
+                  <button
+                    onClick={onOpenCalculator}
+                    className="btn-secondary text-xs sm:text-sm py-2 px-3"
+                    title="Calculadora sob Medida R$/m²"
+                  >
+                    <Ruler size={16} className="text-amber-500" />
+                    <span className="hidden md:inline">Calculadora m²</span>
+                  </button>
+
                   <button
                     onClick={onOpenResellerOrders}
                     className="btn-secondary text-xs sm:text-sm py-2 px-3 sm:px-4"
