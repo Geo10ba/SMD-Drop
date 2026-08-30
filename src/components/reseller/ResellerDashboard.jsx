@@ -158,7 +158,7 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
                 </div>
               </div>
               <p className="text-2xl font-extrabold text-[var(--text-main)] font-['Outfit']">
-                R$ {(estimatedRevenue || 6200).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {estimatedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
               <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                 <TrendingUp size={12} /> Faturamento bruto acumulado
@@ -173,10 +173,10 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
                 </div>
               </div>
               <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-['Outfit']">
-                R$ {(totalNetProfit || 2950).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {totalNetProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
               <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                Margem Líquida Médias: {avgMargin || '47.5'}%
+                Margem Líquida Média: {avgMargin}%
               </span>
             </div>
 
@@ -188,7 +188,7 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
                 </div>
               </div>
               <p className="text-2xl font-extrabold text-[var(--text-main)] font-['Outfit']">
-                {resellerOrders.length || 14} <span className="text-xs font-normal text-[var(--text-muted)]">pedidos</span>
+                {resellerOrders.length} <span className="text-xs font-normal text-[var(--text-muted)]">pedidos</span>
               </p>
               <span className="text-[11px] text-[var(--text-muted)] font-medium">
                 Despachados pela fábrica
