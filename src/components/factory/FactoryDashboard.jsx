@@ -112,16 +112,33 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
   // Filtered Products for Management
   const filteredProducts = products.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // SVG Chart Data (Factory Monthly Volume)
-  const factoryMonthlyData = [
-    { month: 'Mar', revenue: 14200, count: 85 },
-    { month: 'Abr', revenue: 21900, count: 120 },
-    { month: 'Mai', revenue: 38400, count: 210 },
-    { month: 'Jun', revenue: 32000, count: 180 },
-    { month: 'Jul', revenue: 54900, count: 310 },
-    { month: 'Ago', revenue: totalWholesaleRevenue || 68400, count: orders.length || 390 }
-  ];
-  const maxRevenue = Math.max(...factoryMonthlyData.map(d => d.revenue));
+  // SVG Chart Data (Factory Monthly Volume calculated dynamically from real orders)
+  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const now = new Date();
+  const factoryMonthlyData = Array.from({ length: 6 }).map((_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    return {
+      month: monthNames[d.getMonth()],
+      year: d.getFullYear(),
+      monthIndex: d.getMonth(),
+      revenue: 0,
+      count: 0
+    };
+  });
+
+  orders.forEach((o) => {
+    if (!o.createdAt) return;
+    const date = new Date(o.createdAt);
+    const m = date.getMonth();
+    const y = date.getFullYear();
+    const found = factoryMonthlyData.find((item) => item.monthIndex === m && item.year === y);
+    if (found) {
+      found.revenue += (o.wholesaleTotal || 0);
+      found.count += 1;
+    }
+  });
+
+  const maxRevenue = Math.max(100, ...factoryMonthlyData.map(d => d.revenue));
 
   const handleDownloadLabelPdf = (order) => {
     const labelFileName = order.labelPdf || `Etiqueta_${order.marketplace || 'Marketplace'}_${order.id}.pdf`;

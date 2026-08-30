@@ -56,16 +56,35 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
     updateProfile(profileForm);
   };
 
-  // SVG Chart Data (Monthly Sales Simulation)
-  const monthlyData = [
-    { month: 'Mar', sales: 1200, profit: 540 },
-    { month: 'Abr', sales: 2100, profit: 980 },
-    { month: 'Mai', sales: 3400, profit: 1600 },
-    { month: 'Jun', sales: 2800, profit: 1250 },
-    { month: 'Jul', sales: 4900, profit: 2300 },
-    { month: 'Ago', sales: 6200, profit: 2950 },
-  ];
-  const maxSales = Math.max(...monthlyData.map(d => d.sales));
+  // SVG Chart Data (Monthly Sales calculated dynamically from real reseller orders)
+  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const now = new Date();
+  const monthlyData = Array.from({ length: 6 }).map((_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    return {
+      month: monthNames[d.getMonth()],
+      year: d.getFullYear(),
+      monthIndex: d.getMonth(),
+      sales: 0,
+      profit: 0
+    };
+  });
+
+  resellerOrders.forEach((o) => {
+    if (!o.createdAt) return;
+    const date = new Date(o.createdAt);
+    const m = date.getMonth();
+    const y = date.getFullYear();
+    const found = monthlyData.find((item) => item.monthIndex === m && item.year === y);
+    if (found) {
+      const wholesaleCost = o.wholesaleTotal || 0;
+      const retailRevenue = o.items.reduce((sum, item) => sum + ((item.customSellingPrice || item.suggestedRetailPrice || 0) * item.quantity), 0);
+      found.sales += retailRevenue;
+      found.profit += Math.max(0, retailRevenue - wholesaleCost);
+    }
+  });
+
+  const maxSales = Math.max(100, ...monthlyData.map(d => d.sales));
 
   return (
     <div className="space-y-8 animate-fade-in">
