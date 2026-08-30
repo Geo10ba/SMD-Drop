@@ -677,6 +677,19 @@ export const StoreProvider = ({ children }) => {
         whatsapp: "https://wa.me/5511987654321",
         youtube: "https://youtube.com/@smddrop"
       },
+      heroSettings: {
+        enabled: true,
+        badge: "OPORTUNIDADE DE RENDA EXTRA • FABRICAÇÃO PRÓPRIA B2B",
+        title: "Venda Produtos de Acrílico & Neon LED Sem Estoque e Lucre de R$ 3.000 a R$ 15.000/mês!",
+        subtitle: "A fábrica SMD Drop cuida de tudo para você: nós produzimos sob medida, embalamos em caixa neutra e despachamos direto para o seu cliente final com a sua etiqueta do Mercado Livre, Shopee ou Amazon.",
+        ctaText: "✨ Criar Conta Grátis e Liberar Atacado em 30s →",
+        bullet1Title: "Zero Estoque",
+        bullet1Subtitle: "Só pague após vender",
+        bullet2Title: "Envio Cego Neutro",
+        bullet2Subtitle: "Sua marca na etiqueta",
+        bullet3Title: "Margem de 300%",
+        bullet3Subtitle: "Preços direto de fábrica"
+      },
       mySites: [
         { title: "Loja Oficial SMD Drop", url: "https://smddrop.com.br" },
         { title: "Portal de Atacado Fabril", url: "https://atacado.smddrop.com.br" },

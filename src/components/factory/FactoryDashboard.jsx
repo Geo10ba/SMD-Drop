@@ -959,6 +959,162 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
             </div>
           </div>
 
+          {/* Box 5: Hero Banner Manager (Renda Extra & Revenda) */}
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-2">
+              <h4 className="font-bold text-amber-500 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                <Sparkles size={16} /> 5. Gestão do Banner Hero da Capa (Renda Extra & Revenda)
+              </h4>
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--text-main)]">
+                <input
+                  type="checkbox"
+                  checked={settingsForm.heroSettings?.enabled ?? true}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: {
+                      ...settingsForm.heroSettings,
+                      enabled: e.target.checked
+                    }
+                  })}
+                  className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                />
+                Exibir Banner na Capa
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-[var(--text-muted)]">Badge Superior (Tag Dourada)</label>
+                <input
+                  type="text"
+                  value={settingsForm.heroSettings?.badge || ''}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: { ...settingsForm.heroSettings, badge: e.target.value }
+                  })}
+                  className="input-field text-xs"
+                  placeholder="Ex: OPORTUNIDADE DE RENDA EXTRA..."
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-[var(--text-muted)]">Texto do Botão Principal (CTA)</label>
+                <input
+                  type="text"
+                  value={settingsForm.heroSettings?.ctaText || ''}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: { ...settingsForm.heroSettings, ctaText: e.target.value }
+                  })}
+                  className="input-field text-xs"
+                  placeholder="Ex: ✨ Criar Conta Grátis e Liberar Atacado..."
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-[var(--text-muted)]">Título Principal do Banner</label>
+              <textarea
+                rows={2}
+                value={settingsForm.heroSettings?.title || ''}
+                onChange={(e) => setSettingsForm({
+                  ...settingsForm,
+                  heroSettings: { ...settingsForm.heroSettings, title: e.target.value }
+                })}
+                className="input-field text-xs font-semibold"
+                placeholder="Ex: Venda Produtos de Acrílico & Neon LED..."
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-[var(--text-muted)]">Subtítulo / Descrição Explicativa</label>
+              <textarea
+                rows={3}
+                value={settingsForm.heroSettings?.subtitle || ''}
+                onChange={(e) => setSettingsForm({
+                  ...settingsForm,
+                  heroSettings: { ...settingsForm.heroSettings, subtitle: e.target.value }
+                })}
+                className="input-field text-xs"
+                placeholder="Ex: A fábrica SMD Drop cuida de tudo para você..."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+              <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2">
+                <span className="text-[10px] font-extrabold uppercase text-amber-500 block">Destaque 1</span>
+                <input
+                  type="text"
+                  value={settingsForm.heroSettings?.bullet1Title || ''}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: { ...settingsForm.heroSettings, bullet1Title: e.target.value }
+                  })}
+                  className="input-field text-xs font-bold"
+                  placeholder="Título ex: Zero Estoque"
+                />
+                <input
+                  type="text"
+                  value={settingsForm.heroSettings?.bullet1Subtitle || ''}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: { ...settingsForm.heroSettings, bullet1Subtitle: e.target.value }
+                  })}
+                  className="input-field text-xs"
+                  placeholder="Subtítulo ex: Só pague após vender"
+                />
+              </div>
+
+              <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2">
+                <span className="text-[10px] font-extrabold uppercase text-amber-500 block">Destaque 2</span>
+                <input
+                  type="text"
+                  value={settingsForm.heroSettings?.bullet2Title || ''}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: { ...settingsForm.heroSettings, bullet2Title: e.target.value }
+                  })}
+                  className="input-field text-xs font-bold"
+                  placeholder="Título ex: Envio Cego Neutro"
+                />
+                <input
+                  type="text"
+                  value={settingsForm.heroSettings?.bullet2Subtitle || ''}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: { ...settingsForm.heroSettings, bullet2Subtitle: e.target.value }
+                  })}
+                  className="input-field text-xs"
+                  placeholder="Subtítulo ex: Sua marca na etiqueta"
+                />
+              </div>
+
+              <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2">
+                <span className="text-[10px] font-extrabold uppercase text-amber-500 block">Destaque 3</span>
+                <input
+                  type="text"
+                  value={settingsForm.heroSettings?.bullet3Title || ''}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: { ...settingsForm.heroSettings, bullet3Title: e.target.value }
+                  })}
+                  className="input-field text-xs font-bold"
+                  placeholder="Título ex: Margem de 300%"
+                />
+                <input
+                  type="text"
+                  value={settingsForm.heroSettings?.bullet3Subtitle || ''}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    heroSettings: { ...settingsForm.heroSettings, bullet3Subtitle: e.target.value }
+                  })}
+                  className="input-field text-xs"
+                  placeholder="Subtítulo ex: Preços direto de fábrica"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="pt-4 border-t border-[var(--border-color)] flex justify-end">
             <button type="submit" className="btn-gold py-3 px-8 font-bold text-xs shadow-lg flex items-center gap-2">
               <Save size={16} /> Salvar Todas as Configurações da Empresa

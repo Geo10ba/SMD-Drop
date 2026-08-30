@@ -39,29 +39,33 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
     itemsPerRow, 
     setItemsPerRow, 
     categories: globalCategories,
-    currentUser
+    currentUser,
+    companySettings
   } = useStore();
 
   const [resellerViewMode, setResellerViewMode] = useState('catalog'); // 'catalog' or 'dashboard'
   const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [selectedPricingType, setSelectedPricingType] = useState('all'); // all, fixed, custom_m2
+  const [selectedPricingType, setSelectedPricingType] = useState('all'); // 'all', 'fixed', 'custom_m2'
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [isHeroMinimized, setIsHeroMinimized] = useState(false);
-
-  // Selected modals
-  const [m2Product, setM2Product] = useState(null);
-  const [mediaKitProduct, setMediaKitProduct] = useState(null);
-  const [profitModalProduct, setProfitModalProduct] = useState(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [customPrices, setCustomPrices] = useState({});
 
-  const handleCustomPriceChange = (productId, val) => {
-    setCustomPrices((prev) => ({ ...prev, [productId]: val }));
+  const hero = companySettings?.heroSettings || {
+    enabled: true,
+    badge: "OPORTUNIDADE DE RENDA EXTRA • FABRICAÇÃO PRÓPRIA B2B",
+    title: "Venda Produtos de Acrílico & Neon LED Sem Estoque e Lucre de R$ 3.000 a R$ 15.000/mês!",
+    subtitle: "A fábrica SMD Drop cuida de tudo para você: nós produzimos sob medida, embalamos em caixa neutra e despachamos direto para o seu cliente final com a sua etiqueta do Mercado Livre, Shopee ou Amazon.",
+    ctaText: "✨ Criar Conta Grátis e Liberar Atacado em 30s →",
+    bullet1Title: "Zero Estoque",
+    bullet1Subtitle: "Só pague após vender",
+    bullet2Title: "Envio Cego Neutro",
+    bullet2Subtitle: "Sua marca na etiqueta",
+    bullet3Title: "Margem de 300%",
+    bullet3Subtitle: "Preços direto de fábrica"
   };
 
-  // Reset page to 1 whenever filters or itemsPerPage change
-  React.useEffect(() => {
+  // Reset pagination when filters change
+  useEffect(() => {
     setCurrentPage(1);
   }, [selectedCategory, selectedPricingType, searchQuery, itemsPerPage]);
 
@@ -84,20 +88,20 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* High-Converting Renda Extra / Dropshipping B2B Hero Section for Visitors */}
-      {!currentUser && (
+      {/* High-Converting Renda Extra / Dropshipping B2B Hero Section for Visitors (Editable by Admin) */}
+      {!currentUser && hero.enabled && (
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950 p-6 sm:p-8 text-white shadow-2xl border border-amber-500/30 space-y-6">
           <div className="relative z-10 max-w-3xl space-y-4">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider">
-              <Sparkles size={15} /> OPORTUNIDADE DE RENDA EXTRA • FABRICAÇÃO PRÓPRIA B2B
+              <Sparkles size={15} /> {hero.badge}
             </div>
 
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black font-['Outfit'] leading-tight text-white tracking-tight">
-              Venda Produtos de <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300">Acrílico & Neon LED</span> Sem Estoque e Lucre de R$ 3.000 a R$ 15.000/mês!
+              {hero.title}
             </h1>
 
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
-              A fábrica <strong>SMD Drop</strong> cuida de tudo para você: nós produzimos sob medida, embalamos em caixa neutra e despachamos direto para o seu cliente final com a sua etiqueta do Mercado Livre, Shopee ou Amazon.
+              {hero.subtitle}
             </p>
 
             {/* Feature Bullet Badges */}
@@ -107,8 +111,8 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                   <Check size={18} />
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-white block">Zero Estoque</span>
-                  <span className="text-[10px] text-slate-400 block">Só pague após vender</span>
+                  <span className="text-xs font-bold text-white block">{hero.bullet1Title}</span>
+                  <span className="text-[10px] text-slate-400 block">{hero.bullet1Subtitle}</span>
                 </div>
               </div>
 
@@ -117,8 +121,8 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                   <Factory size={18} />
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-white block">Envio Cego Neutro</span>
-                  <span className="text-[10px] text-slate-400 block">Sua marca na etiqueta</span>
+                  <span className="text-xs font-bold text-white block">{hero.bullet2Title}</span>
+                  <span className="text-[10px] text-slate-400 block">{hero.bullet2Subtitle}</span>
                 </div>
               </div>
 
@@ -127,8 +131,8 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                   <Tag size={18} />
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-white block">Margem de 300%</span>
-                  <span className="text-[10px] text-slate-400 block">Preços direto de fábrica</span>
+                  <span className="text-xs font-bold text-white block">{hero.bullet3Title}</span>
+                  <span className="text-[10px] text-slate-400 block">{hero.bullet3Subtitle}</span>
                 </div>
               </div>
             </div>
@@ -139,7 +143,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                 onClick={onOpenRegister}
                 className="btn-gold py-3.5 px-8 text-sm sm:text-base font-extrabold shadow-xl flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 scale-100 hover:scale-105 transition-transform"
               >
-                <UserPlus size={20} /> ✨ Criar Conta Grátis e Liberar Atacado em 30s →
+                <UserPlus size={20} /> {hero.ctaText}
               </button>
 
               <span className="text-[11px] text-slate-400 text-center sm:text-left flex items-center justify-center sm:justify-start gap-1">
