@@ -84,31 +84,69 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Visitor Registration Callout Banner (Appears when user is not logged in) */}
+      {/* High-Converting Renda Extra / Dropshipping B2B Hero Section for Visitors */}
       {!currentUser && (
-        <div className="bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-transparent border border-amber-500/40 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-amber-500 text-slate-900 font-extrabold shrink-0 shadow">
-              <Lock size={24} />
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950 p-6 sm:p-8 text-white shadow-2xl border border-amber-500/30 space-y-6">
+          <div className="relative z-10 max-w-3xl space-y-4">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider">
+              <Sparkles size={15} /> OPORTUNIDADE DE RENDA EXTRA • FABRICAÇÃO PRÓPRIA B2B
             </div>
-            <div>
-              <span className="badge-gold uppercase text-[10px] font-extrabold mb-1 inline-block">
-                PORTAL FABRIL B2B • RESTRITO A REVENDEDORES CADASTRADOS
+
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black font-['Outfit'] leading-tight text-white tracking-tight">
+              Venda Produtos de <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300">Acrílico & Neon LED</span> Sem Estoque e Lucre de R$ 3.000 a R$ 15.000/mês!
+            </h1>
+
+            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
+              A fábrica <strong>SMD Drop</strong> cuida de tudo para você: nós produzimos sob medida, embalamos em caixa neutra e despachamos direto para o seu cliente final com a sua etiqueta do Mercado Livre, Shopee ou Amazon.
+            </p>
+
+            {/* Feature Bullet Badges */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                  <Check size={18} />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">Zero Estoque</span>
+                  <span className="text-[10px] text-slate-400 block">Só pague após vender</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                  <Factory size={18} />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">Envio Cego Neutro</span>
+                  <span className="text-[10px] text-slate-400 block">Sua marca na etiqueta</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold shrink-0">
+                  <Tag size={18} />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">Margem de 300%</span>
+                  <span className="text-[10px] text-slate-400 block">Preços direto de fábrica</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Call-To-Action Button */}
+            <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <button
+                onClick={onOpenRegister}
+                className="btn-gold py-3.5 px-8 text-sm sm:text-base font-extrabold shadow-xl flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 scale-100 hover:scale-105 transition-transform"
+              >
+                <UserPlus size={20} /> ✨ Criar Conta Grátis e Liberar Atacado em 30s →
+              </button>
+
+              <span className="text-[11px] text-slate-400 text-center sm:text-left flex items-center justify-center sm:justify-start gap-1">
+                <Check size={14} className="text-emerald-400" /> Cadastro 100% gratuito e instantâneo
               </span>
-              <h4 className="text-base sm:text-lg font-extrabold text-[var(--text-main)] font-['Outfit']">
-                Cadastre-se gratuitamente para liberar a Tabela Oficial de Atacado da Fábrica!
-              </h4>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Preços de atacado, calculadora sob medida por m² e despachos com etiqueta cega são liberados após o cadastro.
-              </p>
             </div>
           </div>
-          <button
-            onClick={onOpenRegister}
-            className="btn-gold py-3 px-6 text-xs sm:text-sm font-extrabold whitespace-nowrap shrink-0 shadow-lg flex items-center gap-2"
-          >
-            <UserPlus size={16} /> Criar Conta Grátis em 30s →
-          </button>
         </div>
       )}
 
@@ -215,9 +253,9 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
               </div>
             </div>
 
-            {/* Category Pills & Column Controls */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[var(--border-color)] pt-3">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-1">
+            {/* Category Pills (Clean Wrap without ugly scrollbars) */}
+            <div className="border-t border-[var(--border-color)] pt-3">
+              <div className="flex flex-wrap items-center gap-2">
                 {categories.map((cat) => (
                   <button
                     key={cat}
@@ -231,41 +269,6 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                     {cat}
                   </button>
                 ))}
-              </div>
-
-              {/* Items Per Row Quick Switcher */}
-              <div className="flex items-center gap-1 bg-[var(--bg-surface-hover)] p-1 rounded-xl border border-[var(--border-color)] shrink-0 self-end sm:self-auto">
-                <span className="text-[10px] font-bold text-[var(--text-muted)] px-1.5 uppercase hidden md:inline">Visualização:</span>
-                <button
-                  type="button"
-                  onClick={() => setItemsPerRow(3)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                    itemsPerRow === 3 ? 'bg-amber-500 text-slate-900 shadow' : 'text-[var(--text-muted)]'
-                  }`}
-                  title="3 produtos por linha"
-                >
-                  3/linha
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setItemsPerRow(4)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                    itemsPerRow === 4 ? 'bg-amber-500 text-slate-900 shadow' : 'text-[var(--text-muted)]'
-                  }`}
-                  title="4 produtos por linha"
-                >
-                  4/linha
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setItemsPerRow(6)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                    itemsPerRow === 6 ? 'bg-amber-500 text-slate-900 shadow' : 'text-[var(--text-muted)]'
-                  }`}
-                  title="6 produtos por linha"
-                >
-                  ⚡ 6/linha
-                </button>
               </div>
             </div>
           </div>

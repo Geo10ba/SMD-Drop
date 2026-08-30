@@ -264,7 +264,7 @@ export const StoreProvider = ({ children }) => {
         } catch (e) {}
       }
     }
-    return [];
+    return initialProducts;
   });
 
   const setProducts = (prods) => {
