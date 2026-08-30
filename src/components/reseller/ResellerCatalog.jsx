@@ -271,212 +271,234 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
           </div>
 
           {/* Catalog Grid (Dynamic Column Count) */}
-          <div className={`grid ${
-            itemsPerRow === 3 
-              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' 
-              : itemsPerRow === 4 
-              ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' 
-              : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4'
-          }`}>
-            {paginatedProducts.map((product) => {
-              const isM2 = product.pricingType === 'custom_m2';
-              return (
-                <div
-                  key={product.id}
-                  className="glass-panel group overflow-hidden flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+          {products.length === 0 ? (
+            <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-12 text-center space-y-4 my-6 shadow-sm">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-3xl font-bold shadow-inner">
+                📦
+              </div>
+              <h3 className="text-xl font-extrabold text-[var(--text-main)] font-['Outfit']">
+                Catálogo da Fábrica Zerado (Pronto para Produção)
+              </h3>
+              <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
+                O sistema foi totalmente limpo e está 100% pronto para você começar a cadastrar os seus produtos oficiais ou capturar anúncios via Botão Mágico!
+              </p>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={() => openMagicImport()}
+                  className="btn-gold py-2.5 px-5 text-xs font-bold shadow-md flex items-center gap-1.5"
                 >
-                  {/* Card Image / Video Banner */}
-                  <div className={`relative overflow-hidden bg-slate-900 group ${
-                    itemsPerRow === 6 ? 'h-32' : itemsPerRow === 4 ? 'h-36' : 'h-48'
-                  }`}>
-                    {product.video ? (
-                      <video
-                        src={product.video}
-                        controls
-                        loop
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <img
-                        src={product.image}
-                        alt={product.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                    )}
-
-                    {/* Pricing Badge */}
-                    <div className="absolute top-2 left-2 pointer-events-none">
-                      {isM2 ? (
-                        <span className="badge-gold font-bold text-[10px] sm:text-xs shadow-md">
-                          Sob Medida (m²)
-                        </span>
-                      ) : (
-                        <span className="badge-emerald font-bold text-[10px] sm:text-xs shadow-md">
-                          Preço Fixo
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Content Body */}
-                  <div className={`flex flex-col justify-between flex-1 ${
-                    itemsPerRow === 6 ? 'p-3 space-y-2' : itemsPerRow === 4 ? 'p-3.5 space-y-3' : 'p-5 space-y-4'
-                  }`}>
-                    <div>
-                      <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block">
-                        {product.category}
-                      </span>
-                      <h3 className={`font-bold text-[var(--text-main)] font-['Outfit'] line-clamp-1 mt-0.5 ${
-                        itemsPerRow === 6 ? 'text-xs' : itemsPerRow === 4 ? 'text-sm' : 'text-base'
-                      }`}>
-                        {product.title}
-                      </h3>
-                      <p className={`text-[var(--text-muted)] mt-0.5 leading-tight ${
-                        itemsPerRow === 6 ? 'text-[11px] line-clamp-1' : 'text-xs line-clamp-2'
-                      }`}>
-                        {product.description}
-                      </p>
-                    </div>
-
-                    {/* Pricing Block */}
-                    <div className={`bg-[var(--bg-surface-hover)] rounded-xl border border-[var(--border-color)] ${
-                      itemsPerRow === 6 ? 'p-2 space-y-1' : 'p-3 space-y-2'
+                  <Wand2 size={16} /> ⚡ Capturar Anúncio com Botão Mágico
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={`grid ${
+              itemsPerRow === 3 
+                ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' 
+                : itemsPerRow === 4 
+                ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' 
+                : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4'
+            }`}>
+              {paginatedProducts.map((product) => {
+                const isM2 = product.pricingType === 'custom_m2';
+                return (
+                  <div
+                    key={product.id}
+                    className="glass-panel group overflow-hidden flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  >
+                    {/* Card Image / Video Banner */}
+                    <div className={`relative overflow-hidden bg-slate-900 group ${
+                      itemsPerRow === 6 ? 'h-32' : itemsPerRow === 4 ? 'h-36' : 'h-48'
                     }`}>
-                      {currentUser ? (
-                        /* LOGGED IN RESELLER VIEW: Show Wholesale Price & Profit Simulation */
-                        isM2 ? (
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase truncate">Atacado m²:</span>
-                              <button
-                                onClick={() => setProfitModalProduct(product)}
-                                className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-0.5 hover:bg-emerald-500/20 shrink-0"
-                                title="Simular Lucro Líquido"
-                              >
-                                <Calculator size={10} /> Lucro
-                              </button>
-                            </div>
+                      {product.video ? (
+                        <video
+                          src={product.video}
+                          controls
+                          loop
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={product.image}
+                          alt={product.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      )}
 
-                            <div className="flex justify-between items-baseline pt-0.5">
-                              <span className="text-[11px] text-[var(--text-muted)] font-medium">Valor/m²:</span>
-                              <span className="text-sm font-extrabold text-[var(--text-main)] font-['Outfit']">
-                                R$ {product.pricePerM2.toFixed(2)}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between items-baseline text-[11px] pt-1 border-t border-[var(--border-color)]">
-                              <span className="text-[var(--text-muted)]">Sugestão:</span>
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                R$ {product.suggestedPricePerM2.toFixed(2)}/m²
-                              </span>
-                            </div>
-                          </div>
+                      {/* Pricing Badge */}
+                      <div className="absolute top-2 left-2 pointer-events-none">
+                        {isM2 ? (
+                          <span className="badge-gold font-bold text-[10px] sm:text-xs shadow-md">
+                            Sob Medida (m²)
+                          </span>
                         ) : (
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase">Atacado:</span>
-                              <button
-                                onClick={() => setProfitModalProduct(product)}
-                                className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-0.5 hover:bg-emerald-500/20 shrink-0"
-                                title="Simular Lucro Líquido"
-                              >
-                                <Calculator size={10} /> Lucro
-                              </button>
-                            </div>
+                          <span className="badge-emerald font-bold text-[10px] sm:text-xs shadow-md">
+                            Preço Fixo
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                            <div className="flex justify-between items-baseline">
-                              <span className="text-[11px] text-[var(--text-muted)] font-medium">Custo Un:</span>
-                              <span className="text-sm font-extrabold text-[var(--text-main)] font-['Outfit']">
-                                R$ {product.wholesalePrice.toFixed(2)}
-                              </span>
-                            </div>
+                    {/* Content Body */}
+                    <div className={`flex flex-col justify-between flex-1 ${
+                      itemsPerRow === 6 ? 'p-3 space-y-2' : itemsPerRow === 4 ? 'p-3.5 space-y-3' : 'p-5 space-y-4'
+                    }`}>
+                      <div>
+                        <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block">
+                          {product.category}
+                        </span>
+                        <h3 className={`font-bold text-[var(--text-main)] font-['Outfit'] line-clamp-1 mt-0.5 ${
+                          itemsPerRow === 6 ? 'text-xs' : itemsPerRow === 4 ? 'text-sm' : 'text-base'
+                        }`}>
+                          {product.title}
+                        </h3>
+                        <p className={`text-[var(--text-muted)] mt-0.5 leading-tight ${
+                          itemsPerRow === 6 ? 'text-[11px] line-clamp-1' : 'text-xs line-clamp-2'
+                        }`}>
+                          {product.description}
+                        </p>
+                      </div>
 
-                            <div className="flex items-center justify-between gap-1 pt-1 border-t border-[var(--border-color)]">
-                              <span className="text-[10px] font-bold text-[var(--text-main)]">Sua Venda:</span>
-                              <div className="relative w-20">
-                                <span className="absolute left-1.5 top-0.5 text-[10px] text-[var(--text-muted)]">R$</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min={product.wholesalePrice}
-                                  value={customPrices[product.id] !== undefined ? customPrices[product.id] : product.suggestedRetailPrice}
-                                  onChange={(e) => handleCustomPriceChange(product.id, Number(e.target.value))}
-                                  className="input-field py-0.5 pl-6 pr-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 text-right"
-                                />
+                      {/* Pricing Block */}
+                      <div className={`bg-[var(--bg-surface-hover)] rounded-xl border border-[var(--border-color)] ${
+                        itemsPerRow === 6 ? 'p-2 space-y-1' : 'p-3 space-y-2'
+                      }`}>
+                        {currentUser ? (
+                          /* LOGGED IN RESELLER VIEW: Show Wholesale Price & Profit Simulation */
+                          isM2 ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase truncate">Atacado m²:</span>
+                                <button
+                                  onClick={() => setProfitModalProduct(product)}
+                                  className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-0.5 hover:bg-emerald-500/20 shrink-0"
+                                  title="Simular Lucro Líquido"
+                                >
+                                  <Calculator size={10} /> Lucro
+                                </button>
+                              </div>
+
+                              <div className="flex justify-between items-baseline pt-0.5">
+                                <span className="text-[11px] text-[var(--text-muted)] font-medium">Valor/m²:</span>
+                                <span className="text-sm font-extrabold text-[var(--text-main)] font-['Outfit']">
+                                  R$ {product.pricePerM2.toFixed(2)}
+                                </span>
+                              </div>
+
+                              <div className="flex justify-between items-baseline text-[11px] pt-1 border-t border-[var(--border-color)]">
+                                <span className="text-[var(--text-muted)]">Sugestão:</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  R$ {product.suggestedPricePerM2.toFixed(2)}/m²
+                                </span>
                               </div>
                             </div>
-                          </div>
-                        )
-                      ) : (
-                        /* UNAUTHENTICATED VISITOR VIEW: Hide Wholesale Price & Prompt Registration */
-                        <div className="space-y-1 py-1">
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="font-bold text-[var(--text-muted)]">Preço Varejo Sugerido:</span>
-                            <span className="font-mono font-bold text-[var(--text-main)]">
-                              R$ {isM2 ? `${product.suggestedPricePerM2.toFixed(2)}/m²` : product.suggestedRetailPrice.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/30 text-center space-y-1">
-                            <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1">
-                              <Lock size={12} /> Preço Atacado Reservado
-                            </span>
-                            <span className="text-[9px] text-[var(--text-muted)] block">
-                              Exclusivo para revendedores cadastrados
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase">Atacado:</span>
+                                <button
+                                  onClick={() => setProfitModalProduct(product)}
+                                  className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-0.5 hover:bg-emerald-500/20 shrink-0"
+                                  title="Simular Lucro Líquido"
+                                >
+                                  <Calculator size={10} /> Lucro
+                                </button>
+                              </div>
 
-                    {/* Action Buttons */}
-                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                      <button
-                        onClick={() => setMediaKitProduct(product)}
-                        className={`btn-secondary font-semibold justify-center ${
-                          itemsPerRow === 6 ? 'py-1 px-1 text-[10px]' : 'py-2 px-2 text-xs'
-                        }`}
-                      >
-                        <Download size={itemsPerRow === 6 ? 12 : 14} /> Kit Mídia
-                      </button>
+                              <div className="flex justify-between items-baseline">
+                                <span className="text-[11px] text-[var(--text-muted)] font-medium">Custo Un:</span>
+                                <span className="text-sm font-extrabold text-[var(--text-main)] font-['Outfit']">
+                                  R$ {product.wholesalePrice.toFixed(2)}
+                                </span>
+                              </div>
 
-                      {currentUser ? (
-                        isM2 ? (
-                          <button
-                            onClick={() => setM2Product(product)}
-                            className={`btn-gold font-bold justify-center shadow-sm ${
-                              itemsPerRow === 6 ? 'py-1 px-1 text-[10px]' : 'py-2 px-2 text-xs'
-                            }`}
-                          >
-                            <Ruler size={itemsPerRow === 6 ? 12 : 14} /> Calcular m²
-                          </button>
+                              <div className="flex items-center justify-between gap-1 pt-1 border-t border-[var(--border-color)]">
+                                <span className="text-[10px] font-bold text-[var(--text-main)]">Sua Venda:</span>
+                                <div className="relative w-20">
+                                  <span className="absolute left-1.5 top-0.5 text-[10px] text-[var(--text-muted)]">R$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min={product.wholesalePrice}
+                                    value={customPrices[product.id] !== undefined ? customPrices[product.id] : product.suggestedRetailPrice}
+                                    onChange={(e) => handleCustomPriceChange(product.id, Number(e.target.value))}
+                                    className="input-field py-0.5 pl-6 pr-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 text-right"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )
                         ) : (
-                          <button
-                            onClick={() => addToCart({ ...product, customSellingPrice: customPrices[product.id] })}
-                            className={`btn-gold font-bold justify-center shadow-sm ${
-                              itemsPerRow === 6 ? 'py-1 px-1 text-[10px]' : 'py-2 px-2 text-xs'
-                            }`}
-                          >
-                            <ShoppingBag size={itemsPerRow === 6 ? 12 : 14} /> Comprar
-                          </button>
-                        )
-                      ) : (
+                          /* UNAUTHENTICATED VISITOR VIEW: Hide Wholesale Price & Prompt Registration */
+                          <div className="space-y-1 py-1">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="font-bold text-[var(--text-muted)]">Preço Varejo Sugerido:</span>
+                              <span className="font-mono font-bold text-[var(--text-main)]">
+                                R$ {isM2 ? `${product.suggestedPricePerM2.toFixed(2)}/m²` : product.suggestedRetailPrice.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/30 text-center space-y-1">
+                              <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1">
+                                <Lock size={12} /> Preço Atacado Reservado
+                              </span>
+                              <span className="text-[9px] text-[var(--text-muted)] block">
+                                Exclusivo para revendedores cadastrados
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                         <button
-                          onClick={onOpenRegister}
-                          className={`btn-gold font-bold justify-center shadow-sm text-center ${
-                            itemsPerRow === 6 ? 'py-1 px-1 text-[9px]' : 'py-2 px-2 text-[11px]'
+                          onClick={() => setMediaKitProduct(product)}
+                          className={`btn-secondary font-semibold justify-center ${
+                            itemsPerRow === 6 ? 'py-1 px-1 text-[10px]' : 'py-2 px-2 text-xs'
                           }`}
                         >
-                          <Lock size={12} /> Liberar Atacado
+                          <Download size={itemsPerRow === 6 ? 12 : 14} /> Kit Mídia
                         </button>
-                      )}
+
+                        {currentUser ? (
+                          isM2 ? (
+                            <button
+                              onClick={() => setM2Product(product)}
+                              className={`btn-gold font-bold justify-center shadow-sm ${
+                                itemsPerRow === 6 ? 'py-1 px-1 text-[10px]' : 'py-2 px-2 text-xs'
+                              }`}
+                            >
+                              <Ruler size={itemsPerRow === 6 ? 12 : 14} /> Calcular m²
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => addToCart({ ...product, customSellingPrice: customPrices[product.id] })}
+                              className={`btn-gold font-bold justify-center shadow-sm ${
+                                itemsPerRow === 6 ? 'py-1 px-1 text-[10px]' : 'py-2 px-2 text-xs'
+                              }`}
+                            >
+                              <ShoppingBag size={itemsPerRow === 6 ? 12 : 14} /> Comprar
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            onClick={onOpenRegister}
+                            className={`btn-gold font-bold justify-center shadow-sm text-center ${
+                              itemsPerRow === 6 ? 'py-1 px-1 text-[9px]' : 'py-2 px-2 text-[11px]'
+                            }`}
+                          >
+                            <Lock size={12} /> Liberar Atacado
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

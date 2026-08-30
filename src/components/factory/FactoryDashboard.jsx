@@ -56,7 +56,8 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
     deleteUser, 
     deleteOrder, 
     updateOrderStatus,
-    showNotification
+    showNotification,
+    resetSystemForProduction
   } = useStore();
 
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'products', 'orders', 'users', 'pending', 'settings'
@@ -118,7 +119,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
     { month: 'Mai', revenue: 38400, count: 210 },
     { month: 'Jun', revenue: 32000, count: 180 },
     { month: 'Jul', revenue: 54900, count: 310 },
-    { month: 'Ago', revenue: 68200, count: 390 },
+    { month: 'Ago', revenue: totalWholesaleRevenue || 68400, count: orders.length || 390 }
   ];
   const maxRevenue = Math.max(...factoryMonthlyData.map(d => d.revenue));
 
@@ -157,14 +158,26 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
               onClick={() => setIsMaterialManagerOpen(true)}
               className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 py-2.5 px-4 rounded-xl text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition-all"
             >
-              <Layers size={16} /> 🎨 Tabela de Materiais (R$/m²)
+              <Layers size={16} /> 🎨 Preços & Lucro m²
             </button>
 
             <button
               onClick={() => openMagicImport()}
               className="btn-gold py-2.5 px-4 text-xs font-bold shadow-lg flex items-center gap-1.5"
             >
-              <Wand2 size={16} /> ⚡ Botão Mágico (Importar)
+              <Wand2 size={16} /> ⚡ Botão Mágico
+            </button>
+
+            <button
+              onClick={() => {
+                if (window.confirm("⚠️ Tem certeza de que deseja ZERAR todos os dados de simulação (produtos, pedidos e usuários) para colocar o sistema 100% limpo em produção?")) {
+                  resetSystemForProduction();
+                }
+              }}
+              className="bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 text-red-300 py-2.5 px-4 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all"
+              title="Zerar dados de simulação para produção"
+            >
+              <Trash2 size={16} /> 🧹 Zerar Sistema
             </button>
 
             <div className="flex items-center gap-2 bg-slate-800/90 px-3 py-2 rounded-xl border border-slate-700 text-xs shadow-inner">

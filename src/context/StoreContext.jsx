@@ -124,36 +124,24 @@ export const StoreProvider = ({ children }) => {
   };
 
   // Users List (Resellers Managed by Factory Admin)
-  const [users, setUsers] = useState([
-    {
-      id: 'user-1',
-      name: 'Lucas E-Commerce Store',
-      email: 'revendedor@loja.com',
-      phone: '(11) 98765-4321',
-      cnpj: '45.109.892/0001-99',
-      role: 'reseller',
-      status: 'aprovado',
-      tier: 'VIP Gold',
-      discountPercent: 5,
-      totalOrders: 14,
-      totalSpent: 4820.00,
-      createdAt: '2026-05-10'
-    },
-    {
-      id: 'user-2',
-      name: 'Studio Arte & Design',
-      email: 'contato@studioarte.com.br',
-      phone: '(21) 99881-2233',
-      cnpj: '12.345.678/0001-11',
-      role: 'reseller',
-      status: 'aprovado',
-      tier: 'Prata',
-      discountPercent: 2,
-      totalOrders: 8,
-      totalSpent: 2450.00,
-      createdAt: '2026-06-15'
+  const [users, setUsersState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smd_users');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
     }
-  ]);
+    return [];
+  });
+
+  const setUsers = (usrs) => {
+    setUsersState(usrs);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smd_users', JSON.stringify(usrs));
+    }
+  };
 
   // Dynamic Categories State
   const [categories, setCategories] = useState([
@@ -266,71 +254,84 @@ export const StoreProvider = ({ children }) => {
     showNotification('Material removido.');
   };
 
-  // Products State
-  const [products, setProducts] = useState(initialProducts);
+  // Products State (Zerado para Produção)
+  const [products, setProductsState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smd_products');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return [];
+  });
+
+  const setProducts = (prods) => {
+    setProductsState(prods);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smd_products', JSON.stringify(prods));
+    }
+  };
 
   // Reseller Suggested Products (Pending Approval by Admin)
-  const [pendingProducts, setPendingProducts] = useState([
-    {
-      id: "pending-1",
-      title: "Placa Decorativa Neon LED Podcast Studio",
-      description: "Placa neon flex com base em acrílico 4mm importada.",
-      image: "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
-      pricingType: "custom_m2",
-      suggestedPricePerM2: 480.00,
-      wholesalePrice: 0,
-      category: "Neon & Iluminação Custom",
-      resellerName: "Lucas E-Commerce Store",
-      resellerEmail: "revendedor@loja.com",
-      status: "pending_approval",
-      createdAt: new Date(Date.now() - 86400000).toISOString()
+  const [pendingProducts, setPendingProductsState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smd_pending_products');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
     }
-  ]);
+    return [];
+  });
+
+  const setPendingProducts = (pProds) => {
+    setPendingProductsState(pProds);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smd_pending_products', JSON.stringify(pProds));
+    }
+  };
 
   // Reseller Cart
   const [cart, setCart] = useState([]);
 
-  // Orders State (Factory Fulfillment Queue)
-  const [orders, setOrders] = useState([
-    {
-      id: "ORD-9421",
-      resellerName: "Studio Arte & Design",
-      resellerEmail: "contato@studioarte.com.br",
-      dispatchMode: "marketplace_label",
-      marketplace: "Mercado Livre",
-      labelPdf: "Etiqueta_ML_9421_Envios.pdf",
-      customerData: {
-        name: "Guilherme Siqueira",
-        cpf: "123.456.789-00",
-        address: "Av. Paulista, 1500, Apto 42",
-        city: "São Paulo",
-        state: "SP",
-        zip: "01310-200"
-      },
-      items: [
-        {
-          id: "item-1",
-          productId: "prod-1",
-          title: "Logomarca 3D em Acrílico Espelhado (Sob Medida)",
-          pricingType: "custom_m2",
-          widthCm: 100,
-          heightCm: 60,
-          calculatedM2: 0.6,
-          unitWholesalePrice: 108.00,
-          suggestedRetailPrice: 228.00,
-          customSellingPrice: 250.00,
-          quantity: 1,
-          vectorFileName: "logo_cliente_vetor.dxf"
-        }
-      ],
-      wholesaleTotal: 108.00,
-      shippingTotal: 0.00,
-      total: 108.00,
-      status: "aguardando_impressao",
-      trackingCode: "ML-BR9821039",
-      createdAt: new Date(Date.now() - 3600000 * 4).toISOString()
+  // Orders State (Zerado para Produção)
+  const [orders, setOrdersState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smd_orders');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
     }
-  ]);
+    return [];
+  });
+
+  const setOrders = (ords) => {
+    setOrdersState(ords);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smd_orders', JSON.stringify(ords));
+    }
+  };
+
+  const resetSystemForProduction = () => {
+    setProducts([]);
+    setOrders([]);
+    setPendingProducts([]);
+    setUsers([]);
+    setCart([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('smd_products');
+      localStorage.removeItem('smd_orders');
+      localStorage.removeItem('smd_pending_products');
+      localStorage.removeItem('smd_users');
+      localStorage.removeItem('smd_cart');
+    }
+    showNotification('🧹 Sistema zerado com sucesso! Prontíssimo para produção.', 'success');
+  };
 
   // Notifications Toast
   const [notification, setNotification] = useState(null);
@@ -784,7 +785,8 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         itemsPerRow,
         setItemsPerRow,
         companySettings,
-        updateCompanySettings
+        updateCompanySettings,
+        resetSystemForProduction
       }}
     >
       {children}
