@@ -3,11 +3,14 @@ import { useStore } from '../../context/StoreContext';
 import { PlusCircle, Ruler, Tag, Image as ImageIcon, Sparkles } from 'lucide-react';
 
 export const NewProductModal = ({ isOpen, onClose }) => {
-  const { addProduct, categories } = useStore();
+  const { addProduct, categories, addCategory } = useStore();
 
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState(categories[0] || 'Logomarcas & Letreiros');
+  const [category, setCategory] = useState(categories[0] || 'Geral');
   const [pricingType, setPricingType] = useState('fixed'); // 'fixed' or 'custom_m2'
+
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
 
   // Fixed Price fields
   const [wholesalePrice, setWholesalePrice] = useState(50);
@@ -92,16 +95,72 @@ export const NewProductModal = ({ isOpen, onClose }) => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Categoria</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="input-field font-medium"
-                  >
-                    {categories.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                  {!isCreatingCategory ? (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-[var(--text-muted)] uppercase">Categoria</label>
+                        <button
+                          type="button"
+                          onClick={() => setIsCreatingCategory(true)}
+                          className="text-[10px] text-amber-500 font-bold hover:underline"
+                        >
+                          + Nova
+                        </button>
+                      </div>
+                      <select
+                        value={category}
+                        onChange={(e) => {
+                          if (e.target.value === '__NEW__') {
+                            setIsCreatingCategory(true);
+                          } else {
+                            setCategory(e.target.value);
+                          }
+                        }}
+                        className="input-field font-medium"
+                      >
+                        {categories.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                        <option value="__NEW__">➕ Criar Nova Categoria...</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Criar Categoria</label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Nome da categoria..."
+                          value={newCategoryInput}
+                          onChange={(e) => setNewCategoryInput(e.target.value)}
+                          className="input-field font-semibold text-xs py-2"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newCategoryInput.trim()) {
+                              const created = newCategoryInput.trim();
+                              addCategory(created);
+                              setCategory(created);
+                              setNewCategoryInput('');
+                              setIsCreatingCategory(false);
+                            }
+                          }}
+                          className="btn-gold px-2.5 py-2 text-xs font-extrabold shrink-0"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsCreatingCategory(false)}
+                          className="px-1.5 py-2 text-xs text-slate-400 hover:text-white"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
