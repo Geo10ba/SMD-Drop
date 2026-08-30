@@ -52,52 +52,52 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
       </div>
 
       {/* Main Navbar */}
-      <div className="max-w-[1650px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      <div className="w-full max-w-[1650px] mx-auto px-3 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4 overflow-hidden">
         {/* Logo */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="h-12 flex items-center justify-center shrink-0">
-            <img src="/logo.png" alt="SMD Drop Logo" className="h-11 w-auto max-h-12 object-contain rounded-lg shadow-sm" />
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="h-10 sm:h-12 flex items-center justify-center shrink-0">
+            <img src="/logo.png" alt="SMD Drop Logo" className="h-9 sm:h-11 w-auto object-contain rounded-lg shadow-sm" />
           </div>
           <div className="shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xl tracking-tight text-[var(--text-main)] font-['Outfit'] whitespace-nowrap">
+            <div className="flex items-center gap-1.5">
+              <span className="font-extrabold text-lg sm:text-xl tracking-tight text-[var(--text-main)] font-['Outfit'] whitespace-nowrap">
                 SMD <span className="text-[#C59B27] font-light">DROP</span>
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-[var(--accent-gold-light)] text-[var(--accent-gold)] border border-[var(--accent-gold)]/20 whitespace-nowrap hidden sm:inline-block">
+              <span className="text-[9px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[var(--accent-gold-light)] text-[var(--accent-gold)] border border-[var(--accent-gold)]/20 whitespace-nowrap hidden md:inline-block">
                 FABRICAÇÃO PRÓPRIA
               </span>
             </div>
-            <p className="text-xs text-[var(--text-muted)] font-medium hidden lg:block whitespace-nowrap">
+            <p className="text-[11px] text-[var(--text-muted)] font-medium hidden 2xl:block whitespace-nowrap">
               Plataforma Fabril de Dropshipping & Marketplaces
             </p>
           </div>
         </div>
 
-        {/* Center View Mode Switcher (Visible ONLY to Factory Admin) */}
+        {/* Center View Mode Switcher (Visible ONLY to Factory Admin on Large Screens) */}
         {(currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com') && (
-          <div className="hidden md:flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-xl border border-[var(--border-color)] shrink-0">
+          <div className="hidden xl:flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-xl border border-[var(--border-color)] shrink-0">
             <button
               onClick={() => setViewMode('reseller')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 viewMode === 'reseller'
                   ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-sm border border-[var(--border-color)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
               }`}
             >
-              <Store size={16} className={viewMode === 'reseller' ? 'text-[#C59B27]' : ''} />
-              Portal do Revendedor
+              <Store size={15} className={viewMode === 'reseller' ? 'text-[#C59B27]' : ''} />
+              Portal Revendedor
             </button>
             
             <button
               onClick={() => setViewMode('factory')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 viewMode === 'factory'
                   ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-sm border border-[var(--border-color)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
               }`}
             >
-              <Factory size={16} className={viewMode === 'factory' ? 'text-[#C59B27]' : ''} />
-              Painel da Fábrica
+              <Factory size={15} className={viewMode === 'factory' ? 'text-[#C59B27]' : ''} />
+              Painel Fábrica
               {pendingOrdersCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
                   {pendingOrdersCount}
@@ -107,22 +107,22 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
           </div>
         )}
 
-        {/* Right Actions */}
-        <div className="flex items-center gap-3">
-          {/* Mobile Switcher (Visible ONLY to Admin) */}
+        {/* Right Actions Container */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Admin Switcher for Smaller Screens */}
           {(currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com') && (
-            <div className="md:hidden flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-lg border border-[var(--border-color)]">
+            <div className="xl:hidden flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-lg border border-[var(--border-color)] shrink-0">
               <button
                 onClick={() => setViewMode(viewMode === 'reseller' ? 'factory' : 'reseller')}
-                className="text-xs font-semibold px-2.5 py-1 rounded bg-[var(--bg-surface)] text-[var(--text-main)] flex items-center gap-1"
+                className="text-xs font-semibold px-2 py-1 rounded bg-[var(--bg-surface)] text-[var(--text-main)] flex items-center gap-1"
               >
                 {viewMode === 'reseller' ? (
                   <>
-                    <Factory size={14} className="text-[#C59B27]" /> Fábrica
+                    <Factory size={14} className="text-[#C59B27]" /> <span className="hidden sm:inline">Fábrica</span>
                   </>
                 ) : (
                   <>
-                    <Store size={14} className="text-[#C59B27]" /> Revendedor
+                    <Store size={14} className="text-[#C59B27]" /> <span className="hidden sm:inline">Revendedor</span>
                   </>
                 )}
               </button>
@@ -134,43 +134,43 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
             <>
               <button
                 onClick={onOpenFaq}
-                className="btn-secondary text-xs sm:text-sm py-2 px-3"
+                className="btn-secondary text-xs py-1.5 px-2 flex items-center gap-1 shrink-0"
                 title="Central de Ajuda & FAQ"
               >
-                <HelpCircle size={16} className="text-amber-500" />
-                <span className="hidden md:inline">Ajuda</span>
+                <HelpCircle size={15} className="text-amber-500 shrink-0" />
+                <span className="hidden 2xl:inline">Ajuda</span>
               </button>
 
               {currentUser ? (
                 <>
                   <button
                     onClick={onOpenCalculator}
-                    className="btn-secondary text-xs sm:text-sm py-2 px-3"
+                    className="btn-secondary text-xs py-1.5 px-2 flex items-center gap-1 shrink-0"
                     title="Calculadora sob Medida R$/m²"
                   >
-                    <Ruler size={16} className="text-amber-500" />
-                    <span className="hidden md:inline">Calculadora m²</span>
+                    <Ruler size={15} className="text-amber-500 shrink-0" />
+                    <span className="hidden 2xl:inline">Calculadora m²</span>
                   </button>
 
                   <button
                     onClick={onOpenResellerOrders}
-                    className="btn-secondary text-xs sm:text-sm py-2 px-3 sm:px-4"
+                    className="btn-secondary text-xs py-1.5 px-2.5 flex items-center gap-1 shrink-0"
                     title="Ver Meus Pedidos de Revenda"
                   >
-                    <PackageCheck size={16} className="text-amber-500" />
-                    <span className="hidden sm:inline">Meus Pedidos</span>
+                    <PackageCheck size={15} className="text-amber-500 shrink-0" />
+                    <span className="hidden lg:inline">Pedidos</span>
                   </button>
 
-                  <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-xl">
-                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate max-w-[120px]">
-                      {currentUser.name}
+                  <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-xl shrink-0">
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate max-w-[70px] sm:max-w-[100px]">
+                      {currentUser.name?.split(' ')[0]}
                     </span>
                     <button
                       onClick={logout}
-                      className="text-[var(--text-muted)] hover:text-red-500 transition-colors p-1"
+                      className="text-[var(--text-muted)] hover:text-red-500 transition-colors p-0.5"
                       title="Sair da Conta"
                     >
-                      <LogOut size={14} />
+                      <LogOut size={13} />
                     </button>
                   </div>
                 </>
@@ -178,16 +178,16 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
                 <>
                   <button
                     onClick={onOpenRegister}
-                    className="btn-gold text-xs sm:text-sm py-2 px-3 sm:px-4 flex items-center gap-1.5 shadow-md font-bold"
+                    className="btn-gold text-xs py-1.5 px-2.5 flex items-center gap-1 shadow-md font-bold shrink-0"
                     title="Criar Conta Grátis de Revendedor"
                   >
-                    <UserPlus size={16} />
+                    <UserPlus size={15} />
                     <span>Criar Conta</span>
                   </button>
 
                   <button
                     onClick={onOpenRegister}
-                    className="btn-secondary text-xs sm:text-sm py-2 px-3 text-amber-600 dark:text-amber-400 font-bold"
+                    className="btn-secondary text-xs py-1.5 px-2 text-amber-600 dark:text-amber-400 font-bold shrink-0"
                     title="Acessar Conta de Revendedor"
                   >
                     Entrar
@@ -201,23 +201,23 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
           {viewMode === 'factory' && (
             <button
               onClick={onOpenNewProductModal}
-              className="btn-gold text-xs sm:text-sm py-2 px-3 sm:px-4"
+              className="btn-gold text-xs py-1.5 px-3"
             >
-              <PlusCircle size={16} />
-              <span className="hidden sm:inline">Novo Produto Fabricado</span>
+              <PlusCircle size={15} />
+              <span className="hidden sm:inline">Novo Produto</span>
             </button>
           )}
 
-          {/* Reseller Order Cart Drawer Toggle (ALWAYS VISIBLE IN RESELLER MODE) */}
+          {/* Reseller Order Cart Drawer Toggle */}
           {viewMode === 'reseller' && (
             <button
               onClick={onOpenCart}
-              className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-xs sm:text-sm py-2 px-3 sm:px-4 rounded-xl flex items-center gap-2 shadow-md transition-all shrink-0"
+              className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-extrabold text-xs py-1.5 px-2.5 sm:px-3 rounded-xl flex items-center gap-1.5 shadow-md transition-all shrink-0"
               title="Ver Carrinho de Pedidos"
             >
-              <ShoppingBag size={18} />
-              <span>Carrinho</span>
-              <span className="bg-slate-900 text-amber-400 font-black text-xs px-2 py-0.5 rounded-full shadow-inner">
+              <ShoppingBag size={16} />
+              <span className="hidden sm:inline">Carrinho</span>
+              <span className="bg-slate-900 text-amber-400 font-black text-[11px] px-1.5 py-0.2 rounded-full shadow-inner">
                 {cart.length}
               </span>
             </button>
@@ -226,10 +226,10 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-main)] transition-all shadow-sm shrink-0"
+            className="p-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-main)] transition-all shadow-sm shrink-0"
             title={`Mudar para modo ${theme === 'light' ? 'Escuro' : 'Claro'}`}
           >
-            {theme === 'light' ? <Moon size={20} className="text-slate-700" /> : <Sun size={20} className="text-amber-400" />}
+            {theme === 'light' ? <Moon size={18} className="text-slate-700" /> : <Sun size={18} className="text-amber-400" />}
           </button>
         </div>
       </div>
