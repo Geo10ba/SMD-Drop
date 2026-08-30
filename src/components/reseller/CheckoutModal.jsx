@@ -13,6 +13,8 @@ import {
   Building2,
   Sparkles
 } from 'lucide-react';
+import { calculateMelhorEnvioShipping } from '../../lib/melhorenvio';
+import { createMercadoPagoPixPayment, createMercadoPagoPreference } from '../../lib/mercadopago';
 
 export const CheckoutModal = ({ isOpen, onClose }) => {
   const { cart, submitOrder } = useStore();
@@ -21,6 +23,11 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
   const [dispatchMode, setDispatchMode] = useState('marketplace_label'); // 'marketplace_label' or 'direct_blind_shipping'
   const [marketplace, setMarketplace] = useState('Mercado Livre');
   const [labelPdfFile, setLabelPdfFile] = useState(null);
+
+  // Mercado Envios shipping state
+  const [shippingOptions, setShippingOptions] = useState([]);
+  const [selectedShippingOption, setSelectedShippingOption] = useState(null);
+  const [loadingShipping, setLoadingShipping] = useState(false);
 
   // Customer delivery details for direct shipping
   const [customerData, setCustomerData] = useState({
@@ -35,12 +42,13 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
   const [shippingMethod, setShippingMethod] = useState('sedex'); // 'pac', 'sedex', 'jadlog'
   const [loadingCep, setLoadingCep] = useState(false);
 
-  // Auto-fetch address from ViaCEP API
+  // Auto-fetch address from ViaCEP API & calculate Mercado Envios shipping
   const handleCepChange = async (newZip) => {
     setCustomerData((prev) => ({ ...prev, zip: newZip }));
     const cleanZip = newZip.replace(/\D/g, '');
     if (cleanZip.length === 8) {
       setLoadingCep(true);
+      setLoadingShipping(true);
       try {
         const res = await fetch(`https://viacep.com.br/ws/${cleanZip}/json/`);
         const data = await res.json();
@@ -52,10 +60,18 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
             state: data.uf
           }));
         }
+
+        // Calculate live shipping rates via Mercado Envios module
+        const shippingRes = await calculateMelhorEnvioShipping({ toPostalCode: cleanZip });
+        if (shippingRes.success && shippingRes.options.length > 0) {
+          setShippingOptions(shippingRes.options);
+          setSelectedShippingOption(shippingRes.options[0]);
+        }
       } catch (err) {
-        console.error("Erro ao buscar CEP:", err);
+        console.error("Erro ao buscar CEP / Frete:", err);
       } finally {
         setLoadingCep(false);
+        setLoadingShipping(false);
       }
     }
   };
