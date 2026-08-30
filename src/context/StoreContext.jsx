@@ -522,8 +522,77 @@ export const StoreProvider = ({ children }) => {
     showNotification('Seus dados de perfil foram salvos!');
   };
 
+  // Load & Hydrate Data from Supabase Database on App Startup (Syncs Vercel & Localhost)
+  useEffect(() => {
+    const fetchSupabaseData = async () => {
+      try {
+        // 1. Fetch Categories from Supabase
+        const { data: dbCategories, error: catErr } = await supabase.from('categories').select('*');
+        if (!catErr && dbCategories && dbCategories.length > 0) {
+          const catNames = dbCategories.map((c) => c.name);
+          setCategoriesState(catNames);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('smd_categories', JSON.stringify(catNames));
+          }
+        }
+
+        // 2. Fetch Products from Supabase
+        const { data: dbProducts, error: prodErr } = await supabase.from('products').select('*');
+        if (!prodErr && dbProducts && dbProducts.length > 0) {
+          const normalizedProds = dbProducts.map((p) => ({
+            id: p.id,
+            title: p.title,
+            category: p.category_name || p.category || 'Geral',
+            pricingType: p.pricing_type || p.pricingType || 'fixed',
+            wholesalePrice: Number(p.wholesale_price ?? p.wholesalePrice ?? 0),
+            suggestedRetailPrice: Number(p.suggested_retail_price ?? p.suggestedRetailPrice ?? 0),
+            pricePerM2: Number(p.price_per_m2 ?? p.pricePerM2 ?? 530),
+            suggestedPricePerM2: Number(p.suggested_price_per_m2 ?? p.suggestedPricePerM2 ?? 800),
+            description: p.description || '',
+            image: p.image_url || p.image || '',
+            video: p.video || '',
+            inStock: p.in_stock !== false,
+            mediaKit: {
+              photos: [p.image_url || p.image || ''],
+              copyTitle: p.title,
+              copyDescription: p.description
+            }
+          }));
+          setProductsState(normalizedProds);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('smd_products', JSON.stringify(normalizedProds));
+          }
+        }
+
+        // 3. Fetch Orders from Supabase
+        const { data: dbOrders, error: ordErr } = await supabase.from('orders').select('*');
+        if (!ordErr && dbOrders && dbOrders.length > 0) {
+          const normalizedOrders = dbOrders.map((o) => ({
+            id: o.id,
+            resellerName: o.reseller_name || o.resellerName || 'Revendedor',
+            resellerEmail: o.reseller_email || o.resellerEmail || '',
+            wholesaleTotal: Number(o.wholesale_total ?? o.wholesaleTotal ?? 0),
+            total: Number(o.total ?? 0),
+            status: o.status || 'aguardando_impressao',
+            trackingCode: o.tracking_code || o.trackingCode || null,
+            createdAt: o.created_at || o.createdAt,
+            items: o.items || []
+          }));
+          setOrdersState(normalizedOrders);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('smd_orders', JSON.stringify(normalizedOrders));
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase initial fetch fallback:', err);
+      }
+    };
+
+    fetchSupabaseData();
+  }, []);
+
   // Category Operations
-  const addCategory = (categoryName) => {
+  const addCategory = async (categoryName) => {
     if (!categoryName) return;
     const cleanName = categoryName.trim();
     setCategories((prev) => {
@@ -532,10 +601,11 @@ export const StoreProvider = ({ children }) => {
     });
     showNotification(`Categoria "${cleanName}" criada!`);
 
-    // Sync to Supabase
-    syncToSupabase('categories', {
+    // Sync to Supabase table 'categories'
+    await syncToSupabase('categories', {
+      id: 'cat-' + cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
       name: cleanName,
-      slug: cleanName.toLowerCase().replace(/\s+/g, '-')
+      slug: cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-')
     });
   };
 
@@ -595,10 +665,17 @@ export const StoreProvider = ({ children }) => {
     // Sync to Supabase
     syncToSupabase('orders', {
       id: newOrder.id,
+      reseller_name: currentUser?.name || 'Revendedor',
       reseller_email: newOrder.resellerEmail,
-      wholesale_total: newOrder.wholesaleTotal,
+      wholesale_total: newOrder.wholesaleTotal || 0,
+      total: newOrder.wholesaleTotal || 0,
       status: newOrder.status,
-      items: newOrder.items
+      dispatch_mode: orderData.dispatchMode || 'marketplace_label',
+      customer_name: orderData.customerName || 'Cliente Final',
+      customer_address: orderData.customerAddress || 'Endereço',
+      customer_city: orderData.customerCity || 'São Paulo',
+      customer_state: orderData.customerState || 'SP',
+      customer_zip: orderData.customerZip || '01000-000'
     });
 
     return newOrder;
@@ -627,7 +704,16 @@ export const StoreProvider = ({ children }) => {
   };
 
   // Add Product by Admin (Direct active publication)
-  const addProduct = (productData) => {
+  const addProduct = async (productData) => {
+    // Ensure category exists in Supabase first
+    if (productData.category) {
+      await syncToSupabase('categories', {
+        id: 'cat-' + productData.category.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: productData.category,
+        slug: productData.category.toLowerCase().replace(/[^a-z0-9]/g, '-')
+      });
+    }
+
     const newProduct = {
       id: "prod-" + Date.now(),
       inStock: true,
@@ -641,16 +727,19 @@ export const StoreProvider = ({ children }) => {
     setProducts((prev) => [newProduct, ...prev]);
     showNotification(`Novo produto "${productData.title}" cadastrado no catálogo!`);
 
-    // Sync to Supabase
+    // Sync to Supabase matching schema.sql columns
     syncToSupabase('products', {
       id: newProduct.id,
       title: newProduct.title,
-      category: newProduct.category,
-      pricing_type: newProduct.pricingType,
-      wholesale_price: newProduct.wholesalePrice,
-      suggested_retail_price: newProduct.suggestedRetailPrice,
-      image: newProduct.image,
-      description: newProduct.description
+      category_name: newProduct.category || null,
+      pricing_type: newProduct.pricingType || 'fixed',
+      wholesale_price: Number(newProduct.wholesalePrice) || 0,
+      suggested_retail_price: Number(newProduct.suggestedRetailPrice) || 0,
+      price_per_m2: Number(newProduct.pricePerM2) || 0,
+      suggested_price_per_m2: Number(newProduct.suggestedPricePerM2) || 0,
+      description: newProduct.description || '',
+      image_url: newProduct.image || '',
+      status: 'approved'
     });
   };
 
