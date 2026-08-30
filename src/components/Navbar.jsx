@@ -97,8 +97,8 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
           >
             <Factory size={16} className={viewMode === 'factory' ? 'text-[#C59B27]' : ''} />
             Painel da Fábrica
-            {currentUser.role !== 'admin' && <Lock size={12} className="text-amber-500 shrink-0" />}
-            {pendingOrdersCount > 0 && currentUser.role === 'admin' && (
+            {currentUser?.role !== 'admin' && <Lock size={12} className="text-amber-500 shrink-0" />}
+            {pendingOrdersCount > 0 && currentUser?.role === 'admin' && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
                 {pendingOrdersCount}
               </span>
@@ -126,7 +126,7 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
             </button>
           </div>
 
-          {/* Reseller Orders Button */}
+          {/* Reseller Orders & Navigation Buttons */}
           {viewMode === 'reseller' && (
             <>
               <button
@@ -147,23 +147,50 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
                 <span className="hidden md:inline">Ajuda</span>
               </button>
 
-              <button
-                onClick={onOpenResellerOrders}
-                className="btn-secondary text-xs sm:text-sm py-2 px-3 sm:px-4"
-                title="Ver Meus Pedidos de Revenda"
-              >
-                <PackageCheck size={16} className="text-amber-500" />
-                <span className="hidden sm:inline">Meus Pedidos</span>
-              </button>
+              {currentUser ? (
+                <>
+                  <button
+                    onClick={onOpenResellerOrders}
+                    className="btn-secondary text-xs sm:text-sm py-2 px-3 sm:px-4"
+                    title="Ver Meus Pedidos de Revenda"
+                  >
+                    <PackageCheck size={16} className="text-amber-500" />
+                    <span className="hidden sm:inline">Meus Pedidos</span>
+                  </button>
 
-              <button
-                onClick={onOpenRegister}
-                className="bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold px-3 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 transition-all shadow-sm"
-                title="Criar Conta de Revendedor Autorizado"
-              >
-                <UserPlus size={16} />
-                <span className="hidden sm:inline">Criar Conta</span>
-              </button>
+                  <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-xl">
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate max-w-[120px]">
+                      {currentUser.name}
+                    </span>
+                    <button
+                      onClick={logout}
+                      className="text-[var(--text-muted)] hover:text-red-500 transition-colors p-1"
+                      title="Sair da Conta"
+                    >
+                      <LogOut size={14} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={onOpenRegister}
+                    className="btn-gold text-xs sm:text-sm py-2 px-3 sm:px-4 flex items-center gap-1.5 shadow-md font-bold"
+                    title="Criar Conta Grátis de Revendedor"
+                  >
+                    <UserPlus size={16} />
+                    <span>Criar Conta</span>
+                  </button>
+
+                  <button
+                    onClick={onOpenRegister}
+                    className="btn-secondary text-xs sm:text-sm py-2 px-3 text-amber-600 dark:text-amber-400 font-bold"
+                    title="Acessar Conta de Revendedor"
+                  >
+                    Entrar
+                  </button>
+                </>
+              )}
             </>
           )}
 

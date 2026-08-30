@@ -68,7 +68,10 @@ function MainApp() {
       {/* Main Container */}
       <main className="max-w-[1650px] mx-auto px-3 sm:px-6 lg:px-8 py-8">
         {viewMode === 'reseller' ? (
-          <ResellerCatalog onOpenCart={() => setIsCartOpen(true)} />
+          <ResellerCatalog 
+            onOpenCart={() => setIsCartOpen(true)} 
+            onOpenRegister={() => setIsRegisterOpen(true)}
+          />
         ) : (
           <>
             {isFulfillmentOpen ? (

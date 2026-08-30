@@ -86,7 +86,7 @@ export const StoreProvider = ({ children }) => {
       const mode = localStorage.getItem('smd_view_mode');
       if (mode === 'factory') return defaultAdminUser;
     }
-    return defaultResellerUser;
+    return null; // Visitantes não logados iniciam como Visitantes/Visitante Convidado
   });
 
   const setCurrentUser = (user) => {
