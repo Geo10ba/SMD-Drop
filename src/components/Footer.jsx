@@ -232,9 +232,19 @@ export const Footer = ({ onOpenTracking, onOpenFaq }) => {
           <p className="font-semibold text-[var(--text-main)]">
             {companySettings.name} Platform © {new Date().getFullYear()} • Todos os direitos reservados.
           </p>
-          <p className="text-[10px] text-[var(--text-muted)]">
-            Logística Cega (Blind Shipping) • Anexo de Etiquetas Mercado Livre, Shopee & Amazon • Calculadora sob Medida R$/m²
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="text-[10px] text-[var(--text-muted)] hidden md:block">
+              Logística Cega (Blind Shipping) • Anexo de Etiquetas Mercado Livre, Shopee & Amazon • Calculadora sob Medida R$/m²
+            </p>
+            {onOpenAdminLogin && (
+              <button
+                onClick={onOpenAdminLogin}
+                className="text-[11px] text-[var(--text-muted)] hover:text-amber-500 font-semibold flex items-center gap-1 transition-colors border border-[var(--border-color)] px-2.5 py-1 rounded-lg bg-[var(--bg-surface-hover)]"
+              >
+                <Lock size={12} className="text-amber-500" /> Área Restrita Fábrica
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

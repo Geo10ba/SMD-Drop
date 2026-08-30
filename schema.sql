@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS company_settings (
     name VARCHAR(255) DEFAULT 'SMD DROP PRODUTOS PERSONALIZADOS',
     cnpj VARCHAR(32) DEFAULT '45.109.892/0001-99',
     phone VARCHAR(32) DEFAULT '(11) 98765-4321',
-    email VARCHAR(255) DEFAULT 'admin@smddrop.com.br',
+    email VARCHAR(255) DEFAULT 'geovancalado@gmail.com',
     address TEXT DEFAULT 'Rua Fabril do Acrílico, 500 - Distrito Industrial',
     city VARCHAR(128) DEFAULT 'São Paulo',
     state VARCHAR(8) DEFAULT 'SP',
@@ -126,6 +126,11 @@ CREATE TABLE IF NOT EXISTS company_settings (
     legal_privacy TEXT,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- INSERÇÃO INICIAL DO ADMINISTRADOR FÁBRICA
+INSERT INTO users (id, name, email, phone, cnpj, role, status, tier)
+VALUES ('admin-geovan', 'Geovan Calado (Admin Fábrica)', 'geovancalado@gmail.com', '(11) 98765-4321', '45.109.892/0001-99', 'admin', 'aprovado', 'VIP Gold')
+ON CONFLICT (id) DO NOTHING;
 
 -- INSERÇÃO INICIAL DOS MATERIAIS OFICIAIS (TABELA REAL DA EMPRESA)
 INSERT INTO materials (id, name, wholesale_price_per_m2, suggested_price_per_m2, style, lead_time_days, description)

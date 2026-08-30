@@ -52,12 +52,12 @@ export const StoreProvider = ({ children }) => {
   };
 
   // Admin Auth State & Persistence
-  const [adminEmail, setAdminEmail] = useState('admin@smddrop.com.br');
+  const [adminEmail, setAdminEmail] = useState('geovancalado@gmail.com');
 
   const defaultAdminUser = {
     id: 'admin-1',
-    email: 'admin@smddrop.com.br',
-    name: 'Administrador da Fábrica',
+    email: 'geovancalado@gmail.com',
+    name: 'Geovan Calado (Admin Fábrica)',
     role: 'admin'
   };
 

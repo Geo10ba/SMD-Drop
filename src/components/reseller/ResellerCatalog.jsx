@@ -283,12 +283,21 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                 O sistema foi totalmente limpo e está 100% pronto para você começar a cadastrar os seus produtos oficiais ou capturar anúncios via Botão Mágico!
               </p>
               <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-                <button
-                  onClick={() => openMagicImport()}
-                  className="btn-gold py-2.5 px-5 text-xs font-bold shadow-md flex items-center gap-1.5"
-                >
-                  <Wand2 size={16} /> ⚡ Capturar Anúncio com Botão Mágico
-                </button>
+                {currentUser?.role === 'admin' ? (
+                  <button
+                    onClick={() => openMagicImport()}
+                    className="btn-gold py-2.5 px-5 text-xs font-bold shadow-md flex items-center gap-1.5"
+                  >
+                    <Wand2 size={16} /> ⚡ Capturar Anúncio com Botão Mágico
+                  </button>
+                ) : (
+                  <button
+                    onClick={onOpenRegister}
+                    className="btn-gold py-2.5 px-5 text-xs font-bold shadow-md flex items-center gap-1.5"
+                  >
+                    <UserPlus size={16} /> ✨ Criar Conta Grátis em 30s →
+                  </button>
+                )}
               </div>
             </div>
           ) : (

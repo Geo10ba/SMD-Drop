@@ -73,58 +73,61 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
           </div>
         </div>
 
-        {/* Center View Mode Switcher */}
-        <div className="hidden md:flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-xl border border-[var(--border-color)] shrink-0">
-          <button
-            onClick={() => setViewMode('reseller')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
-              viewMode === 'reseller'
-                ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-sm border border-[var(--border-color)]'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            <Store size={16} className={viewMode === 'reseller' ? 'text-[#C59B27]' : ''} />
-            Portal do Revendedor
-          </button>
-          
-          <button
-            onClick={handleFactoryTabClick}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
-              viewMode === 'factory'
-                ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-sm border border-[var(--border-color)]'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            <Factory size={16} className={viewMode === 'factory' ? 'text-[#C59B27]' : ''} />
-            Painel da Fábrica
-            {currentUser?.role !== 'admin' && <Lock size={12} className="text-amber-500 shrink-0" />}
-            {pendingOrdersCount > 0 && currentUser?.role === 'admin' && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
-                {pendingOrdersCount}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Right Actions */}
-        <div className="flex items-center gap-3">
-          {/* Mobile Switcher */}
-          <div className="md:hidden flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-lg border border-[var(--border-color)]">
+        {/* Center View Mode Switcher (Visible ONLY to Factory Admin) */}
+        {currentUser?.role === 'admin' && (
+          <div className="hidden md:flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-xl border border-[var(--border-color)] shrink-0">
             <button
-              onClick={() => setViewMode(viewMode === 'reseller' ? 'factory' : 'reseller')}
-              className="text-xs font-semibold px-2.5 py-1 rounded bg-[var(--bg-surface)] text-[var(--text-main)] flex items-center gap-1"
+              onClick={() => setViewMode('reseller')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                viewMode === 'reseller'
+                  ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-sm border border-[var(--border-color)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+              }`}
             >
-              {viewMode === 'reseller' ? (
-                <>
-                  <Factory size={14} className="text-[#C59B27]" /> Fábrica
-                </>
-              ) : (
-                <>
-                  <Store size={14} className="text-[#C59B27]" /> Revendedor
-                </>
+              <Store size={16} className={viewMode === 'reseller' ? 'text-[#C59B27]' : ''} />
+              Portal do Revendedor
+            </button>
+            
+            <button
+              onClick={() => setViewMode('factory')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                viewMode === 'factory'
+                  ? 'bg-[var(--bg-surface)] text-[var(--text-main)] shadow-sm border border-[var(--border-color)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+              }`}
+            >
+              <Factory size={16} className={viewMode === 'factory' ? 'text-[#C59B27]' : ''} />
+              Painel da Fábrica
+              {pendingOrdersCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                  {pendingOrdersCount}
+                </span>
               )}
             </button>
           </div>
+        )}
+
+        {/* Right Actions */}
+        <div className="flex items-center gap-3">
+          {/* Mobile Switcher (Visible ONLY to Admin) */}
+          {currentUser?.role === 'admin' && (
+            <div className="md:hidden flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-lg border border-[var(--border-color)]">
+              <button
+                onClick={() => setViewMode(viewMode === 'reseller' ? 'factory' : 'reseller')}
+                className="text-xs font-semibold px-2.5 py-1 rounded bg-[var(--bg-surface)] text-[var(--text-main)] flex items-center gap-1"
+              >
+                {viewMode === 'reseller' ? (
+                  <>
+                    <Factory size={14} className="text-[#C59B27]" /> Fábrica
+                  </>
+                ) : (
+                  <>
+                    <Store size={14} className="text-[#C59B27]" /> Revendedor
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Reseller Orders & Navigation Buttons */}
           {viewMode === 'reseller' && (

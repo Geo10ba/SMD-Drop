@@ -53,16 +53,25 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-200">
-      {/* Header / Navbar */}
+      {/* Global Navigation Bar */}
       <Navbar
         onOpenCart={() => setIsCartOpen(true)}
-        onOpenNewProductModal={() => setIsNewProductOpen(true)}
+        onOpenCalculator={() => setM2CalculatorProduct({
+          id: 'calc-sample',
+          title: 'Calculadora de Placas e Letreiros sob Medida',
+          category: 'Logomarcas & Letreiros',
+          pricingType: 'custom_m2',
+          pricePerM2: 530,
+          wholesalePrice: 530,
+          suggestedPricePerM2: 800,
+          suggestedRetailPrice: 800,
+          materials: []
+        })}
         onOpenResellerOrders={() => setIsResellerOrdersOpen(true)}
-        onOpenTracking={() => setIsTrackingOpen(true)}
+        onOpenNewProductModal={() => setIsNewProductOpen(true)}
         onOpenFaq={() => setIsFaqOpen(true)}
-        onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
-        onOpenCalculator={() => setM2CalculatorProduct(products.find(p => p.pricingType === 'custom_m2') || products[0])}
         onOpenRegister={() => setIsRegisterOpen(true)}
+        onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
       />
 
       {/* Main Container */}
@@ -97,7 +106,8 @@ function MainApp() {
       {/* Dynamic Footer with Legal Shielding & Social Links */}
       <Footer
         onOpenTracking={() => setIsTrackingOpen(true)}
-        onOpenFaq={() => setIsFaqOpen(false)}
+        onOpenFaq={() => setIsFaqOpen(true)}
+        onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
       />
 
       {/* Drawers & Modals */}
