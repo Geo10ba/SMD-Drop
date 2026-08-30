@@ -47,8 +47,15 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [selectedPricingType, setSelectedPricingType] = useState('all'); // 'all', 'fixed', 'custom_m2'
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [m2Product, setM2Product] = useState(null);
+  const [mediaKitProduct, setMediaKitProduct] = useState(null);
+  const [profitModalProduct, setProfitModalProduct] = useState(null);
+  const [customPrices, setCustomPrices] = useState({});
+
+  const handleCustomPriceChange = (productId, val) => {
+    setCustomPrices((prev) => ({ ...prev, [productId]: val }));
+  };
 
   const hero = companySettings?.heroSettings || {
     enabled: true,
