@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { initialProducts } from '../data/initialProducts';
+import { supabase, syncToSupabase } from '../lib/supabase';
 
 const StoreContext = createContext();
 
@@ -80,7 +81,12 @@ export const StoreProvider = ({ children }) => {
       if (savedUser) {
         try {
           const parsed = JSON.parse(savedUser);
-          if (parsed && parsed.email) return parsed;
+          if (parsed && parsed.email) {
+            if (parsed.email.toLowerCase() === adminEmail.toLowerCase()) {
+              parsed.role = 'admin';
+            }
+            return parsed;
+          }
         } catch (e) {}
       }
       const mode = localStorage.getItem('smd_view_mode');
@@ -376,37 +382,53 @@ export const StoreProvider = ({ children }) => {
   };
 
   const loginAsReseller = (email, name) => {
+    const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
     const resellerUser = {
-      id: 'user-' + Date.now(),
+      id: isAdmin ? 'admin-geovan' : 'user-' + Date.now(),
       email,
-      name: name || 'Revendedor Autorizado',
-      cnpj: '12.345.678/0001-99',
+      name: name || (isAdmin ? 'Geovan Calado (Admin Fábrica)' : 'Revendedor Autorizado'),
+      cnpj: '45.109.892/0001-99',
       phone: '(11) 99999-8888',
       pixKey: email,
-      role: 'reseller',
+      role: isAdmin ? 'admin' : 'reseller',
       status: 'aprovado',
-      tier: 'Bronze',
-      discountPercent: 0
+      tier: isAdmin ? 'VIP Gold' : 'Bronze',
+      discountPercent: isAdmin ? 100 : 0
     };
     setCurrentUser(resellerUser);
-    setViewMode('reseller');
-    showNotification(`Bem-vindo, ${resellerUser.name}!`);
+    setViewMode(isAdmin ? 'factory' : 'reseller');
+    showNotification(isAdmin ? '👑 Autenticado como Administrador da Fábrica!' : `Bem-vindo, ${resellerUser.name}!`);
+
+    // Sync to Supabase
+    syncToSupabase('users', {
+      id: resellerUser.id,
+      name: resellerUser.name,
+      email: resellerUser.email,
+      phone: resellerUser.phone,
+      cnpj: resellerUser.cnpj,
+      role: resellerUser.role,
+      status: resellerUser.status,
+      tier: resellerUser.tier
+    });
   };
 
   const registerReseller = (userData) => {
     // Security Helper: Sanitize inputs to prevent XSS script injection
     const sanitize = (str) => (typeof str === 'string' ? str.replace(/<[^>]*>?/gm, '').trim() : '');
 
+    const userEmail = sanitize(userData.email).toLowerCase();
+    const isAdmin = userEmail === adminEmail.toLowerCase();
+
     const newResellerUser = {
-      id: 'user-' + Date.now(),
-      name: sanitize(userData.storeName) || 'Nova Loja Revendedora',
-      email: sanitize(userData.email).toLowerCase(),
+      id: isAdmin ? 'admin-geovan' : 'user-' + Date.now(),
+      name: sanitize(userData.storeName) || (isAdmin ? 'Geovan Calado (Admin Fábrica)' : 'Nova Loja Revendedora'),
+      email: userEmail,
       phone: sanitize(userData.phone) || '(11) 99999-9999',
-      cnpj: sanitize(userData.cnpj) || '00.000.000/0001-00',
-      role: 'reseller',
+      cnpj: sanitize(userData.cnpj) || '45.109.892/0001-99',
+      role: isAdmin ? 'admin' : 'reseller',
       status: 'aprovado',
-      tier: 'Bronze',
-      discountPercent: 0,
+      tier: isAdmin ? 'VIP Gold' : 'Bronze',
+      discountPercent: isAdmin ? 100 : 0,
       totalOrders: 0,
       totalSpent: 0.00,
       createdAt: new Date().toISOString().split('T')[0]
@@ -414,9 +436,26 @@ export const StoreProvider = ({ children }) => {
 
     setUsers((prev) => [newResellerUser, ...prev]);
     setCurrentUser(newResellerUser);
-    setViewMode('reseller');
+    setViewMode(isAdmin ? 'factory' : 'reseller');
 
-    showNotification(`🎉 Conta criada com sucesso! Bem-vindo, ${newResellerUser.name}!`);
+    if (isAdmin) {
+      showNotification(`👑 Conta de Administrador da Fábrica ativada! Bem-vindo, Geovan!`);
+    } else {
+      showNotification(`🎉 Conta criada com sucesso! Bem-vindo, ${newResellerUser.name}!`);
+    }
+
+    // Sync to Supabase table 'users'
+    syncToSupabase('users', {
+      id: newResellerUser.id,
+      name: newResellerUser.name,
+      email: newResellerUser.email,
+      phone: newResellerUser.phone,
+      cnpj: newResellerUser.cnpj,
+      role: newResellerUser.role,
+      status: newResellerUser.status,
+      tier: newResellerUser.tier
+    });
+
     return true;
   };
 

@@ -74,7 +74,7 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
         </div>
 
         {/* Center View Mode Switcher (Visible ONLY to Factory Admin) */}
-        {currentUser?.role === 'admin' && (
+        {(currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com') && (
           <div className="hidden md:flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-xl border border-[var(--border-color)] shrink-0">
             <button
               onClick={() => setViewMode('reseller')}
@@ -110,7 +110,7 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
         {/* Right Actions */}
         <div className="flex items-center gap-3">
           {/* Mobile Switcher (Visible ONLY to Admin) */}
-          {currentUser?.role === 'admin' && (
+          {(currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com') && (
             <div className="md:hidden flex items-center bg-[var(--bg-surface-hover)] p-1 rounded-lg border border-[var(--border-color)]">
               <button
                 onClick={() => setViewMode(viewMode === 'reseller' ? 'factory' : 'reseller')}
