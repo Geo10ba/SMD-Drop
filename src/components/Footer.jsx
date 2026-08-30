@@ -33,7 +33,7 @@ const YoutubeIcon = () => (
   </svg>
 );
 
-export const Footer = ({ onOpenTracking, onOpenFaq }) => {
+export const Footer = ({ onOpenTracking, onOpenFaq, onOpenAdminLogin }) => {
   const { companySettings } = useStore();
   const [legalModalMode, setLegalModalMode] = useState(null); // 'terms', 'privacy' or null
 
@@ -48,20 +48,20 @@ export const Footer = ({ onOpenTracking, onOpenFaq }) => {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="h-11 flex items-center justify-center shrink-0">
-                <img src="/logo.png" alt={companySettings.name} className="h-11 w-auto max-h-12 object-contain rounded-lg shadow-sm" />
+                <img src="/logo.png" alt="SMD Drop Logo" className="h-11 w-auto max-h-12 object-contain rounded-lg shadow-sm" />
               </div>
               <div>
                 <span className="font-extrabold text-lg tracking-tight text-[var(--text-main)] font-['Outfit'] block">
-                  {companySettings.name}
+                  SMD <span className="text-[#C59B27] font-light">DROP</span>
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-[#C59B27]">
-                  PRODUÇÃO FABRIL PRÓPRIA
+                <span className="text-[10px] uppercase font-bold tracking-widest text-[#C59B27] block">
+                  FABRICAÇÃO PRÓPRIA
                 </span>
               </div>
             </div>
 
             <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-              {companySettings.subtitle}
+              Plataforma industrial de fabricação e distribuição exclusiva para revendedores de e-commerce e marketplaces.
             </p>
 
             <div className="space-y-1.5 text-[11px] pt-1 text-[var(--text-muted)]">
