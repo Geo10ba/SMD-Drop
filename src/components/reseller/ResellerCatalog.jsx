@@ -98,65 +98,100 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
     <div className="space-y-6 animate-fade-in">
       {/* High-Converting Renda Extra / Dropshipping B2B Hero Section for Visitors (Editable by Admin) */}
       {!currentUser && hero.enabled && (
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950 p-6 sm:p-8 text-white shadow-2xl border border-amber-500/30 space-y-6">
-          <div className="relative z-10 max-w-3xl space-y-4">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider">
-              <Sparkles size={15} /> {hero.badge}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950 p-6 sm:p-8 text-white shadow-2xl border border-amber-500/30">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            {/* Left Content Column */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider">
+                <Sparkles size={15} /> {hero.badge}
+              </div>
+
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black font-['Outfit'] leading-tight text-white tracking-tight">
+                {hero.title}
+              </h1>
+
+              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                {hero.subtitle}
+              </p>
+
+              {/* Feature Bullet Badges */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                    <Check size={18} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">{hero.bullet1Title}</span>
+                    <span className="text-[10px] text-slate-400 block">{hero.bullet1Subtitle}</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                    <Factory size={18} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">{hero.bullet2Title}</span>
+                    <span className="text-[10px] text-slate-400 block">{hero.bullet2Subtitle}</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold shrink-0">
+                    <Tag size={18} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">{hero.bullet3Title}</span>
+                    <span className="text-[10px] text-slate-400 block">{hero.bullet3Subtitle}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Call-To-Action Button */}
+              <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <button
+                  onClick={onOpenRegister}
+                  className="btn-gold py-3.5 px-8 text-sm sm:text-base font-extrabold shadow-xl flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 scale-100 hover:scale-105 transition-transform"
+                >
+                  <UserPlus size={20} /> {hero.ctaText}
+                </button>
+
+                <span className="text-[11px] text-slate-400 text-center sm:text-left flex items-center justify-center sm:justify-start gap-1">
+                  <Check size={14} className="text-emerald-400" /> Cadastro 100% gratuito e instantâneo
+                </span>
+              </div>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black font-['Outfit'] leading-tight text-white tracking-tight">
-              {hero.title}
-            </h1>
+            {/* Right Column: High-Converting Happy Entrepreneur Image Card */}
+            <div className="lg:col-span-5 relative flex items-center justify-center pt-2 lg:pt-0">
+              <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-2xl group">
+                <img
+                  src="/hero_entrepreneur.png"
+                  alt="Revendedor de Sucesso SMD Drop"
+                  className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-500"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80";
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
 
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
-              {hero.subtitle}
-            </p>
-
-            {/* Feature Bullet Badges */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
-                  <Check size={18} />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-white block">{hero.bullet1Title}</span>
-                  <span className="text-[10px] text-slate-400 block">{hero.bullet1Subtitle}</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0">
-                  <Factory size={18} />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-white block">{hero.bullet2Title}</span>
-                  <span className="text-[10px] text-slate-400 block">{hero.bullet2Subtitle}</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/80 flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold shrink-0">
-                  <Tag size={18} />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-white block">{hero.bullet3Title}</span>
-                  <span className="text-[10px] text-slate-400 block">{hero.bullet3Subtitle}</span>
+                {/* Floating Profit Badge */}
+                <div className="absolute bottom-3 left-3 right-3 bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-amber-500/40 flex items-center justify-between shadow-xl">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 font-extrabold flex items-center justify-center text-lg">
+                      💵
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white block">Lucro no Seu Bolso</span>
+                      <span className="text-[10px] text-amber-300 font-semibold block">Margem Média de 300% por Venda</span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                    FÁBRICA B2B
+                  </span>
                 </div>
               </div>
-            </div>
-
-            {/* Main Call-To-Action Button */}
-            <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <button
-                onClick={onOpenRegister}
-                className="btn-gold py-3.5 px-8 text-sm sm:text-base font-extrabold shadow-xl flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 scale-100 hover:scale-105 transition-transform"
-              >
-                <UserPlus size={20} /> {hero.ctaText}
-              </button>
-
-              <span className="text-[11px] text-slate-400 text-center sm:text-left flex items-center justify-center sm:justify-start gap-1">
-                <Check size={14} className="text-emerald-400" /> Cadastro 100% gratuito e instantâneo
-              </span>
             </div>
           </div>
         </div>
@@ -200,12 +235,14 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
             )}
           </div>
 
-          <button
-            onClick={() => setIsExportOpen(true)}
-            className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 font-semibold"
-          >
-            <FileSpreadsheet size={15} className="text-emerald-500" /> Exportar Tabela
-          </button>
+          {currentUser && (
+            <button
+              onClick={() => setIsExportOpen(true)}
+              className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 font-semibold"
+            >
+              <FileSpreadsheet size={15} className="text-emerald-500" /> Exportar Tabela
+            </button>
+          )}
         </div>
       </div>
 
