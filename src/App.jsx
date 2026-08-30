@@ -27,17 +27,12 @@ function MainApp() {
   } = useStore();
 
   const [m2CalculatorProduct, setM2CalculatorProduct] = useState(null);
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [legalModalType, setLegalModalType] = useState(null);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [isResellerOrdersOpen, setIsResellerOrdersOpen] = useState(false);
-  const [isFaqOpen, setIsFaqOpen] = useState(false);
-  const [isTrackingOpen, setIsTrackingOpen] = useState(false);
-  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const [authMode, setAuthMode] = useState('register');
 
-  const [isFulfillmentOpen, setIsFulfillmentOpen] = useState(false);
-  const [isNewProductOpen, setIsNewProductOpen] = useState(false);
+  const handleOpenAuth = (mode = 'register') => {
+    setAuthMode(mode);
+    setIsRegisterOpen(true);
+  };
 
   useEffect(() => {
     document.title = "SMD Drop | Plataforma Fabril de Dropshipping & Marketplaces";
@@ -70,7 +65,7 @@ function MainApp() {
         onOpenResellerOrders={() => setIsResellerOrdersOpen(true)}
         onOpenNewProductModal={() => setIsNewProductOpen(true)}
         onOpenFaq={() => setIsFaqOpen(true)}
-        onOpenRegister={() => setIsRegisterOpen(true)}
+        onOpenRegister={(mode) => handleOpenAuth(mode)}
         onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
       />
 
@@ -79,7 +74,7 @@ function MainApp() {
         {viewMode === 'reseller' ? (
           <ResellerCatalog 
             onOpenCart={() => setIsCartOpen(true)} 
-            onOpenRegister={() => setIsRegisterOpen(true)}
+            onOpenRegister={(mode) => handleOpenAuth(mode)}
           />
         ) : (
           <>
@@ -145,7 +140,7 @@ function MainApp() {
       <AdminLoginModal
         isOpen={isAdminLoginOpen}
         onClose={() => setIsAdminLoginOpen(false)}
-        onOpenRegister={() => setIsRegisterOpen(true)}
+        onOpenRegister={() => handleOpenAuth('register')}
       />
 
       <MagicImportModal
@@ -156,6 +151,7 @@ function MainApp() {
 
       <RegisterModal
         isOpen={isRegisterOpen}
+        initialMode={authMode}
         onClose={() => setIsRegisterOpen(false)}
         onOpenLegalModal={(type) => setLegalModalType(type)}
       />

@@ -177,7 +177,7 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
               ) : (
                 <>
                   <button
-                    onClick={onOpenRegister}
+                    onClick={() => onOpenRegister('register')}
                     className="btn-gold text-xs py-1.5 px-2.5 flex items-center gap-1 shadow-md font-bold shrink-0"
                     title="Criar Conta Grátis de Revendedor"
                   >
@@ -186,8 +186,8 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
                   </button>
 
                   <button
-                    onClick={onOpenRegister}
-                    className="btn-secondary text-xs py-1.5 px-2 text-amber-600 dark:text-amber-400 font-bold shrink-0"
+                    onClick={() => onOpenRegister('login')}
+                    className="btn-secondary text-xs py-1.5 px-2.5 text-amber-600 dark:text-amber-400 font-bold shrink-0"
                     title="Acessar Conta de Revendedor"
                   >
                     Entrar
