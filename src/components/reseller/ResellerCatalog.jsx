@@ -369,149 +369,117 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                     key={product.id}
                     className="glass-panel group overflow-hidden flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                   >
-                    {/* Card Image / Video Banner */}
+                    {/* Card Image Banner (ALWAYS display image, Video badge if exists) */}
                     <div className={`relative overflow-hidden bg-slate-900 group ${
-                      itemsPerRow === 6 ? 'h-32' : itemsPerRow === 4 ? 'h-36' : 'h-48'
+                      itemsPerRow === 6 ? 'h-36' : itemsPerRow === 4 ? 'h-40' : 'h-52'
                     }`}>
-                      {product.video ? (
-                        <video
-                          src={product.video}
-                          controls
-                          loop
-                          muted
-                          playsInline
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <img
-                          src={product.image}
-                          alt={product.title}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      )}
+                      <img
+                        src={product.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80"}
+                        alt={product.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
 
                       {/* Pricing Badge */}
                       <div className="absolute top-2 left-2 pointer-events-none">
                         {isM2 ? (
-                          <span className="badge-gold font-bold text-[10px] sm:text-xs shadow-md">
+                          <span className="badge-gold font-bold text-[10px] shadow-md">
                             Sob Medida (m²)
                           </span>
                         ) : (
-                          <span className="badge-emerald font-bold text-[10px] sm:text-xs shadow-md">
+                          <span className="badge-emerald font-bold text-[10px] shadow-md">
                             Preço Fixo
                           </span>
                         )}
                       </div>
+
+                      {/* Video Available Badge */}
+                      {product.video && (
+                        <div className="absolute top-2 right-2 pointer-events-none">
+                          <span className="bg-purple-600/90 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-full backdrop-blur-sm shadow flex items-center gap-1">
+                            <Video size={10} /> Vídeo
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Content Body */}
-                    <div className="flex flex-col justify-between flex-1 p-4 space-y-3">
+                    {/* Content Body (Ultra-Clean & Compact Layout) */}
+                    <div className="flex flex-col justify-between flex-1 p-3.5 space-y-2.5">
                       <div>
-                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block">
+                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider block truncate">
                           {product.category}
                         </span>
-                        <h3 className="font-bold text-[var(--text-main)] font-['Outfit'] text-sm line-clamp-1 mt-0.5">
+                        <h3 className="font-bold text-[var(--text-main)] font-['Outfit'] text-xs sm:text-sm line-clamp-1 mt-0.5" title={product.title}>
                           {product.title}
                         </h3>
-                        <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed line-clamp-2">
-                          {product.description}
-                        </p>
                       </div>
 
                       {/* Pricing Block */}
-                      <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2">
+                      <div className="bg-[var(--bg-surface-hover)] p-2.5 rounded-xl border border-[var(--border-color)] space-y-2 text-xs">
                         {currentUser ? (
-                          /* LOGGED IN RESELLER VIEW: Show Wholesale Price & Profit Simulation */
+                          /* LOGGED IN RESELLER VIEW */
                           isM2 ? (
-                            <div className="space-y-1.5 text-xs">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Atacado m²</span>
-                                <button
-                                  onClick={() => setProfitModalProduct(product)}
-                                  className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-0.5"
-                                  title="Simular Lucro Líquido"
-                                >
-                                  <Calculator size={11} /> Lucro
-                                </button>
-                              </div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-[var(--text-muted)]">Valor/m²:</span>
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-[var(--text-muted)] font-medium">Valor/m²:</span>
                                 <span className="font-extrabold text-[var(--text-main)] font-['Outfit']">
-                                  R$ {product.pricePerM2.toFixed(2)}
+                                  R$ {product.pricePerM2?.toFixed(2)}
                                 </span>
                               </div>
-                              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[var(--border-color)]">
+                              <div className="flex items-center justify-between text-[10px] pt-1 border-t border-[var(--border-color)]">
                                 <span className="text-[var(--text-muted)]">Sugestão:</span>
                                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                  R$ {product.suggestedPricePerM2.toFixed(2)}/m²
+                                  R$ {product.suggestedPricePerM2?.toFixed(2)}/m²
                                 </span>
                               </div>
                             </div>
                           ) : (
-                            <div className="space-y-2 text-xs">
-                              {/* Atacado & Lucro */}
-                              <div className="flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Atacado:</span>
-                                  <span className="font-extrabold text-[var(--text-main)] font-['Outfit']">
-                                    R$ {product.wholesalePrice.toFixed(2)}
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() => setProfitModalProduct(product)}
-                                  className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-md border border-emerald-500/30 hover:bg-emerald-500/20 shrink-0 flex items-center gap-1"
-                                  title="Simular Lucro Líquido"
-                                >
-                                  <Calculator size={11} /> Lucro
-                                </button>
+                            <div className="space-y-1.5">
+                              {/* Atacado Line */}
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-[var(--text-muted)] uppercase text-[10px]">Atacado:</span>
+                                <span className="font-extrabold text-[var(--text-main)] font-['Outfit'] text-xs">
+                                  R$ {product.wholesalePrice?.toFixed(2)}
+                                </span>
                               </div>
 
                               {/* Sua Venda Field */}
-                              <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[var(--border-color)]">
+                              <div className="flex items-center justify-between gap-1 pt-1 border-t border-[var(--border-color)]">
                                 <span className="text-[10px] font-bold text-[var(--text-main)] whitespace-nowrap">Sua Venda:</span>
-                                <div className="relative flex-1 max-w-[105px]">
-                                  <span className="absolute left-2 top-1 text-[10px] font-bold text-[var(--text-muted)]">R$</span>
+                                <div className="relative w-20 shrink-0">
+                                  <span className="absolute left-1.5 top-0.5 text-[9px] font-bold text-[var(--text-muted)]">R$</span>
                                   <input
                                     type="number"
                                     step="0.01"
                                     min={product.wholesalePrice}
                                     value={customPrices[product.id] !== undefined ? customPrices[product.id] : product.suggestedRetailPrice}
                                     onChange={(e) => handleCustomPriceChange(product.id, Number(e.target.value))}
-                                    className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-lg py-1 pl-7 pr-1.5 text-xs font-extrabold text-emerald-600 dark:text-emerald-400 text-right focus:outline-none focus:border-amber-500 shadow-inner"
+                                    className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-md py-0.5 pl-5 pr-1 text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 text-right focus:outline-none focus:border-amber-500 shadow-inner"
                                   />
                                 </div>
                               </div>
                             </div>
                           )
                         ) : (
-                          /* UNAUTHENTICATED VISITOR VIEW: Hide Wholesale Price & Prompt Registration */
-                          <div className="space-y-1.5 py-0.5">
-                            <div className="flex justify-between items-center text-[10px]">
-                              <span className="font-bold text-[var(--text-muted)]">Preço Varejo Sugerido:</span>
-                              <span className="font-mono font-bold text-[var(--text-main)]">
-                                R$ {isM2 ? `${product.suggestedPricePerM2.toFixed(2)}/m²` : product.suggestedRetailPrice.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/30 text-center space-y-0.5">
-                              <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1">
-                                <Lock size={12} /> Preço Atacado Reservado
-                              </span>
-                              <span className="text-[9px] text-[var(--text-muted)] block">
-                                Exclusivo para revendedores cadastrados
-                              </span>
-                            </div>
+                          /* UNAUTHENTICATED VISITOR VIEW */
+                          <div className="space-y-1 text-center py-0.5">
+                            <span className="text-[10px] font-bold text-[var(--text-muted)] block truncate">
+                              Sugestão Varejo: R$ {isM2 ? `${product.suggestedPricePerM2?.toFixed(2)}/m²` : product.suggestedRetailPrice?.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] font-extrabold text-amber-500 block">
+                              🔒 Atacado Reservado
+                            </span>
                           </div>
                         )}
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="grid grid-cols-2 gap-2 pt-1">
+                      {/* Action Buttons Row */}
+                      <div className="flex items-center gap-1.5 pt-0.5">
                         <button
                           onClick={() => setMediaKitProduct(product)}
-                          className="btn-secondary py-2 px-2 text-xs font-bold flex items-center justify-center gap-1 truncate"
-                          title="Baixar Kit Mídia & Fotos HD"
+                          className="btn-secondary py-1.5 px-2 text-[11px] font-bold flex-1 flex items-center justify-center gap-1 truncate"
+                          title="Ver Fotos HD, Vídeo e Kit Mídia"
                         >
-                          <Download size={14} className="shrink-0 text-amber-500" />
+                          <Download size={13} className="shrink-0 text-amber-500" />
                           <span className="truncate">Kit Mídia</span>
                         </button>
 
@@ -519,27 +487,27 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                           isM2 ? (
                             <button
                               onClick={() => setM2Product(product)}
-                              className="btn-gold py-2 px-2 text-xs font-extrabold flex items-center justify-center gap-1 truncate shadow-md"
+                              className="btn-gold py-1.5 px-2 text-[11px] font-extrabold flex-1 flex items-center justify-center gap-1 truncate shadow-md"
                             >
-                              <Ruler size={14} className="shrink-0" />
+                              <Ruler size={13} className="shrink-0" />
                               <span className="truncate">Calcular m²</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => addToCart({ ...product, customSellingPrice: customPrices[product.id] })}
-                              className="btn-gold py-2 px-2 text-xs font-extrabold flex items-center justify-center gap-1 truncate shadow-md"
+                              className="btn-gold py-1.5 px-2 text-[11px] font-extrabold flex-1 flex items-center justify-center gap-1 truncate shadow-md"
                             >
-                              <ShoppingBag size={14} className="shrink-0" />
+                              <ShoppingBag size={13} className="shrink-0" />
                               <span className="truncate">Comprar</span>
                             </button>
                           )
                         ) : (
                           <button
                             onClick={onOpenRegister}
-                            className="btn-gold py-2 px-2 text-[10px] font-extrabold flex items-center justify-center gap-1 truncate shadow-md"
+                            className="btn-gold py-1.5 px-2 text-[10px] font-extrabold flex-1 flex items-center justify-center gap-1 truncate shadow-md"
                           >
                             <Lock size={12} className="shrink-0" />
-                            <span className="truncate">Liberar Atacado</span>
+                            <span className="truncate">Atacado</span>
                           </button>
                         )}
                       </div>
