@@ -121,10 +121,10 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col p-5 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-2xl w-full max-h-[95vh] flex flex-col p-6 sm:p-7 shadow-2xl relative animate-fade-in my-auto">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
+        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3.5 mb-5 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
               <UserPlus size={22} />
@@ -133,7 +133,7 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
               <span className="badge-gold uppercase tracking-wider text-[10px] mb-1 inline-block">
                 CADASTRO DE REVENDEDOR AUTORIZADO
               </span>
-              <h3 className="text-xl font-bold text-[var(--text-main)] font-['Outfit']">
+              <h3 className="text-xl sm:text-2xl font-bold text-[var(--text-main)] font-['Outfit']">
                 Criar Conta na SMD Drop
               </h3>
             </div>
@@ -144,7 +144,7 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-4 text-xs pr-1">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {errorMessage && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 p-3 rounded-xl flex items-center gap-2 font-medium">
               <AlertCircle size={16} className="shrink-0" />
@@ -152,23 +152,24 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
             </div>
           )}
 
-          {/* Nome da Loja */}
-          <div>
-            <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1 flex items-center gap-1">
-              <Store size={13} className="text-amber-500" /> Nome Fantasia / Razão Social *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="ex: Lucas E-Commerce Store"
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              className="input-field font-semibold text-sm"
-            />
-          </div>
+          {/* Grid Layout 2 Colunas */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Nome da Loja - Ocupa 2 Colunas */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1 flex items-center gap-1">
+                <Store size={13} className="text-amber-500" /> Nome Fantasia / Razão Social *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="ex: Lucas E-Commerce Store"
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                className="input-field font-semibold text-sm py-2.5"
+              />
+            </div>
 
-          {/* CNPJ/CPF e WhatsApp */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* CNPJ ou CPF */}
             <div>
               <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1 flex items-center gap-1">
                 <FileText size={13} className="text-amber-500" /> CNPJ ou CPF
@@ -178,10 +179,11 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
                 placeholder="00.000.000/0001-00"
                 value={documentNumber}
                 onChange={handleDocumentChange}
-                className="input-field font-mono font-semibold"
+                className="input-field font-mono font-semibold py-2.5"
               />
             </div>
 
+            {/* WhatsApp */}
             <div>
               <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1 flex items-center gap-1">
                 <Phone size={13} className="text-amber-500" /> WhatsApp Direct *
@@ -192,28 +194,23 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
                 placeholder="(11) 99999-9999"
                 value={whatsapp}
                 onChange={handleWhatsappChange}
-                className="input-field font-mono font-bold text-amber-500"
+                className="input-field font-mono font-bold text-amber-500 py-2.5"
               />
             </div>
-          </div>
 
-          {/* Email */}
-          <div>
-            <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1 flex items-center gap-1">
-              <Mail size={13} className="text-amber-500" /> E-mail Comercial *
-            </label>
-            <input
-              type="email"
-              required
-              placeholder="contato@sualoja.com.br"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-field font-semibold"
-            />
-          </div>
-
-          {/* Senha e Confirmar Senha com Ícone de Olho */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Email Comercial - Ocupa 2 Colunas */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1 flex items-center gap-1">
+                <Mail size={13} className="text-amber-500" /> E-mail Comercial *
+              </label>
+              <input
+                type="email"
+                required
+                placeholder="contato@sualoja.com.br"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input-field font-semibold py-2.5"
+              />
             {/* Campo Senha */}
             <div>
               <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1 flex items-center gap-1">
@@ -226,12 +223,12 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
                   placeholder="Mínimo 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input-field font-semibold pr-9"
+                  className="input-field font-semibold pr-9 py-2.5"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-2.5 text-[var(--text-muted)] hover:text-amber-500 transition-colors"
+                  className="absolute right-2.5 top-3 text-[var(--text-muted)] hover:text-amber-500 transition-colors"
                   title={showPassword ? 'Ocultar Senha' : 'Mostrar Senha'}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -251,7 +248,7 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
                   placeholder="Repita a senha"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`input-field font-semibold pr-9 ${
+                  className={`input-field font-semibold pr-9 py-2.5 ${
                     confirmPassword && confirmPassword === password
                       ? 'border-emerald-500 focus:border-emerald-500'
                       : confirmPassword && confirmPassword !== password
@@ -262,13 +259,14 @@ export const RegisterModal = ({ isOpen, onClose, onOpenLegalModal }) => {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-2.5 top-2.5 text-[var(--text-muted)] hover:text-amber-500 transition-colors"
+                  className="absolute right-2.5 top-3 text-[var(--text-muted)] hover:text-amber-500 transition-colors"
                   title={showConfirmPassword ? 'Ocultar Senha' : 'Mostrar Senha'}
                 >
                   {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
+          </div>
           </div>
 
           {/* Passwords Match Indicator */}
