@@ -265,24 +265,26 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
               </div>
             </div>
 
-            {/* Category Pills (Clean Wrap without ugly scrollbars) */}
-            <div className="border-t border-[var(--border-color)] pt-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                      selectedCategory === cat
-                        ? 'bg-slate-900 text-white dark:bg-amber-500 dark:text-slate-900 shadow'
-                        : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
+            {/* Category Pills (Clean Wrap - Visible ONLY when categories exist) */}
+            {globalCategories.length > 0 && (
+              <div className="border-t border-[var(--border-color)] pt-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                        selectedCategory === cat
+                          ? 'bg-slate-900 text-white dark:bg-amber-500 dark:text-slate-900 shadow'
+                          : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Catalog Grid (Dynamic Column Count) */}

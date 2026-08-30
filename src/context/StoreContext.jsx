@@ -143,14 +143,25 @@ export const StoreProvider = ({ children }) => {
     }
   };
 
-  // Dynamic Categories State
-  const [categories, setCategories] = useState([
-    'Logomarcas & Letreiros',
-    'Neon & Iluminação Custom',
-    'Iluminação Pronta',
-    'Troféus & Homenagens',
-    'Sinalização & Placas'
-  ]);
+  // Dynamic Categories State (Zerado para Produção)
+  const [categories, setCategoriesState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smd_categories');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return [];
+  });
+
+  const setCategories = (cats) => {
+    setCategoriesState(cats);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smd_categories', JSON.stringify(cats));
+    }
+  };
 
   // Factory Materials Catalog (Official User Pricing Table Persisted in localStorage)
   const defaultInitialMaterials = [
@@ -264,7 +275,7 @@ export const StoreProvider = ({ children }) => {
         } catch (e) {}
       }
     }
-    return initialProducts;
+    return [];
   });
 
   const setProducts = (prods) => {
@@ -319,12 +330,14 @@ export const StoreProvider = ({ children }) => {
 
   const resetSystemForProduction = () => {
     setProducts([]);
+    setCategories([]);
     setOrders([]);
     setPendingProducts([]);
     setUsers([]);
     setCart([]);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('smd_products');
+      localStorage.removeItem('smd_categories');
       localStorage.removeItem('smd_orders');
       localStorage.removeItem('smd_pending_products');
       localStorage.removeItem('smd_users');
