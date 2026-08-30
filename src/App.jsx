@@ -27,7 +27,17 @@ function MainApp() {
   } = useStore();
 
   const [m2CalculatorProduct, setM2CalculatorProduct] = useState(null);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [authMode, setAuthMode] = useState('register');
+  const [legalModalType, setLegalModalType] = useState(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isResellerOrdersOpen, setIsResellerOrdersOpen] = useState(false);
+  const [isFaqOpen, setIsFaqOpen] = useState(false);
+  const [isTrackingOpen, setIsTrackingOpen] = useState(false);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const [isFulfillmentOpen, setIsFulfillmentOpen] = useState(false);
+  const [isNewProductOpen, setIsNewProductOpen] = useState(false);
 
   const handleOpenAuth = (mode = 'register') => {
     setAuthMode(mode);
