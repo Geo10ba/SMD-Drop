@@ -152,18 +152,18 @@ export const StoreProvider = ({ children }) => {
     });
   };
 
-  // Dynamic Categories State (Zerado para Produção)
+  // Dynamic Categories State (Defaluta para Categorias dos Produtos Oficiais)
   const [categories, setCategoriesState] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('smd_categories');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         } catch (e) {}
       }
     }
-    return [];
+    return Array.from(new Set(initialProducts.map((p) => p.category)));
   });
 
   const setCategories = (cats) => {
@@ -281,18 +281,18 @@ export const StoreProvider = ({ children }) => {
     showNotification('Material removido.');
   };
 
-  // Products State (Zerado para Produção)
+  // Products State (Default para o catálogo oficial da fábrica)
   const [products, setProductsState] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('smd_products');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         } catch (e) {}
       }
     }
-    return [];
+    return initialProducts;
   });
 
   const setProducts = (prods) => {

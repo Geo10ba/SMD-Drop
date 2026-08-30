@@ -169,6 +169,10 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                   src="/hero_male_entrepreneur_money.png"
                   alt="Empreendedor de Sucesso com Dinheiro em Mãos SMD Drop"
                   className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-500"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=800&q=80";
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
 
