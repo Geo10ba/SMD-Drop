@@ -174,8 +174,30 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
             <button
               onClick={() => setIsMaterialManagerOpen(true)}
               className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 py-2.5 px-4 rounded-xl text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition-all"
+              title="Gerenciar Tabela de Preços por m² e Lucro Líquido da Fábrica"
             >
               <Layers size={16} /> 🎨 Preços & Lucro m²
+            </button>
+
+            <button
+              onClick={() => setIsCategoryManagerOpen(true)}
+              className="bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-700 py-2.5 px-3.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+            >
+              <FolderTree size={15} className="text-amber-400" /> Categorias ({categories.length})
+            </button>
+
+            <button
+              onClick={onOpenFulfillment}
+              className="bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-700 py-2.5 px-3.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+            >
+              <Truck size={16} className="text-amber-400" /> Central de Expedição ({pendingOrders.length})
+            </button>
+
+            <button
+              onClick={onOpenNewProduct}
+              className="bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-700 py-2.5 px-3.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+            >
+              <Plus size={16} className="text-amber-400" /> + Cadastro Manual
             </button>
 
             <button
@@ -229,35 +251,6 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
                 <option value={6}>⚡ 6 por linha (Recomendado)</option>
               </select>
             </div>
-
-            <button
-              onClick={() => setIsMaterialManagerOpen(true)}
-              className="btn-gold py-2.5 px-3.5 text-xs font-bold shadow-md flex items-center gap-1.5"
-              title="Gerenciar Tabela de Preços por m² e Lucro Líquido da Fábrica"
-            >
-              <Layers size={16} /> Preços & Lucro m²
-            </button>
-
-            <button
-              onClick={() => setIsCategoryManagerOpen(true)}
-              className="btn-secondary py-2.5 px-3.5 text-xs font-semibold bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700"
-            >
-              <FolderTree size={15} /> Categorias ({categories.length})
-            </button>
-
-            <button
-              onClick={onOpenFulfillment}
-              className="btn-secondary py-2.5 px-3.5 text-xs font-semibold bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700"
-            >
-              <Truck size={16} /> Central de Expedição ({pendingOrders.length})
-            </button>
-
-            <button
-              onClick={onOpenNewProduct}
-              className="btn-secondary py-2.5 px-3.5 text-xs font-semibold bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700"
-            >
-              + Cadastro Manual
-            </button>
           </div>
         </div>
 
