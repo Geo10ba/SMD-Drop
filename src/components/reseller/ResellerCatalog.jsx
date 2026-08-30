@@ -43,6 +43,8 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
     companySettings
   } = useStore();
 
+  const availableCategories = ['Todos', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))];
+
   const [resellerViewMode, setResellerViewMode] = useState('catalog'); // 'catalog' or 'dashboard'
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [selectedPricingType, setSelectedPricingType] = useState('all'); // 'all', 'fixed', 'custom_m2'
@@ -303,10 +305,10 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
             </div>
 
             {/* Category Pills (Clean Wrap - Visible ONLY when categories exist) */}
-            {globalCategories.length > 0 && (
+            {availableCategories.length > 1 && (
               <div className="border-t border-[var(--border-color)] pt-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  {categories.map((cat) => (
+                  {availableCategories.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
