@@ -1,22 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Dynamic Credentials Retrieval (From localStorage or env vars)
+const DEFAULT_SUPABASE_URL = 'https://aghbrlihahygczzvxvim.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnaGJybGloYWh5Z2N6enZ4dmltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwNDQyNDIsImV4cCI6MjEwMzYyMDI0Mn0.cYqQZVGdkcQYo4Hx_cwvFZafZ0Qf5UDqNEZH6T9roVc';
+
+// Dynamic Credentials Retrieval (From localStorage, env vars, or default active keys)
 export const getSupabaseCredentials = () => {
-  if (typeof window === 'undefined') {
-    return {
-      url: import.meta.env?.VITE_SUPABASE_URL || '',
-      key: import.meta.env?.VITE_SUPABASE_ANON_KEY || ''
-    };
-  }
+  const customUrl = typeof window !== 'undefined' ? localStorage.getItem('smd_supabase_url') : null;
+  const customKey = typeof window !== 'undefined' ? localStorage.getItem('smd_supabase_anon_key') : null;
 
-  const customUrl = localStorage.getItem('smd_supabase_url');
-  const customKey = localStorage.getItem('smd_supabase_anon_key');
+  const envUrl = import.meta.env?.VITE_SUPABASE_URL;
+  const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
 
-  const envUrl = import.meta.env?.VITE_SUPABASE_URL || '';
-  const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
-
-  const url = customUrl || envUrl || 'https://aghbrlihahygczzvxvim.supabase.co';
-  const key = customKey || (envKey !== 'sua_anon_key_do_supabase_aqui' ? envKey : '');
+  const url = customUrl || (envUrl && envUrl !== 'undefined' ? envUrl : DEFAULT_SUPABASE_URL);
+  const key = customKey || (envKey && envKey !== 'sua_anon_key_do_supabase_aqui' && envKey !== 'undefined' ? envKey : DEFAULT_SUPABASE_ANON_KEY);
 
   return { url, key };
 };
@@ -24,7 +20,7 @@ export const getSupabaseCredentials = () => {
 // Initialize Supabase Client dynamically
 export const getSupabaseClient = () => {
   const { url, key } = getSupabaseCredentials();
-  if (!url || !key || key === 'sua_anon_key_do_supabase_aqui') {
+  if (!url || !key) {
     return null;
   }
   try {
@@ -46,7 +42,6 @@ export const testSupabaseConnection = async (url, key) => {
     const client = createClient(url, key);
     const { data, error } = await client.from('categories').select('id').limit(1);
     if (error && error.code !== 'PGRST116') {
-      // If table missing or auth error
       if (error.message?.includes('JWT') || error.message?.includes('apiKey') || error.message?.includes('Invalid')) {
         return { success: false, message: `Erro de Autenticação: ${error.message}` };
       }

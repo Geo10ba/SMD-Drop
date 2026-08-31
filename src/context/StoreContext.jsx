@@ -675,6 +675,15 @@ export const StoreProvider = ({ children }) => {
 
         // 2. Fetch Products from Supabase
         const { data: dbProducts, error: prodErr } = await client.from('products').select('*');
+        const savedLocal = typeof window !== 'undefined' ? localStorage.getItem('smd_products') : null;
+        let localProds = [];
+        if (savedLocal) {
+          try {
+            const parsed = JSON.parse(savedLocal);
+            if (Array.isArray(parsed)) localProds = parsed;
+          } catch (e) {}
+        }
+
         if (!prodErr && dbProducts && dbProducts.length > 0) {
           const normalizedProds = dbProducts.map((p) => ({
             id: p.id,
@@ -695,9 +704,49 @@ export const StoreProvider = ({ children }) => {
               copyDescription: p.description
             }
           }));
-          setProductsState(normalizedProds);
+
+          // Merge local products not yet in Supabase
+          let mergedProds = [...normalizedProds];
+          for (const lp of localProds) {
+            if (!mergedProds.some((p) => p.id === lp.id || p.title === lp.title)) {
+              mergedProds.push(lp);
+              // Push to Supabase automatically
+              client.from('products').upsert({
+                id: lp.id,
+                title: lp.title,
+                category_name: lp.category || null,
+                pricing_type: lp.pricingType || 'fixed',
+                wholesale_price: Number(lp.wholesalePrice) || 0,
+                suggested_retail_price: Number(lp.suggestedRetailPrice) || 0,
+                price_per_m2: Number(lp.pricePerM2) || 0,
+                suggested_price_per_m2: Number(lp.suggestedPricePerM2) || 0,
+                description: lp.description || '',
+                image_url: lp.image || '',
+                status: 'approved'
+              });
+            }
+          }
+
+          setProductsState(mergedProds);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('smd_products', JSON.stringify(normalizedProds));
+            localStorage.setItem('smd_products', JSON.stringify(mergedProds));
+          }
+        } else if (!prodErr && localProds.length > 0) {
+          // If DB has 0 products but local storage has products, push them all to Supabase!
+          for (const lp of localProds) {
+            client.from('products').upsert({
+              id: lp.id,
+              title: lp.title,
+              category_name: lp.category || null,
+              pricing_type: lp.pricingType || 'fixed',
+              wholesale_price: Number(lp.wholesalePrice) || 0,
+              suggested_retail_price: Number(lp.suggestedRetailPrice) || 0,
+              price_per_m2: Number(lp.pricePerM2) || 0,
+              suggested_price_per_m2: Number(lp.suggestedPricePerM2) || 0,
+              description: lp.description || '',
+              image_url: lp.image || '',
+              status: 'approved'
+            });
           }
         }
 
