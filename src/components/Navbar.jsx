@@ -1,5 +1,6 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
+import logoImg from '../assets/logo.png';
 import { 
   Factory, 
   Store, 
@@ -56,7 +57,7 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
         {/* Logo */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="h-10 sm:h-12 flex items-center justify-center shrink-0">
-            <img src="/logo.png" alt="SMD Drop Logo" className="h-9 sm:h-11 w-auto object-contain rounded-lg shadow-sm" />
+            <img src={logoImg} alt="SMD Drop Logo" className="h-9 sm:h-11 w-auto object-contain rounded-lg shadow-sm" onError={(e) => { e.target.onerror = null; e.target.src = "/logo.png"; }} />
           </div>
           <div className="shrink-0">
             <div className="flex items-center gap-1.5">

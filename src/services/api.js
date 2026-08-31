@@ -1,18 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
-
-// Supabase Credentials for Project aghbrlihahygczzvxvim
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://aghbrlihahygczzvxvim.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'sua_anon_key_do_supabase_aqui')
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : null;
+import { getSupabaseClient } from '../lib/supabase';
 
 export const apiService = {
   // --- USUÁRIOS & AUTENTICAÇÃO ---
   async loginUser(email, password) {
-    if (supabase) {
-      const { data, error } = await supabase
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client
         .from('users')
         .select('*')
         .eq('email', email)
@@ -27,8 +20,9 @@ export const apiService = {
   },
 
   async registerUser(userData) {
-    if (supabase) {
-      const { data, error } = await supabase
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client
         .from('users')
         .insert([userData])
         .select();
@@ -41,21 +35,23 @@ export const apiService = {
 
   // --- CATÁLOGO & PRODUTOS ---
   async fetchProducts() {
-    if (supabase) {
-      const { data, error } = await supabase
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client
         .from('products')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) return data;
     }
-    return null; // Fallback para o estado local se ainda não houver dados no banco
+    return null;
   },
 
   // --- MATÉRIAS-PRIMAS DA FÁBRICA ---
   async fetchMaterials() {
-    if (supabase) {
-      const { data, error } = await supabase
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client
         .from('materials')
         .select('*')
         .order('name', { ascending: true });
@@ -67,8 +63,9 @@ export const apiService = {
 
   // --- PEDIDOS & EXPEDIÇÃO ---
   async submitOrder(orderData) {
-    if (supabase) {
-      const { data, error } = await supabase
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client
         .from('orders')
         .insert([orderData])
         .select();

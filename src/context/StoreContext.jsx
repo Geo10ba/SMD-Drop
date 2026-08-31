@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { initialProducts } from '../data/initialProducts';
-import { supabase, syncToSupabase } from '../lib/supabase';
+import { 
+  getSupabaseClient, 
+  getSupabaseCredentials, 
+  saveSupabaseCredentials, 
+  testSupabaseConnection, 
+  syncToSupabase 
+} from '../lib/supabase';
 
 const StoreContext = createContext();
 
@@ -33,6 +39,15 @@ const getInitialBookmarkletData = () => {
 };
 
 export const StoreProvider = ({ children }) => {
+  const broadcastSync = (key, data) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const channel = new BroadcastChannel('smd_drop_sync_channel');
+      channel.postMessage({ type: 'SYNC_FIELD_UPDATE', key, data });
+      channel.close();
+    } catch (e) {}
+  };
+
   // Theme Management (Default: 'light' Luxe)
   const [theme, setTheme] = useState('light');
 
@@ -147,6 +162,7 @@ export const StoreProvider = ({ children }) => {
       const next = typeof usrs === 'function' ? usrs(prev) : usrs;
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_users', JSON.stringify(next));
+        broadcastSync('users', next);
       }
       return next;
     });
@@ -171,6 +187,7 @@ export const StoreProvider = ({ children }) => {
       const next = typeof cats === 'function' ? cats(prev) : cats;
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_categories', JSON.stringify(next));
+        broadcastSync('categories', next);
       }
       return next;
     });
@@ -248,6 +265,7 @@ export const StoreProvider = ({ children }) => {
       const next = typeof mats === 'function' ? mats(prev) : mats;
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_materials', JSON.stringify(next));
+        broadcastSync('materials', next);
       }
       return next;
     });
@@ -300,6 +318,7 @@ export const StoreProvider = ({ children }) => {
       const next = typeof prods === 'function' ? prods(prev) : prods;
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_products', JSON.stringify(next));
+        broadcastSync('products', next);
       }
       return next;
     });
@@ -324,6 +343,7 @@ export const StoreProvider = ({ children }) => {
       const next = typeof pProds === 'function' ? pProds(prev) : pProds;
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_pending_products', JSON.stringify(next));
+        broadcastSync('pendingProducts', next);
       }
       return next;
     });
@@ -351,6 +371,7 @@ export const StoreProvider = ({ children }) => {
       const next = typeof ords === 'function' ? ords(prev) : ords;
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_orders', JSON.stringify(next));
+        broadcastSync('orders', next);
       }
       return next;
     });
@@ -522,12 +543,128 @@ export const StoreProvider = ({ children }) => {
     showNotification('Seus dados de perfil foram salvos!');
   };
 
+  // Real-time Cross-Tab & Incognito Window Synchronizer
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let channel;
+    try {
+      channel = new BroadcastChannel('smd_drop_sync_channel');
+    } catch (e) {}
+
+    const handleMessage = (event) => {
+      const { type, key, data, payload } = event.data || {};
+
+      if (type === 'REQUEST_STATE_SYNC' && channel) {
+        channel.postMessage({
+          type: 'RESPONSE_STATE_SYNC',
+          payload: {
+            products,
+            categories,
+            materials,
+            orders,
+            users,
+            pendingProducts,
+            companySettings
+          }
+        });
+      } else if (type === 'RESPONSE_STATE_SYNC' && payload) {
+        if (payload.products && Array.isArray(payload.products)) {
+          setProductsState(payload.products);
+          localStorage.setItem('smd_products', JSON.stringify(payload.products));
+        }
+        if (payload.categories && Array.isArray(payload.categories)) {
+          setCategoriesState(payload.categories);
+          localStorage.setItem('smd_categories', JSON.stringify(payload.categories));
+        }
+        if (payload.materials && Array.isArray(payload.materials)) {
+          setMaterialsState(payload.materials);
+          localStorage.setItem('smd_materials', JSON.stringify(payload.materials));
+        }
+        if (payload.orders && Array.isArray(payload.orders)) {
+          setOrdersState(payload.orders);
+          localStorage.setItem('smd_orders', JSON.stringify(payload.orders));
+        }
+        if (payload.users && Array.isArray(payload.users)) {
+          setUsersState(payload.users);
+          localStorage.setItem('smd_users', JSON.stringify(payload.users));
+        }
+        if (payload.pendingProducts && Array.isArray(payload.pendingProducts)) {
+          setPendingProductsState(payload.pendingProducts);
+          localStorage.setItem('smd_pending_products', JSON.stringify(payload.pendingProducts));
+        }
+        if (payload.companySettings) {
+          setCompanySettingsState(payload.companySettings);
+          localStorage.setItem('smd_company_settings', JSON.stringify(payload.companySettings));
+        }
+      } else if (type === 'SYNC_FIELD_UPDATE') {
+        if (key === 'products' && Array.isArray(data)) {
+          setProductsState(data);
+          localStorage.setItem('smd_products', JSON.stringify(data));
+        } else if (key === 'categories' && Array.isArray(data)) {
+          setCategoriesState(data);
+          localStorage.setItem('smd_categories', JSON.stringify(data));
+        } else if (key === 'materials' && Array.isArray(data)) {
+          setMaterialsState(data);
+          localStorage.setItem('smd_materials', JSON.stringify(data));
+        } else if (key === 'orders' && Array.isArray(data)) {
+          setOrdersState(data);
+          localStorage.setItem('smd_orders', JSON.stringify(data));
+        } else if (key === 'users' && Array.isArray(data)) {
+          setUsersState(data);
+          localStorage.setItem('smd_users', JSON.stringify(data));
+        } else if (key === 'pendingProducts' && Array.isArray(data)) {
+          setPendingProductsState(data);
+          localStorage.setItem('smd_pending_products', JSON.stringify(data));
+        } else if (key === 'companySettings' && data) {
+          setCompanySettingsState(data);
+          localStorage.setItem('smd_company_settings', JSON.stringify(data));
+        }
+      }
+    };
+
+    if (channel) {
+      channel.addEventListener('message', handleMessage);
+      channel.postMessage({ type: 'REQUEST_STATE_SYNC' });
+    }
+
+    const handleStorage = (e) => {
+      if (e.key === 'smd_products' && e.newValue) {
+        try { setProductsState(JSON.parse(e.newValue)); } catch (err) {}
+      }
+      if (e.key === 'smd_categories' && e.newValue) {
+        try { setCategoriesState(JSON.parse(e.newValue)); } catch (err) {}
+      }
+      if (e.key === 'smd_orders' && e.newValue) {
+        try { setOrdersState(JSON.parse(e.newValue)); } catch (err) {}
+      }
+      if (e.key === 'smd_users' && e.newValue) {
+        try { setUsersState(JSON.parse(e.newValue)); } catch (err) {}
+      }
+      if (e.key === 'smd_materials' && e.newValue) {
+        try { setMaterialsState(JSON.parse(e.newValue)); } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      if (channel) {
+        channel.removeEventListener('message', handleMessage);
+        channel.close();
+      }
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
   // Load & Hydrate Data from Supabase Database on App Startup (Syncs Vercel & Localhost)
   useEffect(() => {
     const fetchSupabaseData = async () => {
+      const client = getSupabaseClient();
+      if (!client) return;
+
       try {
         // 1. Fetch Categories from Supabase
-        const { data: dbCategories, error: catErr } = await supabase.from('categories').select('*');
+        const { data: dbCategories, error: catErr } = await client.from('categories').select('*');
         if (!catErr && dbCategories && dbCategories.length > 0) {
           const catNames = dbCategories.map((c) => c.name);
           setCategoriesState(catNames);
@@ -537,7 +674,7 @@ export const StoreProvider = ({ children }) => {
         }
 
         // 2. Fetch Products from Supabase
-        const { data: dbProducts, error: prodErr } = await supabase.from('products').select('*');
+        const { data: dbProducts, error: prodErr } = await client.from('products').select('*');
         if (!prodErr && dbProducts && dbProducts.length > 0) {
           const normalizedProds = dbProducts.map((p) => ({
             id: p.id,
@@ -565,7 +702,7 @@ export const StoreProvider = ({ children }) => {
         }
 
         // 3. Fetch Orders from Supabase
-        const { data: dbOrders, error: ordErr } = await supabase.from('orders').select('*');
+        const { data: dbOrders, error: ordErr } = await client.from('orders').select('*');
         if (!ordErr && dbOrders && dbOrders.length > 0) {
           const normalizedOrders = dbOrders.map((o) => ({
             id: o.id,
@@ -590,6 +727,67 @@ export const StoreProvider = ({ children }) => {
 
     fetchSupabaseData();
   }, []);
+
+  // Sync all current state to Supabase
+  const syncAllToSupabase = async () => {
+    const client = getSupabaseClient();
+    if (!client) {
+      showNotification('Supabase não configurado. Adicione a URL e Chave Anon primeiro.', 'error');
+      return false;
+    }
+
+    try {
+      // 1. Sync Categories
+      for (const cat of categories) {
+        await client.from('categories').upsert({
+          id: 'cat-' + cat.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          name: cat,
+          slug: cat.toLowerCase().replace(/[^a-z0-9]/g, '-')
+        });
+      }
+
+      // 2. Sync Products
+      for (const prod of products) {
+        await client.from('products').upsert({
+          id: prod.id,
+          title: prod.title,
+          category_name: prod.category || null,
+          pricing_type: prod.pricingType || 'fixed',
+          wholesale_price: Number(prod.wholesalePrice) || 0,
+          suggested_retail_price: Number(prod.suggestedRetailPrice) || 0,
+          price_per_m2: Number(prod.pricePerM2) || 0,
+          suggested_price_per_m2: Number(prod.suggestedPricePerM2) || 0,
+          description: prod.description || '',
+          image_url: prod.image || '',
+          status: 'approved'
+        });
+      }
+
+      // 3. Sync Orders
+      for (const ord of orders) {
+        await client.from('orders').upsert({
+          id: ord.id,
+          reseller_name: ord.resellerName || 'Revendedor',
+          reseller_email: ord.resellerEmail || '',
+          wholesale_total: Number(ord.wholesaleTotal) || 0,
+          total: Number(ord.wholesaleTotal) || 0,
+          status: ord.status || 'aguardando_impressao',
+          dispatch_mode: ord.dispatchMode || 'marketplace_label',
+          customer_name: ord.customerName || 'Cliente Final',
+          customer_address: ord.customerAddress || 'Endereço',
+          customer_city: ord.customerCity || 'São Paulo',
+          customer_state: ord.customerState || 'SP',
+          customer_zip: ord.customerZip || '01000-000'
+        });
+      }
+
+      showNotification('🚀 Todos os dados foram sincronizados com o Supabase!', 'success');
+      return true;
+    } catch (err) {
+      showNotification(`Erro ao sincronizar com Supabase: ${err.message}`, 'error');
+      return false;
+    }
+  };
 
   // Category Operations
   const addCategory = async (categoryName) => {
@@ -995,7 +1193,11 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         setItemsPerRow,
         companySettings,
         updateCompanySettings,
-        resetSystemForProduction
+        resetSystemForProduction,
+        syncAllToSupabase,
+        getSupabaseCredentials,
+        saveSupabaseCredentials,
+        testSupabaseConnection
       }}
     >
       {children}

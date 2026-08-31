@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import logoImg from '../assets/logo.png';
 import { LegalModal } from './LegalModal';
 import { 
   Building2, 
@@ -48,7 +49,7 @@ export const Footer = ({ onOpenTracking, onOpenFaq, onOpenAdminLogin }) => {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="h-11 flex items-center justify-center shrink-0">
-                <img src="/logo.png" alt="SMD Drop Logo" className="h-11 w-auto max-h-12 object-contain rounded-lg shadow-sm" />
+                <img src={logoImg} alt="SMD Drop Logo" className="h-11 w-auto max-h-12 object-contain rounded-lg shadow-sm" onError={(e) => { e.target.onerror = null; e.target.src = "/logo.png"; }} />
               </div>
               <div>
                 <span className="font-extrabold text-lg tracking-tight text-[var(--text-main)] font-['Outfit'] block">

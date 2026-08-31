@@ -57,7 +57,11 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
     deleteOrder, 
     updateOrderStatus,
     showNotification,
-    resetSystemForProduction
+    resetSystemForProduction,
+    syncAllToSupabase,
+    getSupabaseCredentials,
+    saveSupabaseCredentials,
+    testSupabaseConnection
   } = useStore();
 
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'products', 'orders', 'users', 'pending', 'settings'
@@ -66,6 +70,30 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [evaluatingPendingProduct, setEvaluatingPendingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Database & Cloud Sync State
+  const [dbUrl, setDbUrl] = useState(() => getSupabaseCredentials?.().url || '');
+  const [dbKey, setDbKey] = useState(() => getSupabaseCredentials?.().key || '');
+  const [dbTestResult, setDbTestResult] = useState(null);
+  const [isSyncingDb, setIsSyncingDb] = useState(false);
+
+  const handleTestDb = async () => {
+    setDbTestResult({ loading: true, message: 'Testando conexão com Supabase...' });
+    const res = await testSupabaseConnection(dbUrl, dbKey);
+    setDbTestResult(res);
+  };
+
+  const handleSaveDbCredentials = (e) => {
+    e.preventDefault();
+    saveSupabaseCredentials(dbUrl, dbKey);
+    showNotification('Credenciais do banco de dados salvas!');
+  };
+
+  const handleSyncAll = async () => {
+    setIsSyncingDb(true);
+    await syncAllToSupabase();
+    setIsSyncingDb(false);
+  };
 
   // Settings Form State
   const [settingsForm, setSettingsForm] = useState(() => ({ ...companySettings }));
@@ -1121,6 +1149,83 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
                   className="input-field text-xs"
                   placeholder="Subtítulo ex: Preços direto de fábrica"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Box 6: Database Connection & Cloud Sync */}
+          <div className="space-y-4 pt-4 border-t border-[var(--border-color)]">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-amber-500 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                <Layers size={16} /> 6. Banco de Dados & Sincronização em Nuvem (Supabase & Guia Anônima)
+              </h4>
+              <span className="badge-emerald text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                <CheckCircle size={12} /> Sync Cross-Tab & Incôgnito Ativo
+              </span>
+            </div>
+
+            <div className="bg-[var(--bg-surface-hover)] p-4 rounded-xl border border-[var(--border-color)] space-y-3">
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                Sua plataforma possui sincronização em tempo real via BroadcastChannel para todas as abas e guias anônimas. Para conectar com o banco de dados remoto PostgreSQL/Supabase, configure a URL e Chave Anon abaixo.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase mb-1">VITE_SUPABASE_URL</label>
+                  <input
+                    type="text"
+                    value={dbUrl}
+                    onChange={(e) => setDbUrl(e.target.value)}
+                    placeholder="https://suasubdominio.supabase.co"
+                    className="input-field text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase mb-1">VITE_SUPABASE_ANON_KEY</label>
+                  <input
+                    type="password"
+                    value={dbKey}
+                    onChange={(e) => setDbKey(e.target.value)}
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                    className="input-field text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              {dbTestResult && (
+                <div className={`p-3 rounded-lg text-xs font-semibold border ${
+                  dbTestResult.success ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'
+                }`}>
+                  {dbTestResult.message}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveDbCredentials}
+                  className="btn-gold text-xs py-2 px-4 font-bold flex items-center gap-1.5"
+                >
+                  <Save size={14} /> Salvar Credenciais
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTestDb}
+                  className="btn-secondary text-xs py-2 px-4 font-bold flex items-center gap-1.5"
+                >
+                  <CheckCircle size={14} className="text-amber-500" /> Testar Conexão Supabase
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSyncAll}
+                  disabled={isSyncingDb}
+                  className="btn-emerald text-xs py-2 px-4 font-bold flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md transition-all disabled:opacity-50"
+                >
+                  <Sparkles size={14} /> {isSyncingDb ? 'Sincronizando...' : '🚀 Sincronizar Tudo com Supabase Agora'}
+                </button>
               </div>
             </div>
           </div>
