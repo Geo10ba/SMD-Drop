@@ -544,8 +544,8 @@ export const StoreProvider = ({ children }) => {
 
   // User Management Functions
   const updateUserStatus = (userId, newStatus, newTier, newDiscount) => {
-    setUsers((prev) =>
-      prev.map((u) => {
+    setUsers((prev) => {
+      const next = prev.map((u) => {
         if (u.id === userId) {
           return {
             ...u,
@@ -555,18 +555,51 @@ export const StoreProvider = ({ children }) => {
           };
         }
         return u;
-      })
-    );
+      });
+      const target = next.find((u) => u.id === userId);
+      if (target) {
+        syncToSupabase('users', {
+          id: target.id,
+          name: target.name,
+          email: target.email,
+          phone: target.phone,
+          cnpj: target.cnpj,
+          role: target.role,
+          status: target.status,
+          tier: target.tier,
+          discount_percent: target.discountPercent
+        });
+      }
+      return next;
+    });
     showNotification(`Dados do revendedor atualizados com sucesso!`);
   };
 
   const deleteUser = (userId) => {
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     showNotification('Revendedor removido da base.');
+
+    const client = getSupabaseClient();
+    if (client) {
+      client.from('users').delete().eq('id', userId).then(() => {});
+    }
   };
 
   const updateProfile = (updatedProfile) => {
-    setCurrentUser((prev) => ({ ...prev, ...updatedProfile }));
+    setCurrentUser((prev) => {
+      const nextUser = { ...prev, ...updatedProfile };
+      syncToSupabase('users', {
+        id: nextUser.id,
+        name: nextUser.name,
+        email: nextUser.email,
+        phone: nextUser.phone,
+        cnpj: nextUser.cnpj,
+        role: nextUser.role,
+        status: nextUser.status,
+        tier: nextUser.tier
+      });
+      return nextUser;
+    });
     setUsers((prev) =>
       prev.map((u) => (u.id === currentUser.id ? { ...u, ...updatedProfile } : u))
     );
@@ -818,6 +851,44 @@ export const StoreProvider = ({ children }) => {
             setItemsPerPageState(Number(s.items_per_page));
             if (typeof window !== 'undefined') localStorage.setItem('apex_items_per_page', String(s.items_per_page));
           }
+        }
+
+        // 5. Fetch Materials from Supabase
+        const { data: dbMaterials, error: matErr } = await client.from('materials').select('*');
+        if (!matErr && dbMaterials && dbMaterials.length > 0) {
+          const normalizedMats = dbMaterials.map((m) => ({
+            id: m.id,
+            name: m.name,
+            factoryCostPerM2: Number(m.factory_cost_per_m2 ?? 180),
+            wholesalePricePerM2: Number(m.wholesale_price_per_m2 ?? 530),
+            suggestedPricePerM2: Number(m.suggested_price_per_m2 ?? 800),
+            style: m.style || 'dourado',
+            leadTimeDays: Number(m.lead_time_days ?? 3),
+            description: m.description || ''
+          }));
+          setMaterialsState(normalizedMats);
+          if (typeof window !== 'undefined') localStorage.setItem('smd_materials', JSON.stringify(normalizedMats));
+        }
+
+        // 6. Fetch Users from Supabase
+        const { data: dbUsers, error: usrErr } = await client.from('users').select('*');
+        if (!usrErr && dbUsers && dbUsers.length > 0) {
+          const normalizedUsers = dbUsers.map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            phone: u.phone,
+            cnpj: u.cnpj,
+            role: u.role || 'reseller',
+            status: u.status || 'aprovado',
+            tier: u.tier || 'Bronze',
+            discountPercent: Number(u.discount_percent ?? 0),
+            totalOrders: Number(u.total_orders ?? 0),
+            totalSpent: Number(u.total_spent ?? 0),
+            createdAt: u.created_at
+          }));
+          setUsersState(normalizedUsers);
+          if (typeof window !== 'undefined') localStorage.setItem('smd_users', JSON.stringify(normalizedUsers));
         }
       } catch (err) {
         console.warn('Supabase initial fetch fallback:', err);
