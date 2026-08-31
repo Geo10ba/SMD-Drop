@@ -141,3 +141,13 @@ VALUES
     ('mat-acm', 'ACM (Alumínio Composto)', 670.00, 1000.00, 'prata', 3, 'Metálico e moderno, para fachadas, letreiros externos e painéis.'),
     ('mat-acrilico-luxo', 'Acrílico Premium (Luxo)', 920.00, 1380.00, 'dourado', 3, 'Corte a laser de alta precisão em acrílico cast nobre espelhado.')
 ON CONFLICT (id) DO NOTHING;
+
+-- DESABILITAR ROW-LEVEL SECURITY (RLS) EM TODAS AS TABELAS PARA GARANTIR 100% ACESSO TOTAL
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE materials DISABLE ROW LEVEL SECURITY;
+ALTER TABLE products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE orders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE company_settings DISABLE ROW LEVEL SECURITY;
+
