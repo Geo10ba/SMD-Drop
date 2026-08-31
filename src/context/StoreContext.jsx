@@ -649,6 +649,12 @@ export const StoreProvider = ({ children }) => {
         } else if (key === 'companySettings' && data) {
           setCompanySettingsState(data);
           localStorage.setItem('smd_company_settings', JSON.stringify(data));
+        } else if (key === 'itemsPerRow' && data) {
+          setItemsPerRowState(Number(data));
+          localStorage.setItem('apex_items_per_row', String(data));
+        } else if (key === 'itemsPerPage' && data) {
+          setItemsPerPageState(Number(data));
+          localStorage.setItem('apex_items_per_page', String(data));
         }
       }
     };
@@ -797,6 +803,20 @@ export const StoreProvider = ({ children }) => {
           setOrdersState(normalizedOrders);
           if (typeof window !== 'undefined') {
             localStorage.setItem('smd_orders', JSON.stringify(normalizedOrders));
+          }
+        }
+
+        // 4. Fetch Company Settings & Layout preferences from Supabase
+        const { data: dbSettings, error: setErr } = await client.from('company_settings').select('*').limit(1);
+        if (!setErr && dbSettings && dbSettings.length > 0) {
+          const s = dbSettings[0];
+          if (s.items_per_row) {
+            setItemsPerRowState(Number(s.items_per_row));
+            if (typeof window !== 'undefined') localStorage.setItem('apex_items_per_row', String(s.items_per_row));
+          }
+          if (s.items_per_page) {
+            setItemsPerPageState(Number(s.items_per_page));
+            if (typeof window !== 'undefined') localStorage.setItem('apex_items_per_page', String(s.items_per_page));
           }
         }
       } catch (err) {
@@ -1150,16 +1170,18 @@ export const StoreProvider = ({ children }) => {
     setItemsPerPageState(val);
     if (typeof window !== 'undefined') {
       localStorage.setItem('apex_items_per_page', String(val));
+      broadcastSync('itemsPerPage', val);
     }
+    syncToSupabase('company_settings', { id: 1, items_per_page: val });
     showNotification(`Limite do catálogo configurado para ${val} produtos por página!`);
   };
 
   // Items Per Row Setting (Configured by Factory Admin: 3, 4, or 6 columns)
   const [itemsPerRow, setItemsPerRowState] = useState(() => {
     if (typeof window !== 'undefined') {
-      return Number(localStorage.getItem('apex_items_per_row')) || 6;
+      return Number(localStorage.getItem('apex_items_per_row')) || 4;
     }
-    return 6;
+    return 4;
   });
 
   const setItemsPerRow = (num) => {
@@ -1167,7 +1189,9 @@ export const StoreProvider = ({ children }) => {
     setItemsPerRowState(val);
     if (typeof window !== 'undefined') {
       localStorage.setItem('apex_items_per_row', String(val));
+      broadcastSync('itemsPerRow', val);
     }
+    syncToSupabase('company_settings', { id: 1, items_per_row: val });
     showNotification(`Grade configurada para ${val} produtos por linha!`);
   };
 
