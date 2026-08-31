@@ -285,18 +285,48 @@ export const StoreProvider = ({ children }) => {
     const updated = [item, ...materials];
     setMaterials(updated);
     showNotification(`Material "${item.name}" adicionado com sucesso!`);
+
+    syncToSupabase('materials', {
+      id: item.id,
+      name: item.name,
+      factory_cost_per_m2: item.factoryCostPerM2,
+      wholesale_price_per_m2: item.wholesalePricePerM2,
+      suggested_price_per_m2: item.suggestedPricePerM2,
+      style: item.style,
+      lead_time_days: item.leadTimeDays,
+      description: item.description
+    });
   };
 
   const updateMaterial = (id, updatedFields) => {
     const updated = materials.map((m) => (m.id === id ? { ...m, ...updatedFields } : m));
     setMaterials(updated);
     showNotification('Valores do material atualizados com sucesso!');
+
+    const target = updated.find((m) => m.id === id);
+    if (target) {
+      syncToSupabase('materials', {
+        id: target.id,
+        name: target.name,
+        factory_cost_per_m2: target.factoryCostPerM2,
+        wholesale_price_per_m2: target.wholesalePricePerM2,
+        suggested_price_per_m2: target.suggestedPricePerM2,
+        style: target.style,
+        lead_time_days: target.leadTimeDays,
+        description: target.description
+      });
+    }
   };
 
   const deleteMaterial = (id) => {
     const updated = materials.filter((m) => m.id !== id);
     setMaterials(updated);
     showNotification('Material removido.');
+
+    const client = getSupabaseClient();
+    if (client) {
+      client.from('materials').delete().eq('id', id).then(() => {});
+    }
   };
 
   // Products State (Zerado para Produção Real)
@@ -943,11 +973,22 @@ export const StoreProvider = ({ children }) => {
       })
     );
     showNotification(`Status do Pedido ${orderId} atualizado!`);
+
+    syncToSupabase('orders', {
+      id: orderId,
+      status: newStatus,
+      tracking_code: trackingCode || null
+    });
   };
 
   const deleteOrder = (orderId) => {
     setOrders((prev) => prev.filter((o) => o.id !== orderId));
     showNotification(`Pedido ${orderId} excluído do sistema.`);
+
+    const client = getSupabaseClient();
+    if (client) {
+      client.from('orders').delete().eq('id', orderId).then(() => {});
+    }
   };
 
   // Add Product by Admin (Direct active publication)
@@ -1034,6 +1075,20 @@ export const StoreProvider = ({ children }) => {
       prev.map((p) => (p.id === pendingId ? { ...p, status: 'approved' } : p))
     );
     showNotification(`Produto "${approvedProduct.title}" precificado e APROVADO para o catálogo oficial!`);
+
+    syncToSupabase('products', {
+      id: approvedProduct.id,
+      title: approvedProduct.title,
+      category_name: approvedProduct.category || null,
+      pricing_type: approvedProduct.pricingType || 'fixed',
+      wholesale_price: Number(approvedProduct.wholesalePrice) || 0,
+      suggested_retail_price: Number(approvedProduct.suggestedRetailPrice) || 0,
+      price_per_m2: Number(approvedProduct.pricePerM2) || 0,
+      suggested_price_per_m2: Number(approvedProduct.suggestedPricePerM2) || 0,
+      description: approvedProduct.description || '',
+      image_url: approvedProduct.image || '',
+      status: 'approved'
+    });
   };
 
   // Reject Reseller Suggested Product (Admin action with reason)
@@ -1049,15 +1104,37 @@ export const StoreProvider = ({ children }) => {
   };
 
   const updateProduct = (productId, updatedFields) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, ...updatedFields } : p))
-    );
+    setProducts((prev) => {
+      const next = prev.map((p) => (p.id === productId ? { ...p, ...updatedFields } : p));
+      const target = next.find((p) => p.id === productId);
+      if (target) {
+        syncToSupabase('products', {
+          id: target.id,
+          title: target.title,
+          category_name: target.category || null,
+          pricing_type: target.pricingType || 'fixed',
+          wholesale_price: Number(target.wholesalePrice) || 0,
+          suggested_retail_price: Number(target.suggestedRetailPrice) || 0,
+          price_per_m2: Number(target.pricePerM2) || 0,
+          suggested_price_per_m2: Number(target.suggestedPricePerM2) || 0,
+          description: target.description || '',
+          image_url: target.image || '',
+          status: 'approved'
+        });
+      }
+      return next;
+    });
     showNotification(`Produto atualizado com sucesso!`);
   };
 
   const deleteProduct = (productId) => {
     setProducts((prev) => prev.filter((p) => p.id !== productId));
     showNotification('Produto removido do catálogo.');
+
+    const client = getSupabaseClient();
+    if (client) {
+      client.from('products').delete().eq('id', productId).then(() => {});
+    }
   };
 
   // Items Per Page Setting (Configured by Factory Admin)
