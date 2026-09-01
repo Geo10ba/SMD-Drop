@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { Tag, Plus, Edit2, Trash2, Check, X, FolderTree, Sparkles } from 'lucide-react';
 
@@ -8,6 +9,17 @@ export const CategoryManagerModal = ({ isOpen, onClose }) => {
   const [newCatName, setNewCatName] = useState('');
   const [editingCat, setEditingCat] = useState(null);
   const [editCatName, setEditCatName] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -31,9 +43,9 @@ export const CategoryManagerModal = ({ isOpen, onClose }) => {
     setEditingCat(null);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-3xl w-full flex flex-col p-5 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-3xl w-full flex flex-col p-5 sm:p-6 shadow-2xl relative my-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
           <div className="flex items-center gap-3">
@@ -143,6 +155,7 @@ export const CategoryManagerModal = ({ isOpen, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

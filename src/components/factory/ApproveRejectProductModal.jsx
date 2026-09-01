@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { CheckCircle2, XCircle, DollarSign, Tag, AlertCircle, Sparkles } from 'lucide-react';
 
@@ -10,6 +11,13 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
   const [suggestedPrice, setSuggestedPrice] = useState(140);
   const [category, setCategory] = useState(categories[0]);
   const [rejectionReason, setRejectionReason] = useState('Produto fora do padrão de fabricação da nossa empresa.');
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
 
   useEffect(() => {
     if (pendingProduct) {
@@ -38,9 +46,9 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col p-5 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col p-5 sm:p-6 shadow-2xl relative my-auto">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
           <div>
@@ -188,6 +196,7 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

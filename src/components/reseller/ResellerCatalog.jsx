@@ -7,6 +7,7 @@ import { ProfitCalculatorModal } from './ProfitCalculatorModal';
 import { ExportCatalogModal } from './ExportCatalogModal';
 import { MagicImportModal } from './MagicImportModal';
 import { ResellerDashboard } from './ResellerDashboard';
+import { VariationSelectionModal } from './VariationSelectionModal';
 import { 
   Ruler, 
   ShoppingBag, 
@@ -44,7 +45,9 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
     companySettings
   } = useStore();
 
-  const availableCategories = ['Todos', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))];
+  const activeProducts = products.filter(p => p.status === 'approved');
+
+  const availableCategories = ['Todos', ...Array.from(new Set(activeProducts.map((p) => p.category).filter(Boolean)))];
 
   const [resellerViewMode, setResellerViewMode] = useState('catalog'); // 'catalog' or 'dashboard'
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -55,6 +58,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   const [m2Product, setM2Product] = useState(null);
   const [mediaKitProduct, setMediaKitProduct] = useState(null);
   const [profitModalProduct, setProfitModalProduct] = useState(null);
+  const [variationProduct, setVariationProduct] = useState(null);
   const [customPrices, setCustomPrices] = useState({});
 
   const handleCustomPriceChange = (productId, val) => {
@@ -81,7 +85,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   }, [selectedCategory, selectedPricingType, searchQuery, itemsPerPage]);
 
   // Filter logic
-  const filteredProducts = products.filter((product) => {
+  const filteredProducts = activeProducts.filter((product) => {
     const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory;
     const matchesPricing = selectedPricingType === 'all' || product.pricingType === selectedPricingType;
     const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -497,7 +501,13 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                             </button>
                           ) : (
                             <button
-                              onClick={() => addToCart({ ...product, customSellingPrice: customPrices[product.id] })}
+                              onClick={() => {
+                                if (product.variations && product.variations.length > 0) {
+                                  setVariationProduct(product);
+                                } else {
+                                  addToCart({ ...product, customSellingPrice: customPrices[product.id] });
+                                }
+                              }}
                               className="btn-gold py-1.5 px-2 text-[11px] font-extrabold flex-1 flex items-center justify-center gap-1 truncate shadow-md"
                             >
                               <ShoppingBag size={13} className="shrink-0" />
@@ -524,6 +534,13 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
       )}
 
       {/* Modals */}
+      {variationProduct && (
+        <VariationSelectionModal
+          product={variationProduct}
+          onClose={() => setVariationProduct(null)}
+        />
+      )}
+
       {m2Product && (
         <CustomSizeCalculator
           product={m2Product}

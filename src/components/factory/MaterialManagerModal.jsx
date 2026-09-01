@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { Layers, Plus, Edit2, Trash2, Save, Sparkles, Check, DollarSign, TrendingUp, ShieldAlert } from 'lucide-react';
 
@@ -23,6 +24,17 @@ export const MaterialManagerModal = ({ isOpen, onClose }) => {
   const [newStyle, setNewStyle] = useState('dourado');
   const [newLeadTime, setNewLeadTime] = useState(3);
   const [newDesc, setNewDesc] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -66,9 +78,9 @@ export const MaterialManagerModal = ({ isOpen, onClose }) => {
     setIsAddingNew(false);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col p-5 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col p-5 sm:p-6 shadow-2xl relative my-auto">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
           <div className="flex items-center gap-3">
@@ -346,6 +358,7 @@ export const MaterialManagerModal = ({ isOpen, onClose }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

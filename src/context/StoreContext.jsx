@@ -38,6 +38,93 @@ const getInitialBookmarkletData = () => {
   return null;
 };
 
+export function serializeProductForSupabase(p) {
+  const meta = {
+    shopeeId: p.shopeeId || p.shopee_id || '',
+    parentSku: p.parentSku || p.parent_sku || '',
+    variations: p.variations || [],
+    images: p.images || [p.image || p.image_url],
+    weightKg: p.weightKg ?? p.weight_kg ?? 0.5,
+    dimensions: p.dimensions || { length: 30, width: 30, height: 10 },
+    ncm: p.ncm || '3926.90.90',
+    cest: p.cest || '',
+    measureUnit: p.measureUnit || 'UN (UNIDADE)',
+    cfopSame: p.cfopSame || '5101',
+    cfopDiff: p.cfopDiff || '6101',
+    csosn: p.csosn || '',
+    origin: p.origin || ''
+  };
+
+  const metaString = '<!--SMD_META:' + JSON.stringify(meta) + '-->';
+  const cleanDesc = (p.description || '').replace(/<!--SMD_META:[\s\S]*?-->/g, '').trim();
+
+  return {
+    id: String(p.id),
+    title: p.title,
+    category_name: p.category || p.category_name || 'Geral',
+    pricing_type: p.pricingType || p.pricing_type || 'fixed',
+    wholesale_price: Number(p.wholesalePrice ?? p.wholesale_price ?? 0),
+    suggested_retail_price: Number(p.suggestedRetailPrice ?? p.suggested_retail_price ?? 0),
+    price_per_m2: Number(p.pricePerM2 ?? p.price_per_m2 ?? 0),
+    suggested_price_per_m2: Number(p.suggestedPricePerM2 ?? p.suggested_price_per_m2 ?? 0),
+    factory_stock: Number(p.factoryStock ?? p.factory_stock ?? 100),
+    description: cleanDesc ? `${cleanDesc}\n${metaString}` : metaString,
+    image_url: p.image || p.image_url || (p.images && p.images[0]) || '',
+    ncm: p.ncm || '3926.90.90',
+    status: p.status || 'rascunho'
+  };
+}
+
+export function deserializeProductFromSupabase(p) {
+  let meta = {};
+  let cleanDesc = p.description || '';
+
+  if (p.description && p.description.includes('<!--SMD_META:')) {
+    const match = p.description.match(/<!--SMD_META:([\s\S]*?)-->/);
+    if (match && match[1]) {
+      try {
+        meta = JSON.parse(match[1]);
+        cleanDesc = p.description.replace(/<!--SMD_META:[\s\S]*?-->/g, '').trim();
+      } catch (e) {}
+    }
+  }
+
+  const imgs = meta.images || p.images || [p.image_url || p.image || ''];
+
+  return {
+    id: String(p.id),
+    title: p.title,
+    category: p.category_name || p.category || 'Geral',
+    pricingType: p.pricing_type || p.pricingType || 'fixed',
+    wholesalePrice: Number(p.wholesale_price ?? p.wholesalePrice ?? 0),
+    suggestedRetailPrice: Number(p.suggested_retail_price ?? p.suggestedRetailPrice ?? 0),
+    pricePerM2: Number(p.price_per_m2 ?? p.pricePerM2 ?? 530),
+    suggestedPricePerM2: Number(p.suggested_price_per_m2 ?? p.suggestedPricePerM2 ?? 800),
+    factoryStock: Number(p.factory_stock ?? p.factoryStock ?? 100),
+    description: cleanDesc,
+    image: p.image_url || p.image || (imgs && imgs[0]) || '',
+    images: imgs,
+    variations: meta.variations || p.variations || [],
+    shopeeId: meta.shopeeId || p.shopee_id || '',
+    parentSku: meta.parentSku || p.parent_sku || '',
+    weightKg: meta.weightKg ?? Number(p.weight_kg ?? 0.5),
+    dimensions: meta.dimensions || p.dimensions || { length: 30, width: 30, height: 10 },
+    ncm: meta.ncm || p.ncm || '3926.90.90',
+    cest: meta.cest || p.cest || '',
+    measureUnit: meta.measureUnit || p.measure_unit || 'UN (UNIDADE)',
+    cfopSame: meta.cfopSame || p.cfop_same || '5101',
+    cfopDiff: meta.cfopDiff || p.cfop_diff || '6101',
+    csosn: meta.csosn || p.csosn || '',
+    origin: meta.origin || p.origin || '',
+    status: p.status || 'rascunho',
+    mediaKit: {
+      photos: imgs,
+      copyTitle: p.title,
+      copyDescription: cleanDesc
+    }
+  };
+}
+
 export const StoreProvider = ({ children }) => {
   const broadcastSync = (key, data) => {
     if (typeof window === 'undefined') return;
@@ -407,13 +494,14 @@ export const StoreProvider = ({ children }) => {
     });
   };
 
-  const resetSystemForProduction = () => {
+  const resetSystemForProduction = async () => {
     setProducts([]);
     setCategories([]);
     setOrders([]);
     setPendingProducts([]);
     setUsers([]);
     setCart([]);
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('smd_products');
       localStorage.removeItem('smd_categories');
@@ -422,7 +510,20 @@ export const StoreProvider = ({ children }) => {
       localStorage.removeItem('smd_users');
       localStorage.removeItem('smd_cart');
     }
-    showNotification('🧹 Sistema zerado com sucesso! Prontíssimo para produção.', 'success');
+
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('order_items').delete().neq('id', '___');
+        await client.from('orders').delete().neq('id', '___');
+        await client.from('products').delete().neq('id', '___');
+        await client.from('categories').delete().neq('id', '___');
+      } catch (err) {
+        console.error('Erro ao zerar Supabase:', err);
+      }
+    }
+
+    showNotification('🧹 Sistema e Banco de Dados Zerados com Sucesso! Prontíssimo para Produção.', 'success');
   };
 
   // Notifications Toast
@@ -754,68 +855,11 @@ export const StoreProvider = ({ children }) => {
         }
 
         if (!prodErr && dbProducts && dbProducts.length > 0) {
-          const normalizedProds = dbProducts.map((p) => ({
-            id: p.id,
-            title: p.title,
-            category: p.category_name || p.category || 'Geral',
-            pricingType: p.pricing_type || p.pricingType || 'fixed',
-            wholesalePrice: Number(p.wholesale_price ?? p.wholesalePrice ?? 0),
-            suggestedRetailPrice: Number(p.suggested_retail_price ?? p.suggestedRetailPrice ?? 0),
-            pricePerM2: Number(p.price_per_m2 ?? p.pricePerM2 ?? 530),
-            suggestedPricePerM2: Number(p.suggested_price_per_m2 ?? p.suggestedPricePerM2 ?? 800),
-            description: p.description || '',
-            image: p.image_url || p.image || '',
-            video: p.video || '',
-            inStock: p.in_stock !== false,
-            mediaKit: {
-              photos: [p.image_url || p.image || ''],
-              copyTitle: p.title,
-              copyDescription: p.description
-            }
-          }));
+          const normalizedProds = dbProducts.map((p) => deserializeProductFromSupabase(p));
 
-          // Merge local products not yet in Supabase
-          let mergedProds = [...normalizedProds];
-          for (const lp of localProds) {
-            if (!mergedProds.some((p) => p.id === lp.id || p.title === lp.title)) {
-              mergedProds.push(lp);
-              // Push to Supabase automatically
-              client.from('products').upsert({
-                id: lp.id,
-                title: lp.title,
-                category_name: lp.category || null,
-                pricing_type: lp.pricingType || 'fixed',
-                wholesale_price: Number(lp.wholesalePrice) || 0,
-                suggested_retail_price: Number(lp.suggestedRetailPrice) || 0,
-                price_per_m2: Number(lp.pricePerM2) || 0,
-                suggested_price_per_m2: Number(lp.suggestedPricePerM2) || 0,
-                description: lp.description || '',
-                image_url: lp.image || '',
-                status: 'approved'
-              });
-            }
-          }
-
-          setProductsState(mergedProds);
+          setProductsState(normalizedProds);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('smd_products', JSON.stringify(mergedProds));
-          }
-        } else if (!prodErr && localProds.length > 0) {
-          // If DB has 0 products but local storage has products, push them all to Supabase!
-          for (const lp of localProds) {
-            client.from('products').upsert({
-              id: lp.id,
-              title: lp.title,
-              category_name: lp.category || null,
-              pricing_type: lp.pricingType || 'fixed',
-              wholesale_price: Number(lp.wholesalePrice) || 0,
-              suggested_retail_price: Number(lp.suggestedRetailPrice) || 0,
-              price_per_m2: Number(lp.pricePerM2) || 0,
-              suggested_price_per_m2: Number(lp.suggestedPricePerM2) || 0,
-              description: lp.description || '',
-              image_url: lp.image || '',
-              status: 'approved'
-            });
+            localStorage.setItem('smd_products', JSON.stringify(normalizedProds));
           }
         }
 
@@ -1167,19 +1211,17 @@ export const StoreProvider = ({ children }) => {
     );
     showNotification(`Produto "${approvedProduct.title}" precificado e APROVADO para o catálogo oficial!`);
 
-    syncToSupabase('products', {
-      id: approvedProduct.id,
-      title: approvedProduct.title,
-      category_name: approvedProduct.category || null,
-      pricing_type: approvedProduct.pricingType || 'fixed',
-      wholesale_price: Number(approvedProduct.wholesalePrice) || 0,
-      suggested_retail_price: Number(approvedProduct.suggestedRetailPrice) || 0,
-      price_per_m2: Number(approvedProduct.pricePerM2) || 0,
-      suggested_price_per_m2: Number(approvedProduct.suggestedPricePerM2) || 0,
-      description: approvedProduct.description || '',
-      image_url: approvedProduct.image || '',
-      status: 'approved'
-    });
+    const payload = serializeProductForSupabase(approvedProduct);
+    const client = getSupabaseClient();
+    if (client) {
+      client.from('categories').upsert([{
+        id: 'cat-' + (approvedProduct.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: approvedProduct.category || 'Geral',
+        slug: (approvedProduct.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-')
+      }]).then(() => {
+        client.from('products').upsert(payload);
+      });
+    }
   };
 
   // Reject Reseller Suggested Product (Admin action with reason)
@@ -1199,19 +1241,17 @@ export const StoreProvider = ({ children }) => {
       const next = prev.map((p) => (p.id === productId ? { ...p, ...updatedFields } : p));
       const target = next.find((p) => p.id === productId);
       if (target) {
-        syncToSupabase('products', {
-          id: target.id,
-          title: target.title,
-          category_name: target.category || null,
-          pricing_type: target.pricingType || 'fixed',
-          wholesale_price: Number(target.wholesalePrice) || 0,
-          suggested_retail_price: Number(target.suggestedRetailPrice) || 0,
-          price_per_m2: Number(target.pricePerM2) || 0,
-          suggested_price_per_m2: Number(target.suggestedPricePerM2) || 0,
-          description: target.description || '',
-          image_url: target.image || '',
-          status: 'approved'
-        });
+        const payload = serializeProductForSupabase(target);
+        const client = getSupabaseClient();
+        if (client) {
+          client.from('categories').upsert([{
+            id: 'cat-' + (target.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            name: target.category || 'Geral',
+            slug: (target.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-')
+          }]).then(() => {
+            client.from('products').upsert(payload);
+          });
+        }
       }
       return next;
     });
@@ -1226,6 +1266,131 @@ export const StoreProvider = ({ children }) => {
     if (client) {
       client.from('products').delete().eq('id', productId).then(() => {});
     }
+  };
+
+  // Shopee Spreadsheet Import & Draft Management Functions
+  const importShopeeProducts = (newProductsList) => {
+    if (!Array.isArray(newProductsList) || newProductsList.length === 0) return 0;
+
+    // Extract new categories and add them if not present
+    const newCats = Array.from(new Set(newProductsList.map(p => p.category).filter(Boolean)));
+    setCategories(prev => {
+      const merged = new Set([...prev, ...newCats]);
+      return Array.from(merged);
+    });
+
+    setProducts(prev => {
+      const newItemsMap = new Map(newProductsList.map(p => [p.id, p]));
+      
+      const updatedPrev = prev.map(p => {
+        const matched = newItemsMap.get(p.id) || newProductsList.find(np => np.shopeeId && p.shopeeId && np.shopeeId === p.shopeeId);
+        if (matched) {
+          newItemsMap.delete(matched.id);
+          return {
+            ...p,
+            variations: matched.variations && matched.variations.length > 0 ? matched.variations : (p.variations || []),
+            ncm: matched.ncm || p.ncm,
+            cest: matched.cest || p.cest,
+            measureUnit: matched.measureUnit || p.measureUnit,
+            cfopSame: matched.cfopSame || p.cfopSame,
+            cfopDiff: matched.cfopDiff || p.cfopDiff,
+            csosn: matched.csosn || p.csosn,
+            origin: matched.origin || p.origin,
+            weightKg: matched.weightKg || p.weightKg,
+            dimensions: matched.dimensions || p.dimensions,
+            images: matched.images && matched.images.length > 0 ? matched.images : p.images
+          };
+        }
+        return p;
+      });
+
+      const trulyNew = Array.from(newItemsMap.values());
+      const updated = [...trulyNew, ...updatedPrev];
+
+      // Sync imported drafts to Supabase asynchronously
+      const client = getSupabaseClient();
+      if (client && trulyNew.length > 0) {
+        const payload = trulyNew.map(p => serializeProductForSupabase(p));
+        const catPayload = Array.from(new Set(trulyNew.map(p => p.category).filter(Boolean))).map(c => ({
+          id: 'cat-' + c.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          name: c,
+          slug: c.toLowerCase().replace(/[^a-z0-9]/g, '-')
+        }));
+        client.from('categories').upsert(catPayload).then(() => {
+          // Chunk upload to prevent request size errors
+          const chunkSize = 50;
+          for (let i = 0; i < payload.length; i += chunkSize) {
+            client.from('products').upsert(payload.slice(i, i + chunkSize)).then(() => {});
+          }
+        });
+      }
+
+      return updated;
+    });
+
+    showNotification(`🎉 Planilhas Shopee sincronizadas com sucesso! Variações e dados atualizados.`, 'success');
+    return newProductsList.length;
+  };
+
+  const activateProduct = (productId) => {
+    setProducts((prev) => {
+      const next = prev.map((p) => (p.id === productId ? { ...p, status: 'approved' } : p));
+      const target = next.find((p) => p.id === productId);
+      if (target) {
+        const payload = serializeProductForSupabase(target);
+        const client = getSupabaseClient();
+        if (client) {
+          client.from('categories').upsert([{
+            id: 'cat-' + (target.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            name: target.category || 'Geral',
+            slug: (target.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-')
+          }]).then(() => {
+            client.from('products').upsert(payload);
+          });
+        }
+        showNotification(`✨ Produto "${target.title}" ativado e publicado no catálogo!`, 'success');
+      }
+      return next;
+    });
+  };
+
+  const activateSelectedDrafts = (productIds) => {
+    if (!Array.isArray(productIds) || productIds.length === 0) return;
+    const idSet = new Set(productIds);
+
+    setProducts((prev) => {
+      const next = prev.map((p) => (idSet.has(p.id) ? { ...p, status: 'approved' } : p));
+      
+      // Batch sync to Supabase
+      const client = getSupabaseClient();
+      if (client) {
+        const toSync = next.filter(p => idSet.has(p.id)).map(p => serializeProductForSupabase(p));
+        const catPayload = Array.from(new Set(toSync.map(p => p.category_name).filter(Boolean))).map(c => ({
+          id: 'cat-' + c.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          name: c,
+          slug: c.toLowerCase().replace(/[^a-z0-9]/g, '-')
+        }));
+        client.from('categories').upsert(catPayload).then(() => {
+          client.from('products').upsert(toSync);
+        });
+      }
+
+      return next;
+    });
+    showNotification(`🚀 ${productIds.length} produto(s) ativado(s) e publicado(s) no catálogo oficial!`, 'success');
+  };
+
+  const deleteSelectedDrafts = (productIds) => {
+    if (!Array.isArray(productIds) || productIds.length === 0) return;
+    const idSet = new Set(productIds);
+
+    setProducts((prev) => prev.filter((p) => !idSet.has(p.id)));
+
+    const client = getSupabaseClient();
+    if (client) {
+      client.from('products').delete().in('id', productIds).then(() => {});
+    }
+    showNotification(`🗑️ ${productIds.length} rascunho(s) removido(s).`);
   };
 
   // Items Per Page Setting (Configured by Factory Admin)
@@ -1388,6 +1553,10 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         deleteMaterial,
         products,
         addProduct,
+        importShopeeProducts,
+        activateProduct,
+        activateSelectedDrafts,
+        deleteSelectedDrafts,
         pendingProducts,
         suggestProductByReseller,
         approveProductByAdmin,

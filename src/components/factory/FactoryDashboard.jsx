@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { 
   DollarSign, 
@@ -28,7 +28,17 @@ import {
   ShieldCheck,
   Plus,
   Save,
-  Building2
+  Building2,
+  FileSpreadsheet,
+  UploadCloud,
+  CheckSquare,
+  Square,
+  Zap,
+  Eye,
+  RefreshCw,
+  Play,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { EditProductModal } from './EditProductModal';
@@ -36,6 +46,7 @@ import { ApproveRejectProductModal } from './ApproveRejectProductModal';
 import { MaterialManagerModal } from './MaterialManagerModal';
 import { MagicImportModal } from '../reseller/MagicImportModal';
 import { Wand2, Clock, CheckCircle, XCircle as XCircleIcon } from 'lucide-react';
+import { parseShopeeFiles } from '../../lib/shopeeImporter';
 
 export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
   const { 
@@ -45,6 +56,12 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
     materials,
     users, 
     pendingProducts,
+    importShopeeProducts,
+    activateProduct,
+    activateSelectedDrafts,
+    deleteSelectedDrafts,
+    updateProduct,
+    deleteProduct,
     openMagicImport,
     itemsPerPage,
     setItemsPerPage,
@@ -64,12 +81,169 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
     testSupabaseConnection
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'products', 'orders', 'users', 'pending', 'settings'
+  const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'products', 'drafts', 'orders', 'users', 'pending', 'settings'
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isMaterialManagerOpen, setIsMaterialManagerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [evaluatingPendingProduct, setEvaluatingPendingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Draft Management State
+  const [draftSearchTerm, setDraftSearchTerm] = useState('');
+  const [draftCategoryFilter, setDraftCategoryFilter] = useState('Todos');
+  const [selectedDraftIds, setSelectedDraftIds] = useState([]);
+  const [isImportingLocal, setIsImportingLocal] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Helper: Auto Import from public/Planilha
+  const handleImportLocalFolder = async () => {
+    setIsImportingLocal(true);
+    showNotification('⏳ Lendo planilhas da pasta public/Planilha...', 'gold');
+    try {
+      const filenames = [
+        'mass_update_basic_info_574648231_20260901072516.xlsx',
+        'mass_update_media_info_574648231_20260901072723.xlsx',
+        'mass_update_sales_info_574648231_20260901072537.xlsx',
+        'mass_update_shipping_info_574648231_20260901072617.xlsx',
+        'mass_update_tax_info_574648231_20260901072725.xlsx'
+      ];
+
+      const fileObjs = [];
+      for (const fn of filenames) {
+        try {
+          const resp = await fetch(`/Planilha/${fn}`);
+          if (resp.ok) {
+            const buf = await resp.arrayBuffer();
+            fileObjs.push({ name: fn, data: buf });
+          }
+        } catch (e) {
+          console.warn(`Could not fetch /Planilha/${fn}`, e);
+        }
+      }
+
+      if (fileObjs.length === 0) {
+        showNotification('Nenhuma planilha válida foi acessada em public/Planilha', 'error');
+        setIsImportingLocal(false);
+        return;
+      }
+
+      const parsedProds = parseShopeeFiles(fileObjs);
+      if (parsedProds && parsedProds.length > 0) {
+        const count = importShopeeProducts(parsedProds);
+        setActiveTab('drafts');
+      } else {
+        showNotification('Nenhum produto foi extraído das planilhas.', 'error');
+      }
+    } catch (err) {
+      console.error('Error importing local spreadsheets:', err);
+      showNotification(`Erro ao importar planilhas: ${err.message}`, 'error');
+    }
+    setIsImportingLocal(false);
+  };
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setIsImportingLocal(true);
+    showNotification(`⏳ Lendo ${files.length} arquivo(s) de planilha Shopee...`, 'gold');
+
+    try {
+      const fileObjs = [];
+      for (const file of files) {
+        const buf = await file.arrayBuffer();
+        fileObjs.push({ name: file.name, data: buf });
+      }
+
+      const parsedProds = parseShopeeFiles(fileObjs);
+      if (parsedProds && parsedProds.length > 0) {
+        importShopeeProducts(parsedProds);
+        setActiveTab('drafts');
+      } else {
+        showNotification('Nenhum produto válido encontrado nas planilhas enviadas.', 'error');
+      }
+    } catch (err) {
+      console.error('Error reading files:', err);
+      showNotification(`Erro ao ler arquivos: ${err.message}`, 'error');
+    }
+    setIsImportingLocal(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Filtered product lists
+  const draftProducts = products.filter(p => p.status === 'rascunho' || p.status === 'draft' || !p.status);
+  const activeCatalogProducts = products.filter(p => p.status === 'approved');
+
+  const filteredDrafts = draftProducts.filter(p => {
+    const matchesSearch = p.title.toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
+                          (p.shopeeId && String(p.shopeeId).includes(draftSearchTerm)) ||
+                          (p.sku && p.sku.toLowerCase().includes(draftSearchTerm.toLowerCase()));
+    const matchesCat = draftCategoryFilter === 'Todos' || p.category === draftCategoryFilter;
+    return matchesSearch && matchesCat;
+  });
+
+  const toggleSelectDraft = (id) => {
+    setSelectedDraftIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllDrafts = () => {
+    if (selectedDraftIds.length === filteredDrafts.length && filteredDrafts.length > 0) {
+      setSelectedDraftIds([]);
+    } else {
+      setSelectedDraftIds(filteredDrafts.map(p => p.id));
+    }
+  };
+
+  const handleActivateSelected = () => {
+    if (selectedDraftIds.length === 0) return;
+    if (window.confirm(`Deseja ATIVAR os ${selectedDraftIds.length} produtos selecionados e publicá-los no catálogo oficial?`)) {
+      activateSelectedDrafts(selectedDraftIds);
+      setSelectedDraftIds([]);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedDraftIds.length === 0) return;
+    if (window.confirm(`Tem certeza que deseja EXCLUIR os ${selectedDraftIds.length} rascunhos selecionados?`)) {
+      deleteSelectedDrafts(selectedDraftIds);
+      setSelectedDraftIds([]);
+    }
+  };
+
+  const handleBulkPercentAdjustmentSelected = () => {
+    if (selectedDraftIds.length === 0) return;
+    const input = window.prompt(`Digite a % de reajuste de preço para aplicar em TODAS as variações dos ${selectedDraftIds.length} produtos selecionados (ex: 10 para aumentar 10%, ou -5 para reduzir 5%):`, "10");
+    if (input === null) return;
+    const pct = parseFloat(input.replace(',', '.'));
+    if (isNaN(pct)) {
+      showNotification('Porcentagem inválida informada.', 'error');
+      return;
+    }
+
+    const factor = 1 + (pct / 100);
+
+    selectedDraftIds.forEach(id => {
+      const prod = products.find(p => p.id === id);
+      if (prod) {
+        let updatedVars = (prod.variations || []).map(v => {
+          const nextW = Math.round((parseFloat(v.wholesalePrice) || 0) * factor * 100) / 100;
+          const nextR = Math.round((nextW / 0.45) * 100) / 100;
+          return { ...v, wholesalePrice: nextW, price: nextR };
+        });
+
+        const newWholesale = Math.round((Number(prod.wholesalePrice) || 0) * factor * 100) / 100;
+        const newRetail = Math.round((newWholesale / 0.45) * 100) / 100;
+
+        updateProduct(prod.id, {
+          wholesalePrice: newWholesale,
+          suggestedRetailPrice: newRetail,
+          variations: updatedVars
+        });
+      }
+    });
+
+    showNotification(`⚡ Reajuste de ${pct > 0 ? '+' : ''}${pct}% aplicado com sucesso nos ${selectedDraftIds.length} produtos selecionados!`, 'success');
+  };
 
   // Database & Cloud Sync State
   const [dbUrl, setDbUrl] = useState(() => getSupabaseCredentials?.().url || '');
@@ -229,6 +403,15 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
             </button>
 
             <button
+              onClick={handleImportLocalFolder}
+              disabled={isImportingLocal}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 px-4 rounded-xl text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition-all disabled:opacity-50"
+              title="Importar produtos em massa das planilhas na pasta public/Planilha como RASCUNHO"
+            >
+              <FileSpreadsheet size={16} /> ⚡ Importar Planilhas Shopee
+            </button>
+
+            <button
               onClick={() => openMagicImport()}
               className="btn-gold py-2.5 px-4 text-xs font-bold shadow-lg flex items-center gap-1.5"
             >
@@ -236,9 +419,9 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
             </button>
 
             <button
-              onClick={() => {
-                if (window.confirm("⚠️ Tem certeza de que deseja ZERAR todos os dados de simulação (produtos, pedidos e usuários) para colocar o sistema 100% limpo em produção?")) {
-                  resetSystemForProduction();
+              onClick={async () => {
+                if (window.confirm("⚠️ Tem certeza de que deseja ZERAR todos os dados (produtos, rascunhos, pedidos e banco de dados Supabase) para colocar o sistema 100% limpo em produção?")) {
+                  await resetSystemForProduction();
                 }
               }}
               className="bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 text-red-300 py-2.5 px-4 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all"
@@ -283,7 +466,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
         </div>
 
         {/* Tab Navigation Menu Grid - Zero Horizontal Scroll */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full pt-6 border-t border-slate-700/60 mt-6 text-xs font-bold">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 w-full pt-6 border-t border-slate-700/60 mt-6 text-xs font-bold">
           <button
             onClick={() => setActiveTab('analytics')}
             className={`py-2.5 px-3 rounded-xl transition-all flex items-center justify-between gap-1.5 border text-xs ${
@@ -294,6 +477,24 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
           >
             <span className="flex items-center gap-1.5 truncate">
               <BarChart2 size={15} className="shrink-0" /> Analítico
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('drafts')}
+            className={`py-2.5 px-3 rounded-xl transition-all flex items-center justify-between gap-1.5 border text-xs ${
+              activeTab === 'drafts' 
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold shadow-md border-amber-400' 
+                : 'bg-slate-800/80 hover:bg-slate-700/90 text-slate-300 hover:text-white border-slate-700/80'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 truncate">
+              <FileSpreadsheet size={15} className="shrink-0 text-amber-400" /> Rascunhos
+            </span>
+            <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0 ${
+              activeTab === 'drafts' ? 'bg-slate-950/20 text-slate-950' : 'bg-amber-500/20 text-amber-400'
+            }`}>
+              {draftProducts.length}
             </span>
           </button>
 
@@ -347,7 +548,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
             <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0 ${
               activeTab === 'products' ? 'bg-slate-950/20 text-slate-950' : 'bg-emerald-500/20 text-emerald-400'
             }`}>
-              {products.length}
+              {activeCatalogProducts.length}
             </span>
           </button>
 
@@ -407,7 +608,316 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
             </button>
           </div>
         )}
+        {/* Draft Products Alert Banner */}
+        {draftProducts.length > 0 && (
+          <div className="mt-3 bg-gradient-to-r from-blue-500/20 via-blue-500/10 to-transparent border border-blue-500/40 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-blue-500 text-slate-900 font-extrabold shrink-0">
+                <FileSpreadsheet size={20} />
+              </div>
+              <div>
+                <p className="font-extrabold text-blue-400 text-sm">
+                  📥 {draftProducts.length} Produto(s) Importado(s) em RASCUNHO Aguardando Ativação!
+                </p>
+                <p className="text-slate-300 text-xs mt-0.5">
+                  Produtos importados das planilhas ficam ocultos no catálogo até você ativá-los.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('drafts')}
+              className="btn-gold py-2 px-4 text-xs font-extrabold whitespace-nowrap shrink-0 shadow-md"
+            >
+              📂 Ver Rascunhos Agora →
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* TAB: DRAFTS & SHOPEE SPREADSHEET IMPORT */}
+      {activeTab === 'drafts' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Top Import Action Panel */}
+          <div className="glass-panel p-6 space-y-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-[var(--border-color)] pb-4">
+              <div>
+                <span className="badge-gold uppercase tracking-wider text-[10px] font-bold mb-1 inline-flex items-center gap-1">
+                  <FileSpreadsheet size={13} /> IMPORTADOR EM MASSA DE PLANILHAS SHOPEE
+                </span>
+                <h3 className="text-xl font-bold text-[var(--text-main)] font-['Outfit']">
+                  Gerenciador de Rascunhos & Importação Shopee
+                </h3>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  Ao importar planilhas, os produtos entram no sistema como <strong>RASCUNHO</strong> (ocultos para revendedores), permitindo que você edite e ative apenas os que desejar.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={handleImportLocalFolder}
+                  disabled={isImportingLocal}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  <Zap size={16} /> ⚡ Importar de public/Planilha
+                </button>
+
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImportingLocal}
+                  className="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 font-bold text-xs py-2.5 px-4 rounded-xl shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  <UploadCloud size={16} /> 📁 Upload Planilha Shopee (.xlsx/.csv)
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  multiple
+                  accept=".xlsx, .xls, .csv"
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            {/* Metrics Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
+              <div className="bg-[var(--bg-surface-hover)] p-3.5 rounded-xl border border-[var(--border-color)]">
+                <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] tracking-wider">Total de Rascunhos</span>
+                <p className="text-xl font-extrabold text-amber-500 font-['Outfit'] mt-0.5">
+                  {draftProducts.length} <span className="text-xs font-normal text-[var(--text-muted)]">itens</span>
+                </p>
+              </div>
+
+              <div className="bg-[var(--bg-surface-hover)] p-3.5 rounded-xl border border-[var(--border-color)]">
+                <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] tracking-wider">Categorias Identificadas</span>
+                <p className="text-xl font-extrabold text-[var(--text-main)] font-['Outfit'] mt-0.5">
+                  {new Set(draftProducts.map(d => d.category)).size} <span className="text-xs font-normal text-[var(--text-muted)]">categorias</span>
+                </p>
+              </div>
+
+              <div className="bg-[var(--bg-surface-hover)] p-3.5 rounded-xl border border-[var(--border-color)]">
+                <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] tracking-wider">Produtos Ativos no Catálogo</span>
+                <p className="text-xl font-extrabold text-emerald-500 font-['Outfit'] mt-0.5">
+                  {activeCatalogProducts.length} <span className="text-xs font-normal text-[var(--text-muted)]">visíveis</span>
+                </p>
+              </div>
+
+              <div className="bg-[var(--bg-surface-hover)] p-3.5 rounded-xl border border-[var(--border-color)]">
+                <span className="text-[10px] font-bold uppercase text-[var(--text-muted)] tracking-wider">Rascunhos Selecionados</span>
+                <p className="text-xl font-extrabold text-blue-400 font-['Outfit'] mt-0.5">
+                  {selectedDraftIds.length} <span className="text-xs font-normal text-[var(--text-muted)]">marcados</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Draft Products List Section */}
+          <div className="glass-panel p-6 space-y-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-[var(--border-color)] pb-4">
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                {/* Search */}
+                <div className="relative flex-1 md:w-64">
+                  <Search size={14} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por título, SKU ou ID Shopee..."
+                    value={draftSearchTerm}
+                    onChange={(e) => setDraftSearchTerm(e.target.value)}
+                    className="input-field pl-9 py-1.5 text-xs font-medium"
+                  />
+                </div>
+
+                {/* Category Filter */}
+                <select
+                  value={draftCategoryFilter}
+                  onChange={(e) => setDraftCategoryFilter(e.target.value)}
+                  className="input-field py-1.5 text-xs font-bold md:w-48"
+                >
+                  <option value="Todos">Todas as Categorias ({Array.from(new Set(draftProducts.map(p => p.category))).length})</option>
+                  {Array.from(new Set(draftProducts.map(p => p.category))).map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Batch Action Buttons */}
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                {selectedDraftIds.length > 0 && (
+                  <>
+                    <button
+                      onClick={handleActivateSelected}
+                      className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-extrabold text-xs py-1.5 px-3 rounded-xl shadow-md flex items-center gap-1.5 transition-all"
+                    >
+                      <Play size={14} /> Ativar Selecionados ({selectedDraftIds.length})
+                    </button>
+
+                    <button
+                      onClick={handleBulkPercentAdjustmentSelected}
+                      className="btn-gold font-extrabold text-xs py-1.5 px-3 rounded-xl shadow-md flex items-center gap-1.5 transition-all"
+                    >
+                      <Sparkles size={14} /> Reajustar % em Massa ({selectedDraftIds.length})
+                    </button>
+
+                    <button
+                      onClick={handleDeleteSelected}
+                      className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 font-bold text-xs py-1.5 px-3 rounded-xl flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 size={14} /> Excluir ({selectedDraftIds.length})
+                    </button>
+                  </>
+                )}
+
+                <button
+                  onClick={toggleSelectAllDrafts}
+                  className="btn-secondary text-xs py-1.5 px-3 font-semibold flex items-center gap-1.5"
+                >
+                  {selectedDraftIds.length === filteredDrafts.length && filteredDrafts.length > 0 ? (
+                    <> <CheckSquare size={14} className="text-amber-500" /> Desmarcar Todos </>
+                  ) : (
+                    <> <Square size={14} /> Selecionar Todos ({filteredDrafts.length}) </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Table of Draft Products */}
+            {filteredDrafts.length === 0 ? (
+              <div className="text-center py-12 space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-2xl font-bold">
+                  📥
+                </div>
+                <h4 className="text-base font-bold text-[var(--text-main)] font-['Outfit']">
+                  Nenhum Produto em Rascunho Encontrado
+                </h4>
+                <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
+                  Clique no botão "⚡ Importar Planilhas Shopee" para carregar as planilhas existentes ou envie novos arquivos .xlsx/.csv!
+                </p>
+                <button
+                  onClick={handleImportLocalFolder}
+                  disabled={isImportingLocal}
+                  className="btn-gold text-xs font-bold py-2 px-4 shadow-md inline-flex items-center gap-1.5 mt-2"
+                >
+                  <Zap size={15} /> Importar Planilhas da Pasta public/Planilha
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
+                    <tr>
+                      <th className="p-3 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedDraftIds.length === filteredDrafts.length && filteredDrafts.length > 0}
+                          onChange={toggleSelectAllDrafts}
+                          className="rounded text-amber-500 focus:ring-amber-500 cursor-pointer"
+                        />
+                      </th>
+                      <th className="p-3">Produto</th>
+                      <th className="p-3">Categoria</th>
+                      <th className="p-3">Custo Atacado</th>
+                      <th className="p-3">Venda Sugerida</th>
+                      <th className="p-3">NCM & Peso</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-color)] text-[var(--text-main)]">
+                    {filteredDrafts.map((p) => {
+                      const isSelected = selectedDraftIds.includes(p.id);
+                      return (
+                        <tr
+                          key={p.id}
+                          className={`transition-colors ${
+                            isSelected ? 'bg-amber-500/10 dark:bg-amber-500/20' : 'hover:bg-[var(--bg-surface-hover)]'
+                          }`}
+                        >
+                          <td className="p-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectDraft(p.id)}
+                              className="rounded text-amber-500 focus:ring-amber-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={p.image}
+                                alt={p.title}
+                                className="w-11 h-11 rounded-lg object-cover border border-[var(--border-color)] shrink-0"
+                              />
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-[var(--text-main)] block line-clamp-1" title={p.title}>
+                                  {p.title}
+                                </span>
+                                <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+                                  {p.shopeeId && <span className="font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold">ID: {p.shopeeId}</span>}
+                                  {p.variations && p.variations.length > 0 && <span className="font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">✨ {p.variations.length} variações</span>}
+                                  {p.images && p.images.length > 0 && <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">📸 {p.images.length} fotos</span>}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3 text-[var(--text-muted)] font-medium">
+                            <span className="bg-[var(--bg-surface-hover)] border border-[var(--border-color)] px-2 py-1 rounded-lg font-semibold text-[11px]">
+                              {p.category}
+                            </span>
+                          </td>
+                          <td className="p-3 font-bold font-mono text-amber-600 dark:text-amber-400">
+                            R$ {p.wholesalePrice?.toFixed(2)}
+                          </td>
+                          <td className="p-3 font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                            R$ {p.suggestedRetailPrice?.toFixed(2)}
+                          </td>
+                          <td className="p-3 text-[11px]">
+                            <div className="font-mono">{p.ncm || '3926.90.90'}</div>
+                            <div className="text-[10px] text-[var(--text-muted)]">{p.weightKg || 0.5} kg</div>
+                          </td>
+                          <td className="p-3">
+                            <span className="badge-gold text-[10px] font-extrabold whitespace-nowrap">
+                              📝 Rascunho
+                            </span>
+                          </td>
+                          <td className="p-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => activateProduct(p.id)}
+                                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-[11px] py-1 px-3 rounded-lg shadow-sm flex items-center gap-1"
+                                title="Ativar este produto e publicar no catálogo oficial"
+                              >
+                                <Play size={12} /> Ativar
+                              </button>
+
+                              <button
+                                onClick={() => setEditingProduct(p)}
+                                className="btn-secondary text-[11px] font-bold py-1 px-2.5"
+                                title="Editar informações do rascunho"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Excluir o rascunho "${p.title}"?`)) deleteProduct(p.id);
+                                }}
+                                className="p-1 text-red-500 hover:bg-red-500/10 rounded"
+                                title="Excluir Rascunho"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: ANALYTICS & CHARTS */}
       {activeTab === 'analytics' && (
