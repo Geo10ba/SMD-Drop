@@ -111,24 +111,18 @@ export const EditProductModal = ({ product, onClose }) => {
     const next = [...variations];
     next[index] = { ...next[index], [field]: value };
     
-    // Bidirectional auto-calculation: Atacado <-> Venda
-    if (field === 'price') {
-      const numPrice = parseFloat(value) || 0;
-      next[index].wholesalePrice = Math.round(numPrice * 0.45 * 100) / 100;
-    } else if (field === 'wholesalePrice') {
-      const numWholesale = parseFloat(value) || 0;
-      next[index].price = Math.round((numWholesale / 0.45) * 100) / 100;
-    }
-    
     setVariations(next);
 
-    // Recalculate total stock and min retail price
+    // Recalculate total stock and summary prices
     const totalStock = next.reduce((acc, v) => acc + (parseInt(v.stock, 10) || 0), 0);
     const validPrices = next.map(v => parseFloat(v.price) || 0).filter(p => p > 0);
+    const validWholesales = next.map(v => parseFloat(v.wholesalePrice) || 0).filter(w => w > 0);
+
     if (validPrices.length > 0) {
-      const minPrice = Math.min(...validPrices);
-      setSuggestedRetailPrice(minPrice);
-      setWholesalePrice(Math.round(minPrice * 0.45 * 100) / 100);
+      setSuggestedRetailPrice(Math.min(...validPrices));
+    }
+    if (validWholesales.length > 0) {
+      setWholesalePrice(Math.min(...validWholesales));
     }
     if (totalStock > 0) setFactoryStock(totalStock);
   };
@@ -145,14 +139,18 @@ export const EditProductModal = ({ product, onClose }) => {
       let nextS = parseInt(v.stock, 10) || 0;
 
       if (bulkTarget === 'wholesale') {
-        // Reajusta o Custo Atacado em X%
+        // Reajusta APENAS o Custo Atacado R$, mantendo a Sugestão de Revenda intacta
         nextW = Math.round(nextW * factor * 100) / 100;
-        // Recalcula a Sugestão de Venda mantendo a proporção (45%)
-        nextR = Math.round((nextW / 0.45) * 100) / 100;
       } else if (bulkTarget === 'retail') {
-        // Reajusta a Sugestão de Venda em X%
+        // Reajusta APENAS a Sugestão de Revenda R$, mantendo o Custo Atacado intacto
         nextR = Math.round(nextR * factor * 100) / 100;
-        // Recalcula o Custo Atacado (45%)
+      } else if (bulkTarget === 'wholesale_recalc') {
+        // Reajusta Custo Atacado e Recalcula Revenda (45%)
+        nextW = Math.round(nextW * factor * 100) / 100;
+        nextR = Math.round((nextW / 0.45) * 100) / 100;
+      } else if (bulkTarget === 'retail_recalc') {
+        // Reajusta Sugestão de Revenda e Recalcula Atacado (45%)
+        nextR = Math.round(nextR * factor * 100) / 100;
         nextW = Math.round(nextR * 0.45 * 100) / 100;
       } else if (bulkTarget === 'stock') {
         nextS = parseInt(bulkStockValue, 10) || 0;
@@ -170,11 +168,9 @@ export const EditProductModal = ({ product, onClose }) => {
 
     // Recalculate summary metrics
     const validPrices = updated.map(v => v.price).filter(p => p > 0);
-    if (validPrices.length > 0) {
-      const minPrice = Math.min(...validPrices);
-      setSuggestedRetailPrice(minPrice);
-      setWholesalePrice(Math.round(minPrice * 0.45 * 100) / 100);
-    }
+    const validWholesales = updated.map(v => v.wholesalePrice).filter(w => w > 0);
+    if (validPrices.length > 0) setSuggestedRetailPrice(Math.min(...validPrices));
+    if (validWholesales.length > 0) setWholesalePrice(Math.min(...validWholesales));
     const totalStock = updated.reduce((acc, v) => acc + (v.stock || 0), 0);
     setFactoryStock(totalStock);
   };
@@ -643,8 +639,10 @@ export const EditProductModal = ({ product, onClose }) => {
                         onChange={(e) => setBulkTarget(e.target.value)}
                         className="input-field py-1.5 text-xs font-semibold"
                       >
-                        <option value="wholesale">🏷️ Alterar Custo Atacado R$ (% Recalcula Venda Automático)</option>
-                        <option value="retail">💰 Alterar Sugestão de Revenda R$ (% Recalcula Atacado Automático)</option>
+                        <option value="wholesale">🏷️ Alterar APENAS Custo Atacado R$ (Manter Revenda Intacta)</option>
+                        <option value="retail">💰 Alterar APENAS Sugestão de Revenda R$ (Manter Atacado Intacto)</option>
+                        <option value="wholesale_recalc">🔄 Alterar Custo Atacado R$ (E Recalcular Revenda)</option>
+                        <option value="retail_recalc">🔄 Alterar Sugestão de Revenda R$ (E Recalcular Atacado)</option>
                         <option value="stock">📦 Definir Estoque Fixo em Massa</option>
                       </select>
                     </div>
