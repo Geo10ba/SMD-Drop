@@ -1371,7 +1371,10 @@ export const StoreProvider = ({ children }) => {
           slug: c.toLowerCase().replace(/[^a-z0-9]/g, '-')
         }));
         client.from('categories').upsert(catPayload).then(() => {
-          client.from('products').upsert(toSync);
+          const chunkSize = 50;
+          for (let i = 0; i < toSync.length; i += chunkSize) {
+            client.from('products').upsert(toSync.slice(i, i + chunkSize)).then(() => {});
+          }
         });
       }
 
