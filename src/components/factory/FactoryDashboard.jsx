@@ -38,6 +38,7 @@ import {
   RefreshCw,
   Play,
   Upload,
+  FileEdit,
   Image as ImageIcon
 } from 'lucide-react';
 import { CategoryManagerModal } from './CategoryManagerModal';
@@ -59,6 +60,8 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
     importShopeeProducts,
     activateProduct,
     activateSelectedDrafts,
+    moveProductToDraft,
+    moveSelectedToDraft,
     deleteSelectedDrafts,
     updateProduct,
     deleteProduct,
@@ -1178,12 +1181,25 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
                       {p.pricingType === 'custom_m2' ? "Corte a Laser" : `${p.factoryStock} un`}
                     </td>
                     <td className="p-3 text-right">
-                      <button
-                        onClick={() => setEditingProduct(p)}
-                        className="btn-secondary text-[11px] font-bold py-1 px-3"
-                      >
-                        <Edit2 size={13} /> Editar
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setEditingProduct(p)}
+                          className="btn-secondary text-[11px] font-bold py-1 px-3"
+                        >
+                          <Edit2 size={13} /> Editar
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Deseja mover "${p.title}" de volta para os RASCUNHOS? O produto ficará oculto no catálogo até ser ativado novamente.`)) {
+                              moveProductToDraft(p.id);
+                            }
+                          }}
+                          className="bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-500 font-bold text-[11px] py-1 px-2.5 rounded-lg flex items-center gap-1 transition-all"
+                          title="Mover de volta para Rascunho"
+                        >
+                          <FileEdit size={13} /> Rascunho
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

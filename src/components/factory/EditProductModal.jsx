@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { 
   Edit2, Tag, Image as ImageIcon, Save, Trash2, Sparkles, Eye, X, 
-  Layers, Package, FileText, Plus, Check, AlertCircle, RefreshCw, Star
+  Layers, Package, FileText, Plus, Check, AlertCircle, RefreshCw, Star, FileEdit, Play
 } from 'lucide-react';
 
 export const EditProductModal = ({ product, onClose }) => {
@@ -50,7 +50,7 @@ export const EditProductModal = ({ product, onClose }) => {
   const [csosn, setCsosn] = useState('102 - Tributada pelo Simples Nacional sem permissão de crédito');
   const [origin, setOrigin] = useState('0 - Nacional');
 
-  // Images Gallery
+  const [status, setStatus] = useState('approved');
   const [image, setImage] = useState('');
   const [images, setImages] = useState([]);
   const [newImageUrl, setNewImageUrl] = useState('');
@@ -66,6 +66,7 @@ export const EditProductModal = ({ product, onClose }) => {
     if (product) {
       setTitle(product.title || '');
       setCategory(product.category || categories[0] || 'Geral');
+      setStatus(product.status || 'approved');
       setParentSku(product.parentSku || product.sku || '');
       setShopeeId(product.shopeeId || '');
       setPricingType(product.pricingType || 'fixed');
@@ -261,6 +262,7 @@ export const EditProductModal = ({ product, onClose }) => {
       cfopDiff,
       csosn,
       origin,
+      status,
       image: image || images[0] || '',
       images: images.length > 0 ? images : [image]
     });
@@ -1071,16 +1073,44 @@ export const EditProductModal = ({ product, onClose }) => {
           )}
 
           {/* Modal Footer Controls */}
-          <div className="pt-4 border-t border-[var(--border-color)] flex justify-between items-center shrink-0">
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-500/10 flex items-center gap-1.5 transition-colors"
-            >
-              <Trash2 size={15} /> Excluir Produto
-            </button>
+          <div className="pt-4 border-t border-[var(--border-color)] flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-500/10 flex items-center gap-1.5 transition-colors"
+              >
+                <Trash2 size={15} /> Excluir Produto
+              </button>
 
-            <div className="flex gap-2">
+              {status === 'approved' ? (
+                <button
+                  type="button"
+                  onClick={() => setStatus('rascunho')}
+                  className="bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-500 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  title="Mover produto de volta para os rascunhos"
+                >
+                  <FileEdit size={14} /> Mover para Rascunho
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setStatus('approved')}
+                  className="bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-500 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  title="Ativar produto e publicar no catálogo"
+                >
+                  <Play size={14} /> Ativar Produto
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${
+                status === 'approved' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
+              }`}>
+                Status: {status === 'approved' ? '🟢 Ativo' : '🟡 Rascunho'}
+              </span>
+
               <button type="button" onClick={onClose} className="btn-secondary py-2.5 px-4 text-xs font-semibold">
                 Cancelar
               </button>

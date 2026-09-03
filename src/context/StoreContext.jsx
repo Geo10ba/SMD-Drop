@@ -1383,6 +1383,43 @@ export const StoreProvider = ({ children }) => {
     showNotification(`🚀 ${productIds.length} produto(s) ativado(s) e publicado(s) no catálogo oficial!`, 'success');
   };
 
+  const moveProductToDraft = (productId) => {
+    setProducts((prev) => {
+      const next = prev.map((p) => (p.id === productId ? { ...p, status: 'rascunho' } : p));
+      const target = next.find((p) => p.id === productId);
+      if (target) {
+        const payload = serializeProductForSupabase(target);
+        const client = getSupabaseClient();
+        if (client) {
+          client.from('products').upsert(payload);
+        }
+        showNotification(`📦 Produto "${target.title}" movido para Rascunho com sucesso!`, 'gold');
+      }
+      return next;
+    });
+  };
+
+  const moveSelectedToDraft = (productIds) => {
+    if (!Array.isArray(productIds) || productIds.length === 0) return;
+    const idSet = new Set(productIds);
+
+    setProducts((prev) => {
+      const next = prev.map((p) => (idSet.has(p.id) ? { ...p, status: 'rascunho' } : p));
+      
+      const client = getSupabaseClient();
+      if (client) {
+        const toSync = next.filter(p => idSet.has(p.id)).map(p => serializeProductForSupabase(p));
+        const chunkSize = 50;
+        for (let i = 0; i < toSync.length; i += chunkSize) {
+          client.from('products').upsert(toSync.slice(i, i + chunkSize)).then(() => {});
+        }
+      }
+
+      return next;
+    });
+    showNotification(`📦 ${productIds.length} produto(s) movido(s) para Rascunho!`, 'gold');
+  };
+
   const deleteSelectedDrafts = (productIds) => {
     if (!Array.isArray(productIds) || productIds.length === 0) return;
     const idSet = new Set(productIds);
@@ -1559,6 +1596,8 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         importShopeeProducts,
         activateProduct,
         activateSelectedDrafts,
+        moveProductToDraft,
+        moveSelectedToDraft,
         deleteSelectedDrafts,
         pendingProducts,
         suggestProductByReseller,
