@@ -27,6 +27,8 @@ import {
   Layers, 
   ChevronDown, 
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Lock,
   UserPlus
 } from 'lucide-react';
@@ -45,9 +47,16 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
     companySettings
   } = useStore();
 
-  const activeProducts = products.filter(p => p.status === 'approved');
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com';
+  const displayProducts = products.filter(p => p.status === 'approved' || p.status === 'ativo' || (!p.status && p.inStock)).map(p => {
+    let cleanCat = p.category;
+    if (!cleanCat || cleanCat === 'Others' || cleanCat === 'Outros') cleanCat = 'Quadros & Decoração';
+    if (cleanCat === 'Plates') cleanCat = 'Placas & Sinalização';
+    if (cleanCat === 'Fengshui & Religious Supplies') cleanCat = 'Quadros & Decoração';
+    return { ...p, category: cleanCat };
+  });
 
-  const availableCategories = ['Todos', ...Array.from(new Set(activeProducts.map((p) => p.category).filter(Boolean)))];
+  const availableCategories = ['Todos', ...Array.from(new Set(displayProducts.map((p) => p.category).filter(Boolean)))];
 
   const [resellerViewMode, setResellerViewMode] = useState('catalog'); // 'catalog' or 'dashboard'
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -85,7 +94,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   }, [selectedCategory, selectedPricingType, searchQuery, itemsPerPage]);
 
   // Filter logic
-  const filteredProducts = activeProducts.filter((product) => {
+  const filteredProducts = displayProducts.filter((product) => {
     const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory;
     const matchesPricing = selectedPricingType === 'all' || product.pricingType === selectedPricingType;
     const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -226,7 +235,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                   : 'text-[var(--text-muted)]'
               }`}
             >
-              <Store size={14} /> Catálogo ({products.length})
+              <Store size={14} /> Catálogo ({displayProducts.length})
             </button>
             {currentUser && (
               <button
@@ -241,6 +250,17 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
               </button>
             )}
           </div>
+
+          {/* Botão Mágico (Solicitar Orçamento / Importar Produto - Visível apenas para Usuários Logados) */}
+          {currentUser && (
+            <button
+              onClick={() => openMagicImport()}
+              className="btn-gold text-xs py-2 px-3 flex items-center gap-1.5 font-extrabold shadow-md hover:scale-105 transition-transform"
+              title="Enviar Produto para Aprovação ou Orçamento com Botão Mágico"
+            >
+              <Wand2 size={16} /> ⚡ Botão Mágico
+            </button>
+          )}
 
           {currentUser && (
             <button
@@ -284,7 +304,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                       : 'text-[var(--text-muted)]'
                   }`}
                 >
-                  Todos ({products.length})
+                  Todos ({displayProducts.length})
                 </button>
                 <button
                   onClick={() => setSelectedPricingType('fixed')}
@@ -332,7 +352,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
           </div>
 
           {/* Catalog Grid (Dynamic Column Count) */}
-          {products.length === 0 ? (
+          {displayProducts.length === 0 ? (
             <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-12 text-center space-y-4 my-6 shadow-sm">
               <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-3xl font-bold shadow-inner">
                 📦
@@ -528,6 +548,87 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Pagination Bar Footer */}
+          {totalItems > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[var(--bg-surface)] p-4 rounded-2xl border border-[var(--border-color)] shadow-sm mt-6">
+              {/* Counter and Items Per Page selector */}
+              <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)]">
+                <span>
+                  Mostrando <strong className="text-[var(--text-main)] font-bold">{startIndex + 1}</strong> a{' '}
+                  <strong className="text-[var(--text-main)] font-bold">
+                    {Math.min(startIndex + itemsPerPage, totalItems)}
+                  </strong>{' '}
+                  de <strong className="text-[var(--text-main)] font-bold">{totalItems}</strong> produtos
+                </span>
+
+                <div className="flex items-center gap-1.5 ml-0 sm:ml-2 pl-0 sm:pl-3 sm:border-l border-[var(--border-color)]">
+                  <label htmlFor="itemsPerPageSelect" className="whitespace-nowrap font-medium">Exibir por página:</label>
+                  <select
+                    id="itemsPerPageSelect"
+                    value={itemsPerPage}
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="bg-[var(--bg-surface-hover)] border border-[var(--border-color)] text-[var(--text-main)] rounded-lg text-xs font-bold py-1 px-2 focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value={8}>8</option>
+                    <option value={12}>12</option>
+                    <option value={24}>24</option>
+                    <option value={48}>48</option>
+                    <option value={96}>96</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Page buttons */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                      currentPage === 1
+                        ? 'opacity-40 cursor-not-allowed text-[var(--text-muted)]'
+                        : 'bg-[var(--bg-surface-hover)] text-[var(--text-main)] hover:bg-amber-500/20 hover:text-amber-500 border border-[var(--border-color)]'
+                    }`}
+                    title="Página Anterior"
+                  >
+                    <ChevronLeft size={16} />
+                    <span className="hidden sm:inline">Anterior</span>
+                  </button>
+
+                  <div className="flex items-center gap-1 max-w-[240px] overflow-x-auto py-1 scrollbar-none">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-xl text-xs font-extrabold flex items-center justify-center transition-all ${
+                          currentPage === page
+                            ? 'bg-slate-900 text-white dark:bg-amber-500 dark:text-slate-950 shadow-md scale-105'
+                            : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                      currentPage === totalPages
+                        ? 'opacity-40 cursor-not-allowed text-[var(--text-muted)]'
+                        : 'bg-[var(--bg-surface-hover)] text-[var(--text-main)] hover:bg-amber-500/20 hover:text-amber-500 border border-[var(--border-color)]'
+                    }`}
+                    title="Próxima Página"
+                  >
+                    <span className="hidden sm:inline">Próxima</span>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

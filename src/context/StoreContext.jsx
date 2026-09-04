@@ -38,21 +38,67 @@ const getInitialBookmarkletData = () => {
   return null;
 };
 
+export function resolveSmartNcm(p) {
+  if (p && p.ncm && p.ncm.trim().length >= 8 && p.ncm.trim() !== '3926.90.90') {
+    return p.ncm.trim();
+  }
+  const text = `${p?.title || ''} ${p?.category || ''}`.toLowerCase();
+  if (text.includes('mdf') || text.includes('madeira')) return '4421.99.00';
+  if (text.includes('relógio') || text.includes('relogio') || text.includes('clock')) return '9105.29.00';
+  if (text.includes('led') || text.includes('neon') || text.includes('luz')) return '8539.51.00';
+  if (text.includes('acm') || text.includes('metal') || text.includes('inox')) return '8306.29.00';
+  if (text.includes('quadro') || text.includes('impressão') || text.includes('poster')) return '4911.91.00';
+  return p?.ncm || '3926.90.90';
+}
+
+export function resolveSmartFiscalDetails(p) {
+  const ncm = resolveSmartNcm(p);
+
+  let cest = (p?.cest || '').trim();
+  if (!cest || cest.length < 6) {
+    if (ncm === '8539.51.00') cest = '28.038.00';
+    else if (ncm === '4421.99.00') cest = '28.057.00';
+    else cest = '28.061.00';
+  }
+
+  const measureUnit = p?.measureUnit || p?.measure_unit || (p?.pricingType === 'custom_m2' || p?.pricing_type === 'custom_m2' ? 'M2 (METRO QUADRADO)' : 'UN (UNIDADE)');
+  const cfopSame = p?.cfopSame || p?.cfop_same || '5101';
+  const cfopDiff = p?.cfopDiff || p?.cfop_diff || '6101';
+  const csosn = p?.csosn || '102 - Tributada pelo Simples Nacional sem permissão de crédito';
+  const origin = p?.origin || '0 - Nacional, exceto as indicadas nos códigos 3, 4, 5 e 8';
+  const weightKg = Number(p?.weightKg ?? p?.weight_kg ?? 0.5) || 0.5;
+  const dimensions = p?.dimensions || { length: 30, width: 30, height: 10 };
+
+  return {
+    ncm,
+    cest,
+    measureUnit,
+    cfopSame,
+    cfopDiff,
+    csosn,
+    origin,
+    weightKg,
+    dimensions
+  };
+}
+
 export function serializeProductForSupabase(p) {
+  const fiscal = resolveSmartFiscalDetails(p);
+
   const meta = {
     shopeeId: p.shopeeId || p.shopee_id || '',
     parentSku: p.parentSku || p.parent_sku || '',
     variations: p.variations || [],
     images: p.images || [p.image || p.image_url],
-    weightKg: p.weightKg ?? p.weight_kg ?? 0.5,
-    dimensions: p.dimensions || { length: 30, width: 30, height: 10 },
-    ncm: p.ncm || '3926.90.90',
-    cest: p.cest || '',
-    measureUnit: p.measureUnit || 'UN (UNIDADE)',
-    cfopSame: p.cfopSame || '5101',
-    cfopDiff: p.cfopDiff || '6101',
-    csosn: p.csosn || '',
-    origin: p.origin || ''
+    weightKg: fiscal.weightKg,
+    dimensions: fiscal.dimensions,
+    ncm: fiscal.ncm,
+    cest: fiscal.cest,
+    measureUnit: fiscal.measureUnit,
+    cfopSame: fiscal.cfopSame,
+    cfopDiff: fiscal.cfopDiff,
+    csosn: fiscal.csosn,
+    origin: fiscal.origin
   };
 
   const metaString = '<!--SMD_META:' + JSON.stringify(meta) + '-->';
@@ -64,13 +110,13 @@ export function serializeProductForSupabase(p) {
     category_name: p.category || p.category_name || 'Geral',
     pricing_type: p.pricingType || p.pricing_type || 'fixed',
     wholesale_price: Number(p.wholesalePrice ?? p.wholesale_price ?? 0),
-    suggested_retail_price: Number(p.suggestedRetailPrice ?? p.suggested_retail_price ?? 0),
+    suggested_retail_price: Number(p.suggestedRetailPrice ?? p.suggestedRetailPrice ?? 0),
     price_per_m2: Number(p.pricePerM2 ?? p.price_per_m2 ?? 0),
     suggested_price_per_m2: Number(p.suggestedPricePerM2 ?? p.suggested_price_per_m2 ?? 0),
     factory_stock: Number(p.factoryStock ?? p.factory_stock ?? 100),
     description: cleanDesc ? `${cleanDesc}\n${metaString}` : metaString,
     image_url: p.image || p.image_url || (p.images && p.images[0]) || '',
-    ncm: p.ncm || '3926.90.90',
+    ncm: fiscal.ncm,
     status: p.status || 'rascunho'
   };
 }
@@ -90,6 +136,20 @@ export function deserializeProductFromSupabase(p) {
   }
 
   const imgs = meta.images || p.images || [p.image_url || p.image || ''];
+  const fiscal = resolveSmartFiscalDetails({
+    title: p.title,
+    category: p.category_name || p.category,
+    pricingType: p.pricing_type || p.pricingType,
+    ncm: meta.ncm || p.ncm,
+    cest: meta.cest || p.cest,
+    measureUnit: meta.measureUnit || p.measure_unit,
+    cfopSame: meta.cfopSame || p.cfop_same,
+    cfopDiff: meta.cfopDiff || p.cfop_diff,
+    csosn: meta.csosn || p.csosn,
+    origin: meta.origin || p.origin,
+    weightKg: meta.weightKg ?? p.weight_kg,
+    dimensions: meta.dimensions || p.dimensions
+  });
 
   return {
     id: String(p.id),
@@ -107,15 +167,15 @@ export function deserializeProductFromSupabase(p) {
     variations: meta.variations || p.variations || [],
     shopeeId: meta.shopeeId || p.shopee_id || '',
     parentSku: meta.parentSku || p.parent_sku || '',
-    weightKg: meta.weightKg ?? Number(p.weight_kg ?? 0.5),
-    dimensions: meta.dimensions || p.dimensions || { length: 30, width: 30, height: 10 },
-    ncm: meta.ncm || p.ncm || '3926.90.90',
-    cest: meta.cest || p.cest || '',
-    measureUnit: meta.measureUnit || p.measure_unit || 'UN (UNIDADE)',
-    cfopSame: meta.cfopSame || p.cfop_same || '5101',
-    cfopDiff: meta.cfopDiff || p.cfop_diff || '6101',
-    csosn: meta.csosn || p.csosn || '',
-    origin: meta.origin || p.origin || '',
+    weightKg: fiscal.weightKg,
+    dimensions: fiscal.dimensions,
+    ncm: fiscal.ncm,
+    cest: fiscal.cest,
+    measureUnit: fiscal.measureUnit,
+    cfopSame: fiscal.cfopSame,
+    cfopDiff: fiscal.cfopDiff,
+    csosn: fiscal.csosn,
+    origin: fiscal.origin,
     status: p.status || 'rascunho',
     mediaKit: {
       photos: imgs,
@@ -124,6 +184,80 @@ export function deserializeProductFromSupabase(p) {
     }
   };
 }
+
+export const ensureCategoriesInSupabase = async (categoryNames) => {
+  const client = getSupabaseClient();
+  if (!client || !categoryNames || categoryNames.length === 0) return;
+
+  const uniqueCats = Array.from(new Set(categoryNames.filter(Boolean)));
+  if (uniqueCats.length === 0) return;
+
+  const catPayload = uniqueCats.map((cat, idx) => {
+    const cleanSlug = String(cat)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || `cat-${idx}`;
+
+    return {
+      id: `cat-${cleanSlug}`,
+      name: cat,
+      slug: cleanSlug
+    };
+  });
+
+  try {
+    const { error } = await client.from('categories').upsert(catPayload, { onConflict: 'name' });
+    if (error) {
+      console.warn('[Supabase Categories Sync Warning]:', error.message);
+    }
+  } catch (err) {
+    console.warn('[Supabase Categories Sync Exception]:', err.message);
+  }
+};
+
+export const safeSyncProductToSupabase = async (product) => {
+  const client = getSupabaseClient();
+  if (!client || !product) return;
+
+  try {
+    const catName = product.category || product.category_name || 'Geral';
+    await ensureCategoriesInSupabase([catName]);
+
+    const payload = serializeProductForSupabase(product);
+    const { error } = await client.from('products').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.warn('[Supabase Product Sync Warning]:', error.message);
+    }
+  } catch (err) {
+    console.warn('[Supabase Product Sync Exception]:', err.message);
+  }
+};
+
+export const safeSyncProductsBatchToSupabase = async (productsList) => {
+  const client = getSupabaseClient();
+  if (!client || !Array.isArray(productsList) || productsList.length === 0) return;
+
+  try {
+    const categoriesList = productsList.map((p) => p.category || p.category_name || 'Geral');
+    await ensureCategoriesInSupabase(categoriesList);
+
+    const payloads = productsList.map((p) => serializeProductForSupabase(p));
+
+    const chunkSize = 50;
+    for (let i = 0; i < payloads.length; i += chunkSize) {
+      const chunk = payloads.slice(i, i + chunkSize);
+      const { error } = await client.from('products').upsert(chunk, { onConflict: 'id' });
+      if (error) {
+        console.warn('[Supabase Batch Products Sync Warning]:', error.message);
+      }
+    }
+  } catch (err) {
+    console.warn('[Supabase Batch Products Sync Exception]:', err.message);
+  }
+};
+
 
 export const StoreProvider = ({ children }) => {
   const broadcastSync = (key, data) => {
@@ -837,13 +971,16 @@ export const StoreProvider = ({ children }) => {
         const { data: dbCategories, error: catErr } = await client.from('categories').select('*');
         if (!catErr && dbCategories && dbCategories.length > 0) {
           const catNames = dbCategories.map((c) => c.name);
-          setCategoriesState(catNames);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('smd_categories', JSON.stringify(catNames));
-          }
+          setCategoriesState((prev) => {
+            const merged = Array.from(new Set([...prev, ...catNames]));
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('smd_categories', JSON.stringify(merged));
+            }
+            return merged;
+          });
         }
 
-        // 2. Fetch Products from Supabase
+        // 2. Fetch Products from Supabase (Smart Merge to preserve local activations & drafts)
         const { data: dbProducts, error: prodErr } = await client.from('products').select('*');
         const savedLocal = typeof window !== 'undefined' ? localStorage.getItem('smd_products') : null;
         let localProds = [];
@@ -854,12 +991,27 @@ export const StoreProvider = ({ children }) => {
           } catch (e) {}
         }
 
-        if (!prodErr && dbProducts && dbProducts.length > 0) {
-          const normalizedProds = dbProducts.map((p) => deserializeProductFromSupabase(p));
+        if (!prodErr && dbProducts) {
+          const dbNormalized = dbProducts.map((p) => deserializeProductFromSupabase(p));
+          const mergedProdsMap = new Map();
 
-          setProductsState(normalizedProds);
+          dbNormalized.forEach(p => mergedProdsMap.set(p.id, p));
+
+          localProds.forEach(lp => {
+            if (!mergedProdsMap.has(lp.id)) {
+              mergedProdsMap.set(lp.id, lp);
+            } else {
+              const existingInDb = mergedProdsMap.get(lp.id);
+              if (lp.status === 'approved' && existingInDb.status !== 'approved') {
+                mergedProdsMap.set(lp.id, { ...existingInDb, ...lp, status: 'approved' });
+              }
+            }
+          });
+
+          const finalMergedProducts = Array.from(mergedProdsMap.values());
+          setProductsState(finalMergedProducts);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('smd_products', JSON.stringify(normalizedProds));
+            localStorage.setItem('smd_products', JSON.stringify(finalMergedProducts));
           }
         }
 
@@ -887,6 +1039,27 @@ export const StoreProvider = ({ children }) => {
         const { data: dbSettings, error: setErr } = await client.from('company_settings').select('*').limit(1);
         if (!setErr && dbSettings && dbSettings.length > 0) {
           const s = dbSettings[0];
+          setCompanySettingsState((prev) => {
+            const mergedSettings = {
+              ...prev,
+              ...(s.name ? { name: s.name } : {}),
+              ...(s.subtitle ? { subtitle: s.subtitle } : {}),
+              ...(s.cnpj ? { cnpj: s.cnpj } : {}),
+              ...(s.phone ? { phone: s.phone } : {}),
+              ...(s.email ? { email: s.email } : {}),
+              ...(s.address ? { address: s.address } : {}),
+              ...(s.my_sites ? { mySites: typeof s.my_sites === 'string' ? JSON.parse(s.my_sites) : s.my_sites } : {}),
+              ...(s.social_links ? { socialLinks: typeof s.social_links === 'string' ? JSON.parse(s.social_links) : s.social_links } : {}),
+              ...(s.hero_settings ? { heroSettings: typeof s.hero_settings === 'string' ? JSON.parse(s.hero_settings) : s.hero_settings } : {}),
+              ...(s.legal_terms ? { termsContent: s.legal_terms } : {}),
+              ...(s.legal_privacy ? { privacyContent: s.legal_privacy } : {})
+            };
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('smd_company_settings', JSON.stringify(mergedSettings));
+            }
+            return mergedSettings;
+          });
+
           if (s.items_per_row) {
             setItemsPerRowState(Number(s.items_per_row));
             if (typeof window !== 'undefined') localStorage.setItem('apex_items_per_row', String(s.items_per_row));
@@ -952,30 +1125,10 @@ export const StoreProvider = ({ children }) => {
 
     try {
       // 1. Sync Categories
-      for (const cat of categories) {
-        await client.from('categories').upsert({
-          id: 'cat-' + cat.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-          name: cat,
-          slug: cat.toLowerCase().replace(/[^a-z0-9]/g, '-')
-        });
-      }
+      await ensureCategoriesInSupabase(categories);
 
       // 2. Sync Products
-      for (const prod of products) {
-        await client.from('products').upsert({
-          id: prod.id,
-          title: prod.title,
-          category_name: prod.category || null,
-          pricing_type: prod.pricingType || 'fixed',
-          wholesale_price: Number(prod.wholesalePrice) || 0,
-          suggested_retail_price: Number(prod.suggestedRetailPrice) || 0,
-          price_per_m2: Number(prod.pricePerM2) || 0,
-          suggested_price_per_m2: Number(prod.suggestedPricePerM2) || 0,
-          description: prod.description || '',
-          image_url: prod.image || '',
-          status: 'approved'
-        });
-      }
+      await safeSyncProductsBatchToSupabase(products);
 
       // 3. Sync Orders
       for (const ord of orders) {
@@ -992,8 +1145,27 @@ export const StoreProvider = ({ children }) => {
           customer_city: ord.customerCity || 'São Paulo',
           customer_state: ord.customerState || 'SP',
           customer_zip: ord.customerZip || '01000-000'
-        });
+        }, { onConflict: 'id' });
       }
+
+      // 4. Sync Company Settings
+      await client.from('company_settings').upsert({
+        id: 1,
+        name: companySettings.name || '',
+        subtitle: companySettings.subtitle || '',
+        cnpj: companySettings.cnpj || '',
+        phone: companySettings.phone || '',
+        email: companySettings.email || '',
+        address: companySettings.address || '',
+        my_sites: companySettings.mySites || [],
+        social_links: companySettings.socialLinks || {},
+        hero_settings: companySettings.heroSettings || {},
+        legal_terms: companySettings.termsContent || '',
+        legal_privacy: companySettings.privacyContent || '',
+        items_per_row: itemsPerRow,
+        items_per_page: itemsPerPage,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
 
       showNotification('🚀 Todos os dados foram sincronizados com o Supabase!', 'success');
       return true;
@@ -1128,15 +1300,7 @@ export const StoreProvider = ({ children }) => {
 
   // Add Product by Admin (Direct active publication)
   const addProduct = async (productData) => {
-    // Ensure category exists in Supabase first
-    if (productData.category) {
-      await syncToSupabase('categories', {
-        id: 'cat-' + productData.category.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        name: productData.category,
-        slug: productData.category.toLowerCase().replace(/[^a-z0-9]/g, '-')
-      });
-    }
-
+    const fiscal = resolveSmartFiscalDetails(productData);
     const newProduct = {
       id: "prod-" + Date.now(),
       inStock: true,
@@ -1145,83 +1309,96 @@ export const StoreProvider = ({ children }) => {
         copyTitle: productData.title,
         copyDescription: productData.description
       },
+      status: 'approved',
+      ...fiscal,
       ...productData
     };
     setProducts((prev) => [newProduct, ...prev]);
     showNotification(`Novo produto "${productData.title}" cadastrado no catálogo!`);
 
-    // Sync to Supabase matching schema.sql columns
-    syncToSupabase('products', {
-      id: newProduct.id,
-      title: newProduct.title,
-      category_name: newProduct.category || null,
-      pricing_type: newProduct.pricingType || 'fixed',
-      wholesale_price: Number(newProduct.wholesalePrice) || 0,
-      suggested_retail_price: Number(newProduct.suggestedRetailPrice) || 0,
-      price_per_m2: Number(newProduct.pricePerM2) || 0,
-      suggested_price_per_m2: Number(newProduct.suggestedPricePerM2) || 0,
-      description: newProduct.description || '',
-      image_url: newProduct.image || '',
-      status: 'approved'
-    });
+    safeSyncProductToSupabase(newProduct);
   };
 
   // Suggest Product by Reseller (Requires Admin Approval)
   const suggestProductByReseller = (productData) => {
+    const fiscal = resolveSmartFiscalDetails(productData);
     const newPending = {
       id: "pending-" + Date.now(),
       createdAt: new Date().toISOString(),
-      resellerName: currentUser.name,
-      resellerEmail: currentUser.email,
+      resellerId: currentUser?.id || 'anon',
+      resellerName: currentUser?.name || 'Revendedor Convidado',
+      resellerEmail: currentUser?.email || '',
       status: "pending_approval",
       wholesalePrice: 0,
+      resellerNotes: productData.resellerNotes || '',
+      images: productData.images || (productData.image ? [productData.image] : []),
+      ...fiscal,
       ...productData
     };
     setPendingProducts((prev) => [newPending, ...prev]);
     showNotification(`Produto "${productData.title}" enviado para aprovação da fábrica!`, 'gold');
   };
 
-  // Approve Reseller Suggested Product (Admin action with pricing)
-  const approveProductByAdmin = (pendingId, wholesalePrice, suggestedPrice, category) => {
+  // Approve Reseller Suggested Product (Admin action with pricing and factory notes)
+  const approveProductByAdmin = (pendingId, wholesalePrice, suggestedPrice, category, factoryNotes) => {
     const item = pendingProducts.find((p) => p.id === pendingId);
     if (!item) return;
 
-    const approvedProduct = {
-      id: "prod-" + (products.length + 1),
+    const raw = {
       title: item.title,
-      category: category || item.category || categories[0],
+      category: category || item.category || categories[0] || 'Geral',
+      pricingType: item.pricingType || 'fixed',
+      ...item
+    };
+
+    const fiscal = resolveSmartFiscalDetails(raw);
+
+    const approvedProduct = {
+      id: "prod-" + (products.length + 1) + '-' + Date.now(),
+      title: item.title,
+      category: category || item.category || categories[0] || 'Geral',
       pricingType: item.pricingType || 'fixed',
       wholesalePrice: Number(wholesalePrice),
       suggestedRetailPrice: Number(suggestedPrice),
       pricePerM2: Number(wholesalePrice),
       suggestedPricePerM2: Number(suggestedPrice),
-      factoryStock: 50,
+      factoryStock: 100,
       leadTimeDays: item.pricingType === 'custom_m2' ? 3 : 1,
       description: item.description || "Produto cadastrado e aprovado pela fábrica.",
-      image: item.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
+      image: item.image || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
+      images: item.images && item.images.length > 0 ? item.images : [item.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80"],
       video: item.video || "",
       inStock: true,
-      ncm: "3926.90.90",
-      ean: "7899812" + Math.floor(10000 + Math.random() * 90000)
+      status: 'approved',
+      resellerNotes: item.resellerNotes || "",
+      factoryNotes: factoryNotes || "",
+      requestedByResellerId: item.resellerId || "",
+      requestedByResellerName: item.resellerName || "",
+      requestedByResellerEmail: item.resellerEmail || "",
+      ean: "7899812" + Math.floor(10000 + Math.random() * 90000),
+      createdAt: new Date().toISOString(),
+      ...fiscal
     };
 
     setProducts((prev) => [approvedProduct, ...prev]);
     setPendingProducts((prev) =>
-      prev.map((p) => (p.id === pendingId ? { ...p, status: 'approved' } : p))
+      prev.map((p) =>
+        p.id === pendingId
+          ? {
+              ...p,
+              status: 'approved',
+              wholesalePrice: Number(wholesalePrice),
+              suggestedRetailPrice: Number(suggestedPrice),
+              category: approvedProduct.category,
+              factoryNotes: factoryNotes || "",
+              approvedProductId: approvedProduct.id
+            }
+          : p
+      )
     );
     showNotification(`Produto "${approvedProduct.title}" precificado e APROVADO para o catálogo oficial!`);
 
-    const payload = serializeProductForSupabase(approvedProduct);
-    const client = getSupabaseClient();
-    if (client) {
-      client.from('categories').upsert([{
-        id: 'cat-' + (approvedProduct.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        name: approvedProduct.category || 'Geral',
-        slug: (approvedProduct.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-')
-      }]).then(() => {
-        client.from('products').upsert(payload);
-      });
-    }
+    safeSyncProductToSupabase(approvedProduct);
   };
 
   // Reject Reseller Suggested Product (Admin action with reason)
@@ -1241,17 +1418,7 @@ export const StoreProvider = ({ children }) => {
       const next = prev.map((p) => (p.id === productId ? { ...p, ...updatedFields } : p));
       const target = next.find((p) => p.id === productId);
       if (target) {
-        const payload = serializeProductForSupabase(target);
-        const client = getSupabaseClient();
-        if (client) {
-          client.from('categories').upsert([{
-            id: 'cat-' + (target.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-'),
-            name: target.category || 'Geral',
-            slug: (target.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-')
-          }]).then(() => {
-            client.from('products').upsert(payload);
-          });
-        }
+        safeSyncProductToSupabase(target);
       }
       return next;
     });
@@ -1272,12 +1439,13 @@ export const StoreProvider = ({ children }) => {
   const importShopeeProducts = (newProductsList) => {
     if (!Array.isArray(newProductsList) || newProductsList.length === 0) return 0;
 
-    // Extract new categories and add them if not present
     const newCats = Array.from(new Set(newProductsList.map(p => p.category).filter(Boolean)));
     setCategories(prev => {
-      const merged = new Set([...prev, ...newCats]);
-      return Array.from(merged);
+      const merged = Array.from(new Set([...prev, ...newCats]));
+      return merged;
     });
+
+    let trulyNewItems = [];
 
     setProducts(prev => {
       const newItemsMap = new Map(newProductsList.map(p => [p.id, p]));
@@ -1304,29 +1472,14 @@ export const StoreProvider = ({ children }) => {
         return p;
       });
 
-      const trulyNew = Array.from(newItemsMap.values());
-      const updated = [...trulyNew, ...updatedPrev];
-
-      // Sync imported drafts to Supabase asynchronously
-      const client = getSupabaseClient();
-      if (client && trulyNew.length > 0) {
-        const payload = trulyNew.map(p => serializeProductForSupabase(p));
-        const catPayload = Array.from(new Set(trulyNew.map(p => p.category).filter(Boolean))).map(c => ({
-          id: 'cat-' + c.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-          name: c,
-          slug: c.toLowerCase().replace(/[^a-z0-9]/g, '-')
-        }));
-        client.from('categories').upsert(catPayload).then(() => {
-          // Chunk upload to prevent request size errors
-          const chunkSize = 50;
-          for (let i = 0; i < payload.length; i += chunkSize) {
-            client.from('products').upsert(payload.slice(i, i + chunkSize)).then(() => {});
-          }
-        });
-      }
-
+      trulyNewItems = Array.from(newItemsMap.values());
+      const updated = [...trulyNewItems, ...updatedPrev];
       return updated;
     });
+
+    if (trulyNewItems.length > 0) {
+      safeSyncProductsBatchToSupabase(trulyNewItems);
+    }
 
     showNotification(`🎉 Planilhas Shopee sincronizadas com sucesso! Variações e dados atualizados.`, 'success');
     return newProductsList.length;
@@ -1337,17 +1490,7 @@ export const StoreProvider = ({ children }) => {
       const next = prev.map((p) => (p.id === productId ? { ...p, status: 'approved' } : p));
       const target = next.find((p) => p.id === productId);
       if (target) {
-        const payload = serializeProductForSupabase(target);
-        const client = getSupabaseClient();
-        if (client) {
-          client.from('categories').upsert([{
-            id: 'cat-' + (target.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-'),
-            name: target.category || 'Geral',
-            slug: (target.category || 'Geral').toLowerCase().replace(/[^a-z0-9]/g, '-')
-          }]).then(() => {
-            client.from('products').upsert(payload);
-          });
-        }
+        safeSyncProductToSupabase(target);
         showNotification(`✨ Produto "${target.title}" ativado e publicado no catálogo!`, 'success');
       }
       return next;
@@ -1360,24 +1503,8 @@ export const StoreProvider = ({ children }) => {
 
     setProducts((prev) => {
       const next = prev.map((p) => (idSet.has(p.id) ? { ...p, status: 'approved' } : p));
-      
-      // Batch sync to Supabase
-      const client = getSupabaseClient();
-      if (client) {
-        const toSync = next.filter(p => idSet.has(p.id)).map(p => serializeProductForSupabase(p));
-        const catPayload = Array.from(new Set(toSync.map(p => p.category_name).filter(Boolean))).map(c => ({
-          id: 'cat-' + c.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-          name: c,
-          slug: c.toLowerCase().replace(/[^a-z0-9]/g, '-')
-        }));
-        client.from('categories').upsert(catPayload).then(() => {
-          const chunkSize = 50;
-          for (let i = 0; i < toSync.length; i += chunkSize) {
-            client.from('products').upsert(toSync.slice(i, i + chunkSize)).then(() => {});
-          }
-        });
-      }
-
+      const toSync = next.filter(p => idSet.has(p.id));
+      safeSyncProductsBatchToSupabase(toSync);
       return next;
     });
     showNotification(`🚀 ${productIds.length} produto(s) ativado(s) e publicado(s) no catálogo oficial!`, 'success');
@@ -1388,11 +1515,7 @@ export const StoreProvider = ({ children }) => {
       const next = prev.map((p) => (p.id === productId ? { ...p, status: 'rascunho' } : p));
       const target = next.find((p) => p.id === productId);
       if (target) {
-        const payload = serializeProductForSupabase(target);
-        const client = getSupabaseClient();
-        if (client) {
-          client.from('products').upsert(payload);
-        }
+        safeSyncProductToSupabase(target);
         showNotification(`📦 Produto "${target.title}" movido para Rascunho com sucesso!`, 'gold');
       }
       return next;
@@ -1405,16 +1528,8 @@ export const StoreProvider = ({ children }) => {
 
     setProducts((prev) => {
       const next = prev.map((p) => (idSet.has(p.id) ? { ...p, status: 'rascunho' } : p));
-      
-      const client = getSupabaseClient();
-      if (client) {
-        const toSync = next.filter(p => idSet.has(p.id)).map(p => serializeProductForSupabase(p));
-        const chunkSize = 50;
-        for (let i = 0; i < toSync.length; i += chunkSize) {
-          client.from('products').upsert(toSync.slice(i, i + chunkSize)).then(() => {});
-        }
-      }
-
+      const toSync = next.filter(p => idSet.has(p.id));
+      safeSyncProductsBatchToSupabase(toSync);
       return next;
     });
     showNotification(`📦 ${productIds.length} produto(s) movido(s) para Rascunho!`, 'gold');
@@ -1560,6 +1675,30 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_company_settings', JSON.stringify(updated));
       }
+
+      const client = getSupabaseClient();
+      if (client) {
+        client.from('company_settings').upsert({
+          id: 1,
+          name: updated.name || '',
+          subtitle: updated.subtitle || '',
+          cnpj: updated.cnpj || '',
+          phone: updated.phone || '',
+          email: updated.email || '',
+          address: updated.address || '',
+          my_sites: updated.mySites || [],
+          social_links: updated.socialLinks || {},
+          hero_settings: updated.heroSettings || {},
+          legal_terms: updated.termsContent || '',
+          legal_privacy: updated.privacyContent || '',
+          items_per_row: itemsPerRow,
+          items_per_page: itemsPerPage,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' }).then(({ error }) => {
+          if (error) console.warn('[Supabase Company Settings Sync Error]:', error.message);
+        });
+      }
+
       return updated;
     });
     showNotification('Configurações da empresa e jurídicas salvas com sucesso!');

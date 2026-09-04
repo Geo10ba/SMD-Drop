@@ -1791,9 +1791,9 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
                   <tr>
                     <th className="p-3">Produto Sugerido</th>
                     <th className="p-3">Revendedor</th>
-                    <th className="p-3">Categoria Sugerida</th>
+                    <th className="p-3">Observações / Solicitação</th>
                     <th className="p-3">Preço Desejado Revenda</th>
-                    <th className="p-3">Status</th>
+                    <th className="p-3">Status & Resposta</th>
                     <th className="p-3 text-right">Ação Admin</th>
                   </tr>
                 </thead>
@@ -1812,20 +1812,35 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
                         <br />
                         <span className="text-[10px] text-[var(--text-muted)]">{item.resellerEmail}</span>
                       </td>
-                      <td className="p-3 text-[var(--text-muted)]">{item.category || "Geral"}</td>
+                      <td className="p-3 max-w-xs">
+                        {item.resellerNotes ? (
+                          <p className="text-[11px] text-[var(--text-main)] font-medium italic bg-amber-500/10 border border-amber-500/20 p-1.5 rounded-lg line-clamp-2">
+                            "{item.resellerNotes}"
+                          </p>
+                        ) : (
+                          <span className="text-[10px] text-[var(--text-muted)] italic">Sem observações específicas</span>
+                        )}
+                      </td>
                       <td className="p-3 font-bold font-mono text-emerald-600 dark:text-emerald-400">
                         R$ {item.suggestedRetailPrice?.toFixed(2)}
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 space-y-1">
                         {item.status === 'pending_approval' && (
                           <span className="badge-gold text-[10px] font-extrabold flex items-center gap-1 w-fit">
                             <Clock size={12} /> Aguardando Precificação
                           </span>
                         )}
                         {item.status === 'approved' && (
-                          <span className="badge-emerald text-[10px] font-extrabold flex items-center gap-1 w-fit">
-                            <CheckCircle size={12} /> Aprovado no Catálogo
-                          </span>
+                          <div>
+                            <span className="badge-emerald text-[10px] font-extrabold flex items-center gap-1 w-fit">
+                              <CheckCircle size={12} /> Aprovado (Atacado: R$ {item.wholesalePrice?.toFixed(2) || '0.00'})
+                            </span>
+                            {item.factoryNotes && (
+                              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 line-clamp-1">
+                                Resp: {item.factoryNotes}
+                              </p>
+                            )}
+                          </div>
                         )}
                         {item.status === 'rejected' && (
                           <div>

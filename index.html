@@ -38,6 +38,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
+    <!-- PWA Manifest & iOS Meta Tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SMD Drop" />
+
     <!-- JSON-LD Structured Data Schema -->
     <script type="application/ld+json">
     {
@@ -57,5 +63,16 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(reg) {
+            console.log('PWA ServiceWorker registrado com sucesso:', reg.scope);
+          }).catch(function(err) {
+            console.log('Erro ao registrar ServiceWorker:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

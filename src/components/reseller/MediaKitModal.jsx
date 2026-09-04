@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, Scale, FileCheck, ExternalLink } from 'lucide-react';
+import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, Scale, FileCheck, ExternalLink, Plus } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { ResellerProductImagesModal } from './ResellerProductImagesModal';
 
 export const MediaKitModal = ({ product, onClose }) => {
   const { showNotification } = useStore();
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'variations' | 'dimensions' | 'fiscal' | 'photos'
   const [copiedTitle, setCopiedTitle] = useState(false);
   const [copiedDesc, setCopiedDesc] = useState(false);
+  const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
 
   if (!product) return null;
 
@@ -363,9 +365,18 @@ export const MediaKitModal = ({ product, onClose }) => {
           {/* TAB 5: FOTOS HD */}
           {activeTab === 'photos' && (
             <div className="space-y-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
-                <ImageIcon size={14} className="text-indigo-500" /> Galeria Completa de Fotos HD ({images.length} fotos)
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                  <ImageIcon size={14} className="text-indigo-500" /> Galeria Completa de Fotos HD ({images.length} fotos)
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setIsImagesModalOpen(true)}
+                  className="btn-gold py-1.5 px-3 text-xs font-bold flex items-center gap-1 shadow-sm"
+                >
+                  <Plus size={14} /> Adicionar Fotos ao Catálogo
+                </button>
+              </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {images.map((imgUrl, idx) => (
@@ -390,6 +401,14 @@ export const MediaKitModal = ({ product, onClose }) => {
           )}
 
         </div>
+
+        {/* Add/Edit Product Images Modal */}
+        {isImagesModalOpen && (
+          <ResellerProductImagesModal
+            product={product}
+            onClose={() => setIsImagesModalOpen(false)}
+          />
+        )}
       </div>
     </div>
   );

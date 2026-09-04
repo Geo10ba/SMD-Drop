@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
-import { CheckCircle2, XCircle, DollarSign, Tag, AlertCircle, Sparkles } from 'lucide-react';
+import { CheckCircle2, XCircle, DollarSign, Tag, AlertCircle, Sparkles, MessageSquare } from 'lucide-react';
 
 export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
   const { approveProductByAdmin, rejectProductByAdmin, categories } = useStore();
@@ -10,6 +10,7 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
   const [wholesalePrice, setWholesalePrice] = useState(60);
   const [suggestedPrice, setSuggestedPrice] = useState(140);
   const [category, setCategory] = useState(categories[0]);
+  const [factoryNotes, setFactoryNotes] = useState('Produto aprovado para fabricação com preço de atacado preenchido.');
   const [rejectionReason, setRejectionReason] = useState('Produto fora do padrão de fabricação da nossa empresa.');
 
   useEffect(() => {
@@ -24,6 +25,9 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
       setSuggestedPrice(pendingProduct.suggestedRetailPrice || 140);
       setWholesalePrice(Math.round((pendingProduct.suggestedRetailPrice || 140) * 0.45));
       setCategory(pendingProduct.category || categories[0]);
+      if (pendingProduct.factoryNotes) {
+        setFactoryNotes(pendingProduct.factoryNotes);
+      }
     }
   }, [pendingProduct]);
 
@@ -35,7 +39,8 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
       pendingProduct.id,
       Number(wholesalePrice),
       Number(suggestedPrice),
-      category
+      category,
+      factoryNotes
     );
     onClose();
   };
@@ -83,6 +88,18 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
               </span>
             </div>
           </div>
+
+          {/* Reseller Notes Callout */}
+          {pendingProduct.resellerNotes && (
+            <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl space-y-1">
+              <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <MessageSquare size={13} /> Observações / Solicitação do Revendedor:
+              </span>
+              <p className="text-xs text-[var(--text-main)] font-medium italic leading-relaxed">
+                "{pendingProduct.resellerNotes}"
+              </p>
+            </div>
+          )}
 
           {/* Mode Selector Tabs */}
           <div className="grid grid-cols-2 gap-2 border-b border-[var(--border-color)] pb-3">
@@ -153,6 +170,19 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
                       className="input-field font-extrabold mt-1 text-base text-emerald-600 dark:text-emerald-400"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[var(--text-muted)] font-bold mb-1">
+                    Observações / Resposta da Fábrica ao Revendedor
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={factoryNotes}
+                    onChange={(e) => setFactoryNotes(e.target.value)}
+                    placeholder="ex: Orçamento aprovado! Produto fabricado em acrílico cast 3mm nobre."
+                    className="input-field text-xs font-medium"
+                  />
                 </div>
               </div>
 

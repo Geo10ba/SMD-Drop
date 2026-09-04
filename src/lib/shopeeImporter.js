@@ -4,19 +4,19 @@ import * as XLSX from 'xlsx';
  * Clean Shopee category strings
  */
 export function cleanCategory(catStr) {
-  if (!catStr || typeof catStr !== 'string') return 'Geral';
+  if (!catStr || typeof catStr !== 'string') return 'Quadros & Decoração';
   let clean = catStr.replace(/^\d+\s*-\s*/, '').trim();
   if (clean.includes('/')) {
     const parts = clean.split('/').map(p => p.trim());
     clean = parts[parts.length - 1] || parts[0];
   }
-  if (clean.toLowerCase().includes('photo frames') || clean.toLowerCase().includes('wall decoration')) {
-    return 'Quadros & Decoração';
-  }
-  if (clean.toLowerCase().includes('home') || clean.toLowerCase().includes('living')) {
-    return 'Casa & Decoração';
-  }
-  return clean || 'Geral';
+  const lower = clean.toLowerCase();
+  if (lower === 'others' || lower === 'outros') return 'Quadros & Decoração';
+  if (lower.includes('plate') || lower.includes('placa')) return 'Placas & Sinalização';
+  if (lower.includes('fengshui') || lower.includes('religious')) return 'Quadros & Decoração';
+  if (lower.includes('photo frames') || lower.includes('wall decoration')) return 'Quadros & Decoração';
+  if (lower.includes('home') || lower.includes('living')) return 'Casa & Decoração';
+  return clean || 'Quadros & Decoração';
 }
 
 /**

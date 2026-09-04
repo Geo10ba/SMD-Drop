@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useStore } from '../../context/StoreContext';
-import { Wand2, Copy, Check, Sparkles, FileText, Video } from 'lucide-react';
+import { useStore, resolveSmartFiscalDetails } from '../../context/StoreContext';
+import { Wand2, Copy, Check, Sparkles, FileText, Video, MessageSquare, Loader2 } from 'lucide-react';
+import { generateProductDescriptionAndNcm } from '../../lib/smdAssistIa';
 
 export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
   const { currentUser, viewMode, addProduct, suggestProductByReseller, categories, addCategory, showNotification } = useStore();
@@ -8,31 +9,52 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
   const [copiedBookmarklet, setCopiedBookmarklet] = useState(false);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   // Extracted Product Form (Initialized from initialData synchronously)
-  const [form, setForm] = useState(() => ({
-    title: initialData?.title || '',
-    description: initialData?.description || '',
-    image: initialData?.image || '',
-    video: initialData?.video || '',
-    category: categories[0] || 'Logomarcas & Letreiros',
-    pricingType: 'fixed',
-    wholesalePrice: initialData?.wholesalePrice || 50,
-    suggestedRetailPrice: initialData?.suggestedRetailPrice || 120
-  }));
+  const [form, setForm] = useState(() => {
+    const raw = {
+      title: initialData?.title || '',
+      description: initialData?.description || '',
+      image: initialData?.image || '',
+      video: initialData?.video || '',
+      category: categories[0] || 'Logomarcas & Letreiros',
+      pricingType: 'fixed',
+      wholesalePrice: initialData?.wholesalePrice || 50,
+      suggestedRetailPrice: initialData?.suggestedRetailPrice || 120,
+      resellerNotes: initialData?.resellerNotes || '',
+      ncm: initialData?.ncm || '',
+      cest: initialData?.cest || '',
+      measureUnit: initialData?.measureUnit || '',
+      cfopSame: initialData?.cfopSame || '5101',
+      cfopDiff: initialData?.cfopDiff || '6101',
+      csosn: initialData?.csosn || '102 - Tributada pelo Simples Nacional sem permissão de crédito',
+      origin: initialData?.origin || '0 - Nacional, exceto as indicadas nos códigos 3, 4, 5 e 8',
+      weightKg: initialData?.weightKg || 0.5,
+      dimensions: initialData?.dimensions || { length: 30, width: 30, height: 10 }
+    };
+    const fiscal = resolveSmartFiscalDetails(raw);
+    return { ...raw, ...fiscal };
+  });
 
   // Sync initialData passed from StoreContext when updated
   useEffect(() => {
     if (initialData && initialData.title) {
-      setForm((prev) => ({
-        ...prev,
-        title: initialData.title || prev.title,
-        description: initialData.description || prev.description,
-        image: initialData.image || prev.image,
-        video: initialData.video || prev.video,
-        suggestedRetailPrice: initialData.suggestedRetailPrice || prev.suggestedRetailPrice,
-        wholesalePrice: initialData.wholesalePrice || prev.wholesalePrice
-      }));
+      setForm((prev) => {
+        const raw = {
+          ...prev,
+          title: initialData.title || prev.title,
+          description: initialData.description || prev.description,
+          image: initialData.image || prev.image,
+          video: initialData.video || prev.video,
+          suggestedRetailPrice: initialData.suggestedRetailPrice || prev.suggestedRetailPrice,
+          wholesalePrice: initialData.wholesalePrice || prev.wholesalePrice,
+          resellerNotes: initialData.resellerNotes || prev.resellerNotes,
+          ncm: initialData.ncm || prev.ncm
+        };
+        const fiscal = resolveSmartFiscalDetails(raw);
+        return { ...raw, ...fiscal };
+      });
     }
   }, [initialData, isOpen]);
 
@@ -51,52 +73,73 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
     showNotification('Código do Botão Mágico copiado! Cole no favorito (Ctrl+D).');
   };
 
-  // AI Description Generator Assistant
-  const handleGenerateAiDescription = () => {
+  // AI Description & NCM Generator Assistant via Groq/9Router
+  const handleGenerateAiDescription = async () => {
     if (!form.title) {
-      showNotification('Digite o título primeiro para gerar a descrição.', 'error');
+      showNotification('Digite o título primeiro para gerar com a IA.', 'error');
       return;
     }
-    const aiDesc = `🔥 ${form.title.toUpperCase()} - PRODUTO PREMIUM DE FÁBRICA\n\n` +
-      `✨ Destaques & Especificações Técnicas:\n` +
-      `• Acabamento de altíssima precisão com corte a laser.\n` +
-      `• Matéria-prima nobre e espessura reforçada de alta durabilidade.\n` +
-      `• Produto enviado em embalagem reforçada anti-impacto (Envio Cego sem marca).\n` +
-      `• Pronta entrega e envio imediato direto da fábrica.\n\n` +
-      `📦 Garantia total contra defeitos de fabricação e envio com Nota Fiscal/Declaração.`;
 
-    setForm((prev) => ({ ...prev, description: aiDesc }));
-    showNotification('✨ Descrição comercial profissional gerada por IA!');
+    setIsGeneratingAi(true);
+    showNotification('🤖 Lumen IA gerando descrição comercial & dados fiscais NFe...', 'info');
+
+    try {
+      const res = await generateProductDescriptionAndNcm({
+        title: form.title,
+        category: form.category,
+        description: form.description,
+        ncm: form.ncm,
+        pricingType: form.pricingType
+      });
+
+      if (res && res.description) {
+        setForm((prev) => ({
+          ...prev,
+          description: res.description,
+          ncm: res.ncm || prev.ncm,
+          cest: res.cest || prev.cest,
+          measureUnit: res.measureUnit || prev.measureUnit,
+          cfopSame: res.cfopSame || prev.cfopSame,
+          cfopDiff: res.cfopDiff || prev.cfopDiff,
+          csosn: res.csosn || prev.csosn,
+          origin: res.origin || prev.origin
+        }));
+        showNotification(`✨ Descrição comercial & Dados Fiscais NFe (NCM ${res.ncm}, CEST ${res.cest}) gerados com sucesso por IA!`);
+      }
+    } catch (err) {
+      console.error('Erro na IA:', err);
+      showNotification('Erro ao conectar com a IA, tente novamente.', 'error');
+    } finally {
+      setIsGeneratingAi(false);
+    }
   };
 
   const handleSaveProduct = (e) => {
     e.preventDefault();
     if (!form.title) return;
 
+    const fiscal = resolveSmartFiscalDetails(form);
+    const payload = {
+      title: form.title,
+      category: form.category,
+      pricingType: form.pricingType,
+      wholesalePrice: Number(form.wholesalePrice),
+      suggestedRetailPrice: Number(form.suggestedRetailPrice),
+      factoryStock: 100,
+      pricePerM2: Number(form.wholesalePrice),
+      suggestedPricePerM2: Number(form.suggestedRetailPrice),
+      description: form.description || `Produto ${form.title} fabricado com qualidade fabril.`,
+      image: form.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
+      images: form.image ? [form.image] : [],
+      video: form.video || "",
+      resellerNotes: form.resellerNotes || "",
+      ...fiscal
+    };
+
     if (isAdmin) {
-      addProduct({
-        title: form.title,
-        category: form.category,
-        pricingType: form.pricingType,
-        wholesalePrice: Number(form.wholesalePrice),
-        suggestedRetailPrice: Number(form.suggestedRetailPrice),
-        factoryStock: 100,
-        pricePerM2: Number(form.wholesalePrice),
-        suggestedPricePerM2: Number(form.suggestedRetailPrice),
-        description: form.description || `Produto ${form.title} fabricado com qualidade fabril.`,
-        image: form.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
-        video: form.video || ""
-      });
+      addProduct(payload);
     } else {
-      suggestProductByReseller({
-        title: form.title,
-        category: form.category,
-        pricingType: form.pricingType,
-        suggestedRetailPrice: Number(form.suggestedRetailPrice),
-        description: form.description || `Produto ${form.title} sugerido para fabricação.`,
-        image: form.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
-        video: form.video || ""
-      });
+      suggestProductByReseller(payload);
     }
 
     onClose();
@@ -345,10 +388,21 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
                 </label>
                 <button
                   type="button"
+                  disabled={isGeneratingAi}
                   onClick={handleGenerateAiDescription}
-                  className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30"
+                  className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30 disabled:opacity-50"
                 >
-                  <Sparkles size={11} /> ⚡ Gerar Descrição Comercial IA
+                  {isGeneratingAi ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin text-amber-500" />
+                      <span>⚡ Gerando Descrição & NCM...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={11} />
+                      <span>⚡ Gerar Descrição & NCM com IA</span>
+                    </>
+                  )}
                 </button>
               </div>
               <textarea
@@ -358,6 +412,23 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
                 placeholder="Descrição capturada automaticamente da página do anúncio..."
                 className="input-field text-xs font-sans leading-relaxed"
               />
+            </div>
+
+            {/* Campo de Observações do Revendedor (Solicitação de Orçamento / Fábrica) */}
+            <div>
+              <label className="font-bold text-[var(--text-muted)] uppercase flex items-center gap-1.5 mb-1">
+                <MessageSquare size={14} className="text-amber-500" /> Observações do Orçamento / Especificações de Fabricação
+              </label>
+              <textarea
+                rows={3}
+                value={form.resellerNotes}
+                onChange={(e) => setForm({ ...form, resellerNotes: e.target.value })}
+                placeholder="Ex: Gostaria de saber se dá para fabricar em acrílico espelhado 3mm com LED Amarelo, tamanho 50x30cm..."
+                className="input-field text-xs font-sans leading-relaxed"
+              />
+              <span className="text-[10px] text-[var(--text-muted)] mt-1 block">
+                * Informe detalhes, dimensões ou dúvidas para a fábrica precificar seu produto no atacado.
+              </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -382,6 +453,24 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
                   placeholder="https://..."
                   className="input-field font-mono"
                 />
+              </div>
+            </div>
+
+            {/* Dados Fiscais NFe Gerados Automáticos (IA SMD) */}
+            <div className="bg-emerald-500/10 p-3.5 rounded-xl border border-emerald-500/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                  <FileText size={15} /> Dados Fiscais NFe Preenchidos Automáticos pela IA
+                </span>
+                <span className="bg-emerald-500 text-slate-950 text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  100% Salvos
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono text-[var(--text-main)] pt-1 border-t border-emerald-500/20">
+                <div><span className="text-[var(--text-muted)] font-sans block text-[10px]">NCM:</span> <strong>{form.ncm || '3926.90.90'}</strong></div>
+                <div><span className="text-[var(--text-muted)] font-sans block text-[10px]">CEST:</span> <strong>{form.cest || '28.061.00'}</strong></div>
+                <div><span className="text-[var(--text-muted)] font-sans block text-[10px]">Unidade:</span> <strong>{form.measureUnit || 'UN (UNIDADE)'}</strong></div>
+                <div><span className="text-[var(--text-muted)] font-sans block text-[10px]">CFOP Est/Inter:</span> <strong>{form.cfopSame || '5101'} / {form.cfopDiff || '6101'}</strong></div>
               </div>
             </div>
 

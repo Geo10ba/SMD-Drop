@@ -16,6 +16,8 @@ import { Footer } from './components/Footer';
 import { CustomSizeCalculator } from './components/reseller/CustomSizeCalculator';
 import { RegisterModal } from './components/reseller/RegisterModal';
 import { LegalModal } from './components/LegalModal';
+import { SmdAssistantChat } from './components/assistant/SmdAssistantChat';
+import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 
 function MainApp() {
   const { 
@@ -177,6 +179,12 @@ function MainApp() {
           onClose={() => setM2CalculatorProduct(null)}
         />
       )}
+
+      {/* PWA Mobile & Desktop Install Prompt */}
+      <PwaInstallPrompt />
+
+      {/* Floating Virtual Assistant */}
+      <SmdAssistantChat />
     </div>
   );
 }

@@ -3,13 +3,15 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { 
   Edit2, Tag, Image as ImageIcon, Save, Trash2, Sparkles, Eye, X, 
-  Layers, Package, FileText, Plus, Check, AlertCircle, RefreshCw, Star, FileEdit, Play
+  Layers, Package, FileText, Plus, Check, AlertCircle, RefreshCw, Star, FileEdit, Play, Loader2
 } from 'lucide-react';
+import { generateProductDescriptionAndNcm } from '../../lib/smdAssistIa';
 
 export const EditProductModal = ({ product, onClose }) => {
-  const { updateProduct, deleteProduct, categories, addCategory } = useStore();
+  const { updateProduct, deleteProduct, categories, addCategory, showNotification } = useStore();
 
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'variations' | 'logistics' | 'fiscal' | 'gallery'
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   // General fields
   const [title, setTitle] = useState('');
@@ -107,17 +109,27 @@ export const EditProductModal = ({ product, onClose }) => {
   const [bulkTarget, setBulkTarget] = useState('wholesale'); // 'wholesale' | 'retail' | 'stock'
   const [bulkStockValue, setBulkStockValue] = useState(100);
 
+  // Helper to safely parse decimal numbers with commas or dots
+  const parseNum = (val, fallback = 0) => {
+    if (val === undefined || val === null || val === '') return fallback;
+    if (typeof val === 'number') return isNaN(val) ? fallback : val;
+    const cleaned = String(val).replace(',', '.').trim();
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? fallback : parsed;
+  };
+
   // Variation handlers
   const handleUpdateVariation = (index, field, value) => {
     const next = [...variations];
-    next[index] = { ...next[index], [field]: value };
+    const parsedVal = (field === 'price' || field === 'wholesalePrice') ? parseNum(value, 0) : value;
+    next[index] = { ...next[index], [field]: parsedVal };
     
     setVariations(next);
 
     // Recalculate total stock and summary prices
-    const totalStock = next.reduce((acc, v) => acc + (parseInt(v.stock, 10) || 0), 0);
-    const validPrices = next.map(v => parseFloat(v.price) || 0).filter(p => p > 0);
-    const validWholesales = next.map(v => parseFloat(v.wholesalePrice) || 0).filter(w => w > 0);
+    const totalStock = next.reduce((acc, v) => acc + (parseInt(parseNum(v.stock, 0), 10) || 0), 0);
+    const validPrices = next.map(v => parseNum(v.price, 0)).filter(p => p > 0);
+    const validWholesales = next.map(v => parseNum(v.wholesalePrice, 0)).filter(w => w > 0);
 
     if (validPrices.length > 0) {
       setSuggestedRetailPrice(Math.min(...validPrices));
@@ -125,36 +137,32 @@ export const EditProductModal = ({ product, onClose }) => {
     if (validWholesales.length > 0) {
       setWholesalePrice(Math.min(...validWholesales));
     }
-    if (totalStock > 0) setFactoryStock(totalStock);
+    setFactoryStock(totalStock);
   };
 
   const handleApplyBulkAdjustment = () => {
     if (variations.length === 0) return;
 
-    const pct = parseFloat(bulkPercent) || 0;
+    const pct = parseNum(bulkPercent, 0);
     const factor = 1 + (pct / 100);
 
     const updated = variations.map(v => {
-      let nextW = parseFloat(v.wholesalePrice) || 0;
-      let nextR = parseFloat(v.price) || 0;
-      let nextS = parseInt(v.stock, 10) || 0;
+      let nextW = parseNum(v.wholesalePrice, 0);
+      let nextR = parseNum(v.price, 0);
+      let nextS = parseInt(parseNum(v.stock, 0), 10);
 
       if (bulkTarget === 'wholesale') {
-        // Reajusta APENAS o Custo Atacado R$, mantendo a Sugestão de Revenda intacta
         nextW = Math.round(nextW * factor * 100) / 100;
       } else if (bulkTarget === 'retail') {
-        // Reajusta APENAS a Sugestão de Revenda R$, mantendo o Custo Atacado intacto
         nextR = Math.round(nextR * factor * 100) / 100;
       } else if (bulkTarget === 'wholesale_recalc') {
-        // Reajusta Custo Atacado e Recalcula Revenda (45%)
         nextW = Math.round(nextW * factor * 100) / 100;
         nextR = Math.round((nextW / 0.45) * 100) / 100;
       } else if (bulkTarget === 'retail_recalc') {
-        // Reajusta Sugestão de Revenda e Recalcula Atacado (45%)
         nextR = Math.round(nextR * factor * 100) / 100;
         nextW = Math.round(nextR * 0.45 * 100) / 100;
       } else if (bulkTarget === 'stock') {
-        nextS = parseInt(bulkStockValue, 10) || 0;
+        nextS = parseInt(parseNum(bulkStockValue, 0), 10);
       }
 
       return {
@@ -167,7 +175,6 @@ export const EditProductModal = ({ product, onClose }) => {
 
     setVariations(updated);
 
-    // Recalculate summary metrics
     const validPrices = updated.map(v => v.price).filter(p => p > 0);
     const validWholesales = updated.map(v => v.wholesalePrice).filter(w => w > 0);
     if (validPrices.length > 0) setSuggestedRetailPrice(Math.min(...validPrices));
@@ -177,13 +184,15 @@ export const EditProductModal = ({ product, onClose }) => {
   };
 
   const handleAddVariation = () => {
+    const defaultRetail = parseNum(suggestedRetailPrice, 49.90);
+    const defaultWholesale = parseNum(wholesalePrice, Math.round(defaultRetail * 0.45 * 100) / 100);
     const newVar = {
       id: 'var-custom-' + Date.now(),
       name: `Nova Variação ${variations.length + 1}`,
       sku: `${parentSku || 'SKU'}-V${variations.length + 1}`,
-      price: suggestedRetailPrice || 49.90,
-      wholesalePrice: Math.round((suggestedRetailPrice || 49.90) * 0.45 * 100) / 100,
-      stock: 100,
+      price: defaultRetail,
+      wholesalePrice: defaultWholesale,
+      stock: parseNum(factoryStock, 100),
       gtin: ''
     };
     setVariations([...variations, newVar]);
@@ -218,21 +227,67 @@ export const EditProductModal = ({ product, onClose }) => {
     setImage(imgUrl);
   };
 
+  const handleAiGenerateDescAndNcm = async () => {
+    if (!title) {
+      showNotification('Digite o título primeiro para a IA analisar.', 'error');
+      return;
+    }
+    setIsGeneratingAi(true);
+    showNotification('🤖 Lumen IA gerando descrição comercial & dados fiscais NFe...', 'info');
+
+    try {
+      const res = await generateProductDescriptionAndNcm({
+        title,
+        category,
+        description,
+        ncm,
+        pricingType
+      });
+
+      if (res && res.description) {
+        setDescription(res.description);
+        if (res.ncm) setNcm(res.ncm);
+        if (res.cest) setCest(res.cest);
+        if (res.measureUnit) setMeasureUnit(res.measureUnit);
+        if (res.cfopSame) setCfopSame(res.cfopSame);
+        if (res.cfopDiff) setCfopDiff(res.cfopDiff);
+        if (res.csosn) setCsosn(res.csosn);
+        if (res.origin) setOrigin(res.origin);
+        showNotification(`✨ Descrição comercial & Dados Fiscais NFe (NCM ${res.ncm}, CEST ${res.cest}) gerados por IA!`);
+      }
+    } catch (err) {
+      console.error('Erro na IA:', err);
+      showNotification('Erro ao gerar com a IA. Tente novamente.', 'error');
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Recalculate summary prices if variations exist
-    let finalRetailPrice = Number(suggestedRetailPrice);
-    let finalWholesalePrice = Number(wholesalePrice);
-    let finalStock = Number(factoryStock);
+    let finalRetailPrice = parseNum(suggestedRetailPrice, 0);
+    let finalWholesalePrice = parseNum(wholesalePrice, 0);
+    let finalStock = parseInt(parseNum(factoryStock, 0), 10);
 
-    if (variations.length > 0) {
-      const validPrices = variations.map(v => Number(v.price) || 0).filter(p => p > 0);
-      if (validPrices.length > 0) {
+    let updatedVariations = [...variations];
+
+    if (updatedVariations.length === 1) {
+      updatedVariations[0] = {
+        ...updatedVariations[0],
+        wholesalePrice: finalWholesalePrice,
+        price: finalRetailPrice,
+        stock: finalStock
+      };
+    } else if (updatedVariations.length > 1) {
+      const validPrices = updatedVariations.map(v => parseNum(v.price, 0)).filter(p => p > 0);
+      if (validPrices.length > 0 && finalRetailPrice === 0) {
         finalRetailPrice = Math.min(...validPrices);
-        finalWholesalePrice = Math.round(finalRetailPrice * 0.45 * 100) / 100;
       }
-      finalStock = variations.reduce((acc, v) => acc + (Number(v.stock) || 0), 0);
+      const validWholesales = updatedVariations.map(v => parseNum(v.wholesalePrice, 0)).filter(w => w > 0);
+      if (validWholesales.length > 0 && finalWholesalePrice === 0) {
+        finalWholesalePrice = Math.min(...validWholesales);
+      }
     }
 
     updateProduct(product.id, {
@@ -244,17 +299,17 @@ export const EditProductModal = ({ product, onClose }) => {
       wholesalePrice: finalWholesalePrice,
       suggestedRetailPrice: finalRetailPrice,
       factoryStock: finalStock,
-      pricePerM2: Number(pricePerM2),
-      suggestedPricePerM2: Number(suggestedPricePerM2),
+      pricePerM2: parseNum(pricePerM2, 530),
+      suggestedPricePerM2: parseNum(suggestedPricePerM2, 800),
       description,
-      variations,
-      weightKg: Number(weightKg),
+      variations: updatedVariations,
+      weightKg: parseNum(weightKg, 0.5),
       dimensions: {
-        length: Number(lengthCm),
-        width: Number(widthCm),
-        height: Number(heightCm)
+        length: parseNum(lengthCm, 30),
+        width: parseNum(widthCm, 30),
+        height: parseNum(heightCm, 10)
       },
-      leadTimeDays: Number(leadTimeDays),
+      leadTimeDays: parseNum(leadTimeDays, 3),
       ncm,
       cest,
       measureUnit,
@@ -486,16 +541,30 @@ export const EditProductModal = ({ product, onClose }) => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Modelo de Precificação</label>
-                    <select
-                      value={pricingType}
-                      onChange={(e) => setPricingType(e.target.value)}
-                      className="input-field font-semibold"
-                    >
-                      <option value="fixed">Preço Fixo (Unidade)</option>
-                      <option value="custom_m2">Sob Medida (R$/m²)</option>
-                    </select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Modelo de Precificação</label>
+                      <select
+                        value={pricingType}
+                        onChange={(e) => setPricingType(e.target.value)}
+                        className="input-field font-semibold"
+                      >
+                        <option value="fixed">Preço Fixo (Unidade)</option>
+                        <option value="custom_m2">Sob Medida (R$/m²)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Status de Visibilidade</label>
+                      <select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        className="input-field font-extrabold"
+                      >
+                        <option value="approved">✨ Publicado no Catálogo (Ativo)</option>
+                        <option value="rascunho">📦 Rascunho (Oculto da Loja)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -537,20 +606,34 @@ export const EditProductModal = ({ product, onClose }) => {
                         <div>
                           <label className="block text-[10px] font-bold text-[var(--text-muted)]">Custo Atacado R$</label>
                           <input
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             value={wholesalePrice}
-                            onChange={(e) => setWholesalePrice(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setWholesalePrice(val);
+                              if (variations.length === 1) {
+                                const parsed = parseNum(val, 0);
+                                setVariations(prev => [{ ...prev[0], wholesalePrice: parsed }]);
+                              }
+                            }}
                             className="input-field font-extrabold text-amber-500 mt-1"
                           />
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-[var(--text-muted)]">Sugestão Revenda R$</label>
                           <input
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             value={suggestedRetailPrice}
-                            onChange={(e) => setSuggestedRetailPrice(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSuggestedRetailPrice(val);
+                              if (variations.length === 1) {
+                                const parsed = parseNum(val, 0);
+                                setVariations(prev => [{ ...prev[0], price: parsed }]);
+                              }
+                            }}
                             className="input-field font-extrabold text-emerald-500 mt-1"
                           />
                         </div>
@@ -559,7 +642,14 @@ export const EditProductModal = ({ product, onClose }) => {
                           <input
                             type="number"
                             value={factoryStock}
-                            onChange={(e) => setFactoryStock(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFactoryStock(val);
+                              if (variations.length === 1) {
+                                const parsed = parseInt(parseNum(val, 0), 10);
+                                setVariations(prev => [{ ...prev[0], stock: parsed }]);
+                              }
+                            }}
                             className="input-field font-bold mt-1"
                           />
                         </div>
@@ -585,7 +675,27 @@ export const EditProductModal = ({ product, onClose }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1">Descrição Detalhada do Produto</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[var(--text-muted)] uppercase">Descrição Detalhada do Produto</label>
+                  <button
+                    type="button"
+                    disabled={isGeneratingAi}
+                    onClick={handleAiGenerateDescAndNcm}
+                    className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30 disabled:opacity-50"
+                  >
+                    {isGeneratingAi ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin text-amber-500" />
+                        <span>⚡ Gerando Descrição & NCM...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={11} />
+                        <span>⚡ Gerar Descrição & NCM Fiscal IA</span>
+                      </>
+                    )}
+                  </button>
+                </div>
                 <textarea
                   rows={6}
                   value={description}
@@ -764,20 +874,20 @@ export const EditProductModal = ({ product, onClose }) => {
                           </td>
                           <td className="p-2">
                             <input
-                              type="number"
-                              step="0.01"
+                              type="text"
+                              inputMode="decimal"
                               value={v.wholesalePrice}
-                              onChange={(e) => handleUpdateVariation(idx, 'wholesalePrice', parseFloat(e.target.value) || 0)}
-                              className="input-field py-1 text-xs font-extrabold text-amber-500"
+                              onChange={(e) => handleUpdateVariation(idx, 'wholesalePrice', e.target.value)}
+                              className="input-field py-1 text-xs font-extrabold text-amber-500 font-mono"
                             />
                           </td>
                           <td className="p-2">
                             <input
-                              type="number"
-                              step="0.01"
+                              type="text"
+                              inputMode="decimal"
                               value={v.price}
                               onChange={(e) => handleUpdateVariation(idx, 'price', e.target.value)}
-                              className="input-field py-1 text-xs font-extrabold text-emerald-500"
+                              className="input-field py-1 text-xs font-extrabold text-emerald-500 font-mono"
                             />
                           </td>
                           <td className="p-2">
@@ -916,7 +1026,19 @@ export const EditProductModal = ({ product, onClose }) => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1">NCM (Nomenclatura Mercosul)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[var(--text-muted)] uppercase">NCM (Nomenclatura Mercosul)</label>
+                    <button
+                      type="button"
+                      disabled={isGeneratingAi}
+                      onClick={handleAiGenerateDescAndNcm}
+                      className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 disabled:opacity-50"
+                      title="Sugerir NCM Fiscal via IA"
+                    >
+                      {isGeneratingAi ? <Loader2 size={11} className="animate-spin text-amber-500" /> : <Sparkles size={11} />}
+                      <span>IA NCM</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
                     required

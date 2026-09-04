@@ -16,11 +16,13 @@ import {
   Lock,
   LogOut,
   Ruler,
-  UserPlus
+  UserPlus,
+  Wand2,
+  Smartphone
 } from 'lucide-react';
 
 export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders, onOpenTracking, onOpenFaq, onOpenAdminLogin, onOpenCalculator, onOpenRegister }) => {
-  const { theme, toggleTheme, viewMode, setViewMode, currentUser, logout, cart, orders, notification } = useStore();
+  const { theme, toggleTheme, viewMode, setViewMode, currentUser, logout, cart, orders, notification, openMagicImport } = useStore();
 
   const pendingOrdersCount = orders.filter((o) => o.status === 'aguardando_impressao').length;
 
@@ -43,6 +45,15 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
           <span>Despacho em 24h para Mercado Livre, Shopee & Envio Direto com Etiqueta Cega!</span>
         </div>
         <div className="hidden sm:flex items-center gap-4 text-slate-300">
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('smd_open_pwa_prompt'));
+            }}
+            className="flex items-center gap-1.5 hover:text-amber-400 font-semibold transition-colors text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30"
+            title="Instalar aplicativo SMD Drop no celular"
+          >
+            <Smartphone size={13} className="text-amber-400" /> Instalar App
+          </button>
           <button
             onClick={onOpenTracking}
             className="flex items-center gap-1 hover:text-amber-400 font-semibold transition-colors"

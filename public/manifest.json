@@ -1,0 +1,25 @@
+{
+  "name": "SMD Drop | Dropshipping Fabril & Marketplaces",
+  "short_name": "SMD Drop",
+  "description": "Plataforma Fabril de Dropshipping, Produtos sob Medida R$/m² e Etiqueta Cega para Mercado Livre, Shopee e Amazon.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

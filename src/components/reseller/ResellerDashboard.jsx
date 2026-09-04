@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { ResellerProductImagesModal } from './ResellerProductImagesModal';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -17,13 +18,16 @@ import {
   Wand2,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Image as ImageIcon,
+  MessageSquare
 } from 'lucide-react';
 
 export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) => {
-  const { currentUser, orders, pendingProducts, updateProfile } = useStore();
+  const { currentUser, orders, pendingProducts, products, updateProfile } = useStore();
 
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'orders', 'profile', 'suggested'
+  const [managingImagesProduct, setManagingImagesProduct] = useState(null);
 
   // Filter reseller specific orders and suggested products
   const resellerOrders = orders.filter(
@@ -338,22 +342,29 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
       {/* Suggested Products by Reseller Tab */}
       {activeTab === 'suggested' && (
         <div className="glass-panel p-6 space-y-4 animate-fade-in">
-          <div className="flex justify-between items-center border-b border-[var(--border-color)] pb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-[var(--border-color)] pb-4">
             <div>
               <h3 className="text-lg font-bold text-[var(--text-main)] font-['Outfit'] flex items-center gap-2">
-                <Wand2 className="text-amber-500" /> Meus Produtos Sugeridos via Botão Mágico
+                <Wand2 className="text-amber-500" /> Meus Orçamentos & Produtos Sugeridos via Botão Mágico
               </h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Acompanhe em tempo real o status de precificação e aprovação dos produtos sugeridos para o catálogo oficial da fábrica.
+                Acompanhe os orçamentos solicitados, veja o Custo Atacado preenchido pela fábrica e adicione fotos para salvar no seu catálogo.
               </p>
             </div>
+
+            <button
+              onClick={() => openMagicImport()}
+              className="btn-gold text-xs py-2 px-4 font-bold shadow-md flex items-center gap-1.5 shrink-0"
+            >
+              <Wand2 size={16} /> ⚡ Solicitar Novo Orçamento / Produto
+            </button>
           </div>
 
           {mySuggestedProducts.length === 0 ? (
             <div className="text-center py-10 text-[var(--text-muted)] space-y-2">
               <Wand2 size={36} className="mx-auto text-amber-500 opacity-60" />
-              <p className="text-sm font-semibold">Você ainda não sugeriu nenhum produto.</p>
-              <p className="text-xs">Use o Botão Mágico no catálogo para capturar e enviar produtos para a avaliação da fábrica!</p>
+              <p className="text-sm font-semibold">Você ainda não sugeriu nenhum produto ou orçamento.</p>
+              <p className="text-xs">Use o Botão Mágico no catálogo para capturar anúncios ou enviar seu produto para avaliação da fábrica!</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -362,59 +373,107 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
                   <tr>
                     <th className="p-3">Produto Sugerido</th>
                     <th className="p-3">Categoria</th>
-                    <th className="p-3">Preço Sugerido Venda</th>
+                    <th className="p-3">Preços & Custo Fábrica</th>
                     <th className="p-3">Status de Aprovação</th>
-                    <th className="p-3">Observações / Motivo da Fábrica</th>
+                    <th className="p-3">Observações & Resposta Fábrica</th>
+                    <th className="p-3 text-right">Ação Revendedor</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-color)] text-[var(--text-main)]">
-                  {mySuggestedProducts.map((item) => (
-                    <tr key={item.id} className="hover:bg-[var(--bg-surface-hover)] transition-colors">
-                      <td className="p-3 font-semibold flex items-center gap-3">
-                        <img src={item.image} alt={item.title} className="w-10 h-10 rounded-lg object-cover border border-[var(--border-color)]" />
-                        <div>
-                          <p className="font-extrabold">{item.title}</p>
-                          <p className="text-[10px] text-[var(--text-muted)] line-clamp-1">{item.description}</p>
-                        </div>
-                      </td>
-                      <td className="p-3 text-[var(--text-muted)] font-medium">{item.category || "Geral"}</td>
-                      <td className="p-3 font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                        R$ {item.suggestedRetailPrice?.toFixed(2)}
-                      </td>
-                      <td className="p-3">
-                        {item.status === 'pending_approval' && (
-                          <span className="badge-gold text-[10px] font-extrabold flex items-center gap-1 w-fit">
-                            <Clock size={12} /> Em Análise pela Fábrica
-                          </span>
-                        )}
-                        {item.status === 'approved' && (
-                          <span className="badge-emerald text-[10px] font-extrabold flex items-center gap-1 w-fit">
-                            <CheckCircle size={12} /> Aprovado & Publicado!
-                          </span>
-                        )}
-                        {item.status === 'rejected' && (
-                          <span className="badge-red text-[10px] font-extrabold flex items-center gap-1 w-fit">
-                            <XCircle size={12} /> Recusado
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {item.status === 'rejected' ? (
-                          <div className="bg-red-500/10 border border-red-500/30 p-2 rounded-lg text-red-600 dark:text-red-400 text-[11px] font-medium max-w-md">
-                            <strong>Motivo da Recusa:</strong> {item.rejectionReason || "Produto fora do padrão de fabricação."}
+                  {mySuggestedProducts.map((item) => {
+                    const linkedApprovedProd = products.find(p => p.id === item.approvedProductId || p.title === item.title);
+
+                    return (
+                      <tr key={item.id} className="hover:bg-[var(--bg-surface-hover)] transition-colors">
+                        <td className="p-3 font-semibold flex items-center gap-3">
+                          <img src={item.image} alt={item.title} className="w-10 h-10 rounded-lg object-cover border border-[var(--border-color)]" />
+                          <div>
+                            <p className="font-extrabold">{item.title}</p>
+                            <p className="text-[10px] text-[var(--text-muted)] line-clamp-1">{item.description}</p>
                           </div>
-                        ) : item.status === 'approved' ? (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
-                            ✅ Produto cadastrado no catálogo oficial com desconto atacado!
-                          </span>
-                        ) : (
-                          <span className="text-[var(--text-muted)] italic text-[11px]">
-                            A fábrica está avaliando o custo fabril...
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="p-3 text-[var(--text-muted)] font-medium">{item.category || "Geral"}</td>
+                        <td className="p-3 font-mono">
+                          {item.status === 'approved' && (item.wholesalePrice > 0 || (linkedApprovedProd && linkedApprovedProd.wholesalePrice)) ? (
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold block">
+                                Custo Atacado: R$ {(item.wholesalePrice || linkedApprovedProd?.wholesalePrice || 0).toFixed(2)}
+                              </span>
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block">
+                                Sugerido Venda: R$ {(item.suggestedRetailPrice || linkedApprovedProd?.suggestedRetailPrice || 0).toFixed(2)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                              Desejado: R$ {item.suggestedRetailPrice?.toFixed(2)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {item.status === 'pending_approval' && (
+                            <span className="badge-gold text-[10px] font-extrabold flex items-center gap-1 w-fit">
+                              <Clock size={12} /> Em Análise pela Fábrica
+                            </span>
+                          )}
+                          {item.status === 'approved' && (
+                            <span className="badge-emerald text-[10px] font-extrabold flex items-center gap-1 w-fit">
+                              <CheckCircle size={12} /> Aprovado & Publicado!
+                            </span>
+                          )}
+                          {item.status === 'rejected' && (
+                            <span className="badge-red text-[10px] font-extrabold flex items-center gap-1 w-fit">
+                              <XCircle size={12} /> Recusado
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 max-w-xs space-y-1">
+                          {item.resellerNotes && (
+                            <div className="bg-[var(--bg-surface-hover)] border border-[var(--border-color)] p-1.5 rounded text-[10px] text-[var(--text-muted)]">
+                              <strong>Minhas Obs:</strong> "{item.resellerNotes}"
+                            </div>
+                          )}
+                          {item.status === 'rejected' ? (
+                            <div className="bg-red-500/10 border border-red-500/30 p-2 rounded-lg text-red-600 dark:text-red-400 text-[11px] font-medium">
+                              <strong>Motivo da Recusa:</strong> {item.rejectionReason || "Produto fora do padrão de fabricação."}
+                            </div>
+                          ) : item.status === 'approved' ? (
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-lg text-emerald-700 dark:text-emerald-300 text-[11px]">
+                              <strong>Fábrica:</strong> {item.factoryNotes || "Aprovado com preço de atacado preenchido!"}
+                            </div>
+                          ) : (
+                            <span className="text-[var(--text-muted)] italic text-[11px] block">
+                              Aguardando precificação fabril...
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          {item.status === 'approved' ? (
+                            <button
+                              onClick={() => {
+                                const targetProduct = linkedApprovedProd || {
+                                  id: item.approvedProductId || item.id,
+                                  title: item.title,
+                                  wholesalePrice: item.wholesalePrice || 50,
+                                  suggestedRetailPrice: item.suggestedRetailPrice || 120,
+                                  category: item.category || 'Geral',
+                                  image: item.image,
+                                  images: item.images || [item.image].filter(Boolean)
+                                };
+                                setManagingImagesProduct(targetProduct);
+                              }}
+                              className="btn-gold text-[11px] font-bold py-1.5 px-3 shadow-sm inline-flex items-center gap-1 shrink-0"
+                            >
+                              <ImageIcon size={13} /> Adicionar Fotos / Catálogo
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-[var(--text-muted)] font-mono italic">
+                              Ag. Aprovação
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -552,6 +611,14 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
             </table>
           </div>
         </div>
+      )}
+
+      {/* Reseller Product Images Management Modal */}
+      {managingImagesProduct && (
+        <ResellerProductImagesModal
+          product={managingImagesProduct}
+          onClose={() => setManagingImagesProduct(null)}
+        />
       )}
     </div>
   );
