@@ -49,7 +49,7 @@ import { MagicImportModal } from '../reseller/MagicImportModal';
 import { Wand2, Clock, CheckCircle, XCircle as XCircleIcon } from 'lucide-react';
 import { parseShopeeFiles } from '../../lib/shopeeImporter';
 
-export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
+export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTab: externalTab, onTabChange }) => {
   const { 
     orders, 
     products, 
@@ -84,7 +84,13 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct }) => {
     testSupabaseConnection
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'products', 'drafts', 'orders', 'users', 'pending', 'settings'
+  const [internalTab, setInternalTab] = useState('analytics'); // 'analytics', 'products', 'drafts', 'orders', 'users', 'pending', 'settings'
+  const activeTab = externalTab || internalTab;
+
+  const setActiveTab = (tab) => {
+    setInternalTab(tab);
+    if (onTabChange) onTabChange(tab);
+  };
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isMaterialManagerOpen, setIsMaterialManagerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);

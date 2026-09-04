@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { PackageCheck, Truck, Clock, FileText, CheckCircle2, Search, ExternalLink } from 'lucide-react';
 import { TrackingModal } from '../TrackingModal';
+import { Breadcrumb } from '../common/Breadcrumb';
 
 export const ResellerOrdersModal = ({ isOpen, onClose }) => {
   const { orders } = useStore();
@@ -13,7 +14,7 @@ export const ResellerOrdersModal = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col p-5 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
+        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
               <PackageCheck size={22} />
@@ -30,6 +31,11 @@ export const ResellerOrdersModal = ({ isOpen, onClose }) => {
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)] text-xl font-bold p-1">
             ✕
           </button>
+        </div>
+
+        {/* Modal Breadcrumb Trail */}
+        <div className="shrink-0 mb-3">
+          <Breadcrumb currentPath="pedidos" />
         </div>
 
         {/* Orders Grid (No Scroll) */}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Calculator, DollarSign, TrendingUp, Percent, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Calculator, DollarSign, TrendingUp, Percent, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+import { generateSmartPricingSuggestion } from '../../lib/smdAssistIa';
 
 export const ProfitCalculatorModal = ({ product, isOpen, onClose }) => {
   const [salePrice, setSalePrice] = useState(
@@ -7,10 +8,26 @@ export const ProfitCalculatorModal = ({ product, isOpen, onClose }) => {
   );
   const [marketplace, setMarketplace] = useState('ml_classic'); // 'ml_classic', 'ml_premium', 'shopee'
   const [monthlyVolume, setMonthlyVolume] = useState(30);
+  const [aiPricing, setAiPricing] = useState(null);
+  const [loadingAi, setLoadingAi] = useState(false);
 
   if (!isOpen || !product) return null;
 
   const cost = product.pricingType === 'custom_m2' ? product.pricePerM2 : product.wholesalePrice;
+
+  const handleSuggestPrice = async () => {
+    setLoadingAi(true);
+    try {
+      const res = await generateSmartPricingSuggestion({ product, marketplace, currentPrice: salePrice });
+      if (res && res.success) {
+        setAiPricing(res);
+      }
+    } catch (e) {
+      console.warn("Erro ao consultar sugestão de preço:", e);
+    } finally {
+      setLoadingAi(false);
+    }
+  };
 
   // Fee calculation logic
   let marketplaceFeePercent = 0;
@@ -66,7 +83,10 @@ export const ProfitCalculatorModal = ({ product, isOpen, onClose }) => {
                 </label>
                 <select
                   value={marketplace}
-                  onChange={(e) => setMarketplace(e.target.value)}
+                  onChange={(e) => {
+                    setMarketplace(e.target.value);
+                    setAiPricing(null);
+                  }}
                   className="input-field font-semibold"
                 >
                   <option value="ml_classic">Mercado Livre (Anúncio Clássico - 14% + R$6)</option>
@@ -76,9 +96,23 @@ export const ProfitCalculatorModal = ({ product, isOpen, onClose }) => {
               </div>
 
               <div>
-                <label className="block font-bold text-[var(--text-muted)] uppercase mb-1">
-                  Seu Preço de Venda Praticado (R$)
-                </label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block font-bold text-[var(--text-muted)] uppercase">
+                    Seu Preço de Venda Praticado (R$)
+                  </label>
+                  <button
+                    onClick={handleSuggestPrice}
+                    disabled={loadingAi}
+                    className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                  >
+                    {loadingAi ? (
+                      <span className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    {loadingAi ? 'Analisando...' : 'Sugerir Preço com IA'}
+                  </button>
+                </div>
                 <input
                   type="number"
                   step="0.01"
@@ -87,6 +121,29 @@ export const ProfitCalculatorModal = ({ product, isOpen, onClose }) => {
                   className="input-field text-base font-extrabold text-emerald-600 dark:text-emerald-400"
                 />
               </div>
+
+              {/* Lumen AI Pricing Box */}
+              {aiPricing && (
+                <div className="bg-purple-500/10 border border-purple-500/30 p-3 rounded-xl space-y-2 text-xs animate-fade-in">
+                  <div className="flex items-center justify-between text-purple-600 dark:text-purple-300 font-bold">
+                    <span className="flex items-center gap-1">
+                      <Sparkles size={14} className="text-amber-400" /> Preço Ideal Recomendado:
+                    </span>
+                    <span className="font-mono text-sm font-extrabold text-purple-700 dark:text-purple-200">
+                      R$ {aiPricing.recommendedPrice.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-tight">
+                    {aiPricing.strategyReason}
+                  </p>
+                  <button
+                    onClick={() => setSalePrice(aiPricing.recommendedPrice)}
+                    className="w-full btn-purple py-1.5 text-xs font-bold justify-center"
+                  >
+                    Aplicar R$ {aiPricing.recommendedPrice.toFixed(2)} no Simulador
+                  </button>
+                </div>
+              )}
 
               <div>
                 <label className="block font-bold text-[var(--text-muted)] uppercase mb-1">

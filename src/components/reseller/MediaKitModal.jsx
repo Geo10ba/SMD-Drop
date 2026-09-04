@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, Scale, FileCheck, ExternalLink, Plus } from 'lucide-react';
+import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, Scale, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { ResellerProductImagesModal } from './ResellerProductImagesModal';
+import { generateMarketingContent } from '../../lib/smdAssistIa';
 
 export const MediaKitModal = ({ product, onClose }) => {
   const { showNotification } = useStore();
-  const [activeTab, setActiveTab] = useState('general'); // 'general' | 'variations' | 'dimensions' | 'fiscal' | 'photos'
+  const [activeTab, setActiveTab] = useState('general'); // 'general' | 'variations' | 'dimensions' | 'fiscal' | 'photos' | 'marketing'
   const [copiedTitle, setCopiedTitle] = useState(false);
   const [copiedDesc, setCopiedDesc] = useState(false);
+  const [copiedItem, setCopiedItem] = useState(null);
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
+  const [marketingData, setMarketingData] = useState(null);
+  const [loadingMarketing, setLoadingMarketing] = useState(false);
 
   if (!product) return null;
 
@@ -18,6 +22,30 @@ export const MediaKitModal = ({ product, onClose }) => {
     : [product.image || product.image_url || 'https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80'];
 
   const dims = product.dimensions || { length: 30, width: 30, height: 10 };
+
+  const handleGenerateMarketing = async () => {
+    setLoadingMarketing(true);
+    try {
+      const res = await generateMarketingContent({ product });
+      if (res && res.success) {
+        setMarketingData(res);
+        showNotification('Kit de Marketing gerado com sucesso via Lumen IA!');
+      } else {
+        showNotification('Erro ao gerar kit de marketing.', 'error');
+      }
+    } catch (e) {
+      showNotification('Erro ao conectar com assistente Lumen.', 'error');
+    } finally {
+      setLoadingMarketing(false);
+    }
+  };
+
+  const copyText = (text, keyName, label) => {
+    navigator.clipboard.writeText(text);
+    setCopiedItem(keyName);
+    setTimeout(() => setCopiedItem(null), 2000);
+    showNotification(`${label} copiado!`);
+  };
 
   const copyToClipboard = (text, type) => {
     navigator.clipboard.writeText(text);
@@ -33,10 +61,10 @@ export const MediaKitModal = ({ product, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col p-5 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col p-4 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
+        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold">
               <Download size={22} />
@@ -58,65 +86,82 @@ export const MediaKitModal = ({ product, onClose }) => {
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-[var(--border-color)] pb-3 mb-4 overflow-x-auto shrink-0 scrollbar-none">
+        {/* Tab Navigation Grid - Zero text cut off */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 sm:gap-2 border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
           <button
             onClick={() => setActiveTab('general')}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all whitespace-nowrap ${
+            className={`px-2.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-center ${
               activeTab === 'general'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
                 : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
             }`}
           >
-            <FileText size={14} /> Dados Gerais & Descrição
+            <FileText size={14} className="shrink-0" />
+            <span className="truncate">Dados Gerais</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('marketing')}
+            className={`px-2.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-center ${
+              activeTab === 'marketing'
+                ? 'bg-purple-600 text-white shadow-md font-extrabold'
+                : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20'
+            }`}
+          >
+            <Megaphone size={14} className="shrink-0" />
+            <span className="truncate">Marketing IA ⚡</span>
           </button>
 
           <button
             onClick={() => setActiveTab('variations')}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all whitespace-nowrap ${
+            className={`px-2.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-center ${
               activeTab === 'variations'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
                 : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
             }`}
           >
-            <Layers size={14} /> Variações Shopee
-            <span className="ml-1 bg-slate-900/20 text-[10px] px-1.5 py-0.5 rounded-full font-mono">
+            <Layers size={14} className="shrink-0" />
+            <span className="truncate">Variações</span>
+            <span className="bg-slate-900/20 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
               {variations.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('dimensions')}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all whitespace-nowrap ${
+            className={`px-2.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-center ${
               activeTab === 'dimensions'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
                 : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
             }`}
           >
-            <Package size={14} /> Pesos & Dimensões
+            <Package size={14} className="shrink-0" />
+            <span className="truncate">Dimensões</span>
           </button>
 
           <button
             onClick={() => setActiveTab('fiscal')}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all whitespace-nowrap ${
+            className={`px-2.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-center ${
               activeTab === 'fiscal'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
                 : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
             }`}
           >
-            <FileCheck size={14} /> Dados Fiscais (NCM)
+            <FileCheck size={14} className="shrink-0" />
+            <span className="truncate">Dados Fiscais</span>
           </button>
 
           <button
             onClick={() => setActiveTab('photos')}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all whitespace-nowrap ${
+            className={`px-2.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-center ${
               activeTab === 'photos'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
                 : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
             }`}
           >
-            <ImageIcon size={14} /> Fotos HD
-            <span className="ml-1 bg-slate-900/20 text-[10px] px-1.5 py-0.5 rounded-full font-mono">
+            <ImageIcon size={14} className="shrink-0" />
+            <span className="truncate">Fotos HD</span>
+            <span className="bg-slate-900/20 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
               {images.length}
             </span>
           </button>
@@ -223,6 +268,169 @@ export const MediaKitModal = ({ product, onClose }) => {
                   </span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB MARKETING MULTICANAL IA */}
+          {activeTab === 'marketing' && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-purple-900/30 via-slate-900 to-indigo-900/30 p-5 rounded-2xl border border-purple-500/30 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center md:text-left">
+                  <span className="badge-purple uppercase tracking-wider text-[10px] inline-flex items-center gap-1">
+                    <Sparkles size={12} className="text-amber-400" /> GERADOR MULTICANAL LUMEN IA
+                  </span>
+                  <h4 className="text-base font-bold text-[var(--text-main)]">
+                    Kits Prontos para Mercado Livre, Shopee, Instagram & TikTok
+                  </h4>
+                  <p className="text-xs text-[var(--text-muted)] max-w-xl">
+                    Crie títulos otimizados para mecanismos de busca e legendas persuasivas em segundos com a inteligência do Lumen.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleGenerateMarketing}
+                  disabled={loadingMarketing}
+                  className="btn-purple py-2.5 px-5 text-xs font-bold shrink-0 shadow-lg flex items-center gap-2"
+                >
+                  {loadingMarketing ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Lumen Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} className="text-amber-300" />
+                      {marketingData ? 'Gerar Novas Ideias com IA' : 'Gerar Kit de Marketing com IA'}
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {loadingMarketing && (
+                <div className="p-10 text-center space-y-3 bg-[var(--bg-surface-hover)] rounded-2xl border border-[var(--border-color)]">
+                  <div className="w-10 h-10 border-3 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto" />
+                  <p className="text-xs font-semibold text-[var(--text-main)]">
+                    Lumen está criando os títulos SEO, legendas de alto engajamento e o roteiro de vídeo de 15s...
+                  </p>
+                </div>
+              )}
+
+              {!loadingMarketing && marketingData && (
+                <div className="space-y-6 animate-fade-in">
+                  {/* Títulos para Marketplaces */}
+                  <div className="space-y-3">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                      <Megaphone size={14} className="text-purple-500" /> Títulos Otimizados para Busca (SEO)
+                    </h5>
+
+                    <div className="grid grid-cols-1 gap-3 text-xs">
+                      {/* Mercado Livre */}
+                      <div className="bg-[var(--bg-surface-hover)] p-3.5 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-3">
+                        <div className="space-y-1 flex-1">
+                          <span className="text-[10px] font-bold text-yellow-600 dark:text-yellow-400 uppercase block">
+                            Mercado Livre (Máx 60 caracteres)
+                          </span>
+                          <p className="font-mono font-semibold text-[var(--text-main)] text-xs">
+                            {marketingData.titleML}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyText(marketingData.titleML, 'titleML', 'Título Mercado Livre')}
+                          className="btn-secondary py-1.5 px-3 text-[11px] shrink-0 font-bold"
+                        >
+                          {copiedItem === 'titleML' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                          {copiedItem === 'titleML' ? 'Copiado!' : 'Copiar'}
+                        </button>
+                      </div>
+
+                      {/* Shopee */}
+                      <div className="bg-[var(--bg-surface-hover)] p-3.5 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-3">
+                        <div className="space-y-1 flex-1">
+                          <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase block">
+                            Shopee Brasil (Chamativo + Palavras-Chave)
+                          </span>
+                          <p className="font-mono font-semibold text-[var(--text-main)] text-xs">
+                            {marketingData.titleShopee}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyText(marketingData.titleShopee, 'titleShopee', 'Título Shopee')}
+                          className="btn-secondary py-1.5 px-3 text-[11px] shrink-0 font-bold"
+                        >
+                          {copiedItem === 'titleShopee' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                          {copiedItem === 'titleShopee' ? 'Copiado!' : 'Copiar'}
+                        </button>
+                      </div>
+
+                      {/* Amazon */}
+                      <div className="bg-[var(--bg-surface-hover)] p-3.5 rounded-xl border border-[var(--border-color)] flex items-center justify-between gap-3">
+                        <div className="space-y-1 flex-1">
+                          <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase block">
+                            Amazon Brasil (Título Completo)
+                          </span>
+                          <p className="font-mono font-semibold text-[var(--text-main)] text-xs">
+                            {marketingData.titleAmazon}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyText(marketingData.titleAmazon, 'titleAmazon', 'Título Amazon')}
+                          className="btn-secondary py-1.5 px-3 text-[11px] shrink-0 font-bold"
+                        >
+                          {copiedItem === 'titleAmazon' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                          {copiedItem === 'titleAmazon' ? 'Copiado!' : 'Copiar'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Legenda para Redes Sociais */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                        <Share2 size={14} className="text-rose-500" /> Legenda para Instagram & TikTok + Hashtags
+                      </h5>
+                      <button
+                        onClick={() => copyText(marketingData.instagramCaption, 'caption', 'Legenda social')}
+                        className="text-xs text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1 hover:underline"
+                      >
+                        {copiedItem === 'caption' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                        {copiedItem === 'caption' ? 'Legenda Copiada!' : 'Copiar Legenda Completa'}
+                      </button>
+                    </div>
+                    <div className="bg-[var(--bg-surface-hover)] p-4 rounded-xl border border-[var(--border-color)] text-xs leading-relaxed text-[var(--text-main)] whitespace-pre-line font-sans">
+                      {marketingData.instagramCaption}
+                    </div>
+                  </div>
+
+                  {/* Roteiro de Vídeo Curto (15s) */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                        <Film size={14} className="text-indigo-500" /> Roteiro de 15 Segundos para Vídeo Curto (Reels / TikTok)
+                      </h5>
+                      <button
+                        onClick={() => copyText(marketingData.videoScript, 'script', 'Roteiro de vídeo')}
+                        className="text-xs text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1 hover:underline"
+                      >
+                        {copiedItem === 'script' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                        {copiedItem === 'script' ? 'Roteiro Copiado!' : 'Copiar Roteiro'}
+                      </button>
+                    </div>
+                    <div className="bg-indigo-950/20 border border-indigo-500/30 p-4 rounded-xl text-xs leading-relaxed text-[var(--text-main)] whitespace-pre-line font-mono">
+                      {marketingData.videoScript}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!loadingMarketing && !marketingData && (
+                <div className="p-8 text-center bg-[var(--bg-surface-hover)] rounded-2xl border border-[var(--border-color)] space-y-3">
+                  <Megaphone size={32} className="mx-auto text-purple-500 opacity-60" />
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Clique no botão acima para gerar os títulos para Mercado Livre/Shopee, legenda social com hashtags e roteiro de vídeo para este produto.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

@@ -18,11 +18,13 @@ import { RegisterModal } from './components/reseller/RegisterModal';
 import { LegalModal } from './components/LegalModal';
 import { SmdAssistantChat } from './components/assistant/SmdAssistantChat';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
+import { Breadcrumb } from './components/common/Breadcrumb';
 
 function MainApp() {
   const { 
     products,
     viewMode, 
+    setViewMode,
     isMagicImportOpen, 
     magicImportInitialData, 
     closeMagicImport 
@@ -41,10 +43,163 @@ function MainApp() {
   const [isFulfillmentOpen, setIsFulfillmentOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
 
+  const [factoryTab, setFactoryTab] = useState('analytics');
+  const [currentPath, setCurrentPath] = useState('catalogo');
+
   const handleOpenAuth = (mode = 'register') => {
     setAuthMode(mode);
     setIsRegisterOpen(true);
   };
+
+  const handleNavigatePath = (path) => {
+    if (path.startsWith('fabrica')) {
+      setViewMode('factory');
+      const sub = path.replace('fabrica/', '').replace('fabrica', '').trim();
+      if (sub === 'expedicao') {
+        setIsFulfillmentOpen(true);
+      } else if (sub === 'novo-produto') {
+        setIsNewProductOpen(true);
+      } else {
+        setIsFulfillmentOpen(false);
+        setIsNewProductOpen(false);
+        if (['analytics', 'products', 'drafts', 'orders', 'users', 'pending', 'settings'].includes(sub)) {
+          setFactoryTab(sub);
+        }
+      }
+    } else {
+      setViewMode('reseller');
+      setIsFulfillmentOpen(false);
+      setIsNewProductOpen(false);
+      setIsResellerOrdersOpen(path === 'pedidos');
+      setIsCartOpen(path === 'carrinho');
+      setIsCheckoutOpen(path === 'checkout');
+      setIsFaqOpen(path === 'ajuda');
+      setIsTrackingOpen(path === 'rastreio');
+      if (path === 'cadastro') {
+        setAuthMode('register');
+        setIsRegisterOpen(true);
+      } else if (path === 'login') {
+        setAuthMode('login');
+        setIsRegisterOpen(true);
+      } else {
+        setIsRegisterOpen(false);
+      }
+      setIsAdminLoginOpen(path === 'admin-login');
+      if (path === 'calculadora-m2') {
+        setM2CalculatorProduct({
+          id: 'calc-sample',
+          title: 'Calculadora sob Medida R$/m²',
+          category: 'Logomarcas & Letreiros',
+          pricingType: 'custom_m2',
+          pricePerM2: 530,
+          wholesalePrice: 530,
+          suggestedPricePerM2: 800,
+          suggestedRetailPrice: 800,
+          materials: []
+        });
+      } else {
+        setM2CalculatorProduct(null);
+      }
+    }
+    window.location.hash = `#${path}`;
+  };
+
+  // Sync state changes to window.location.hash
+  useEffect(() => {
+    let targetPath = 'catalogo';
+    if (viewMode === 'factory') {
+      if (isFulfillmentOpen) targetPath = 'fabrica/expedicao';
+      else if (isNewProductOpen) targetPath = 'fabrica/novo-produto';
+      else targetPath = `fabrica/${factoryTab}`;
+    } else {
+      if (isResellerOrdersOpen) targetPath = 'pedidos';
+      else if (isCartOpen) targetPath = 'carrinho';
+      else if (isCheckoutOpen) targetPath = 'checkout';
+      else if (isFaqOpen) targetPath = 'ajuda';
+      else if (isTrackingOpen) targetPath = 'rastreio';
+      else if (isRegisterOpen) targetPath = authMode === 'login' ? 'login' : 'cadastro';
+      else if (isAdminLoginOpen) targetPath = 'admin-login';
+      else if (m2CalculatorProduct) targetPath = 'calculadora-m2';
+      else targetPath = 'catalogo';
+    }
+
+    setCurrentPath(targetPath);
+    if (window.location.hash !== `#${targetPath}`) {
+      window.history.replaceState(null, '', `#${targetPath}`);
+    }
+  }, [
+    viewMode,
+    factoryTab,
+    isFulfillmentOpen,
+    isNewProductOpen,
+    isResellerOrdersOpen,
+    isCartOpen,
+    isCheckoutOpen,
+    isFaqOpen,
+    isTrackingOpen,
+    isRegisterOpen,
+    authMode,
+    isAdminLoginOpen,
+    m2CalculatorProduct
+  ]);
+
+  // Initial Load & Hash Change Event Listener
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '').trim();
+      if (!hash) return;
+
+      if (hash.startsWith('fabrica')) {
+        setViewMode('factory');
+        const sub = hash.replace('fabrica/', '').replace('fabrica', '').trim();
+        if (sub === 'expedicao') {
+          setIsFulfillmentOpen(true);
+        } else if (sub === 'novo-produto') {
+          setIsNewProductOpen(true);
+        } else if (['analytics', 'products', 'drafts', 'orders', 'users', 'pending', 'settings'].includes(sub)) {
+          setIsFulfillmentOpen(false);
+          setIsNewProductOpen(false);
+          setFactoryTab(sub);
+        }
+      } else {
+        setViewMode('reseller');
+        setIsFulfillmentOpen(false);
+        setIsNewProductOpen(false);
+        setIsResellerOrdersOpen(hash === 'pedidos');
+        setIsCartOpen(hash === 'carrinho');
+        setIsCheckoutOpen(hash === 'checkout');
+        setIsFaqOpen(hash === 'ajuda');
+        setIsTrackingOpen(hash === 'rastreio');
+        if (hash === 'cadastro') {
+          setAuthMode('register');
+          setIsRegisterOpen(true);
+        } else if (hash === 'login') {
+          setAuthMode('login');
+          setIsRegisterOpen(true);
+        } else {
+          setIsRegisterOpen(false);
+        }
+        setIsAdminLoginOpen(hash === 'admin-login');
+        if (hash === 'calculadora-m2') {
+          setM2CalculatorProduct({
+            id: 'calc-sample',
+            title: 'Calculadora sob Medida R$/m²',
+            category: 'Logomarcas & Letreiros',
+            pricingType: 'custom_m2',
+            pricePerM2: 530,
+            wholesalePrice: 530,
+            suggestedPricePerM2: 800,
+            suggestedRetailPrice: 800,
+            materials: []
+          });
+        }
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   useEffect(() => {
     document.title = "SMD Drop | Plataforma Fabril de Dropshipping & Marketplaces";
@@ -82,7 +237,13 @@ function MainApp() {
       />
 
       {/* Main Container */}
-      <main className="max-w-[1650px] mx-auto px-3 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-[1650px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+        {/* Dynamic Breadcrumb Navigation Bar */}
+        <Breadcrumb
+          currentPath={currentPath}
+          onNavigate={handleNavigatePath}
+        />
+
         {viewMode === 'reseller' ? (
           <ResellerCatalog 
             onOpenCart={() => setIsCartOpen(true)} 
@@ -102,6 +263,8 @@ function MainApp() {
               </div>
             ) : (
               <FactoryDashboard
+                activeTab={factoryTab}
+                onTabChange={(tab) => setFactoryTab(tab)}
                 onOpenFulfillment={() => setIsFulfillmentOpen(true)}
                 onOpenNewProduct={() => setIsNewProductOpen(true)}
               />

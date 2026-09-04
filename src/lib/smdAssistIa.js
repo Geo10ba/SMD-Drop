@@ -46,7 +46,10 @@ const SYSTEM_PROMPTS = {
     "2. SAUDAÇÃO E DIÁLOGO DIRETO:\n" +
     "   - Ao cumprimentar o usuário, seja aberto e direto: 'Oi, tudo bem por aí? 😊 Como posso te ajudar hoje?' sem listar categorias que você não confirmou na lista do catálogo!\n" +
     "3. RESPOSTAS DIRETAS E CURTAS (SEM TEXTOS GIGANTES!):\n" +
-    "   - Responda em 1 a 3 parágrafos curtos no máximo. NUNCA envie listas enormes a menos que o usuário peça expressamente.",
+    "   - Responda em 1 a 3 parágrafos curtos no máximo. NUNCA envie listas enormes a menos que o usuário peça expressamente.\n" +
+    "4. STATUS E RASTREAMENTO DE PEDIDOS:\n" +
+    "   - Se o usuário perguntar sobre o status do seu pedido ou produção, consulte a lista de PEDIDOS REALIZADOS no contexto da tela.\n" +
+    "   - Explique amigavelmente a etapa em que o pedido se encontra (Ex: Rascunho, Pendente, Em Produção na Fábrica, Enviado com código de rastreamento ou Entregue).",
 
   "tira-duvidas":
     "Você é o Lumen, atendente humano da SMD Drop. Responda à dúvida de forma curta e direta com base nos produtos reais cadastrados.",
@@ -67,7 +70,15 @@ const SYSTEM_PROMPTS = {
     "Crie 3 roteiros dinâmicos e curtos para vídeos demonstrativos.",
 
   "desc-otimizada":
-    "Crie uma descrição completa e persuasiva para o produto."
+    "Crie uma descrição completa e persuasiva para o produto.",
+
+  "marketing-multicanal":
+    "Você é o Lumen, especialista em marketing digital e vendas multicanal e e-commerce (Mercado Livre, Shopee, Instagram, TikTok).\n" +
+    "Gere títulos irresistíveis para busca SEO e legendas prontas para converter seguidores em clientes.",
+
+  "inteligencia-lucro":
+    "Você é o Lumen, consultor financeiro e especialista em precificação para e-commerce e marketplaces (Mercado Livre, Shopee, Amazon).\n" +
+    "Recomende a estratégia de preço ideal para maximizar lucros e vendas."
 };
 
 /** Chamada à API Groq */
@@ -292,4 +303,135 @@ export async function generateProductDescriptionAndNcm({ title, category, descri
     provider: "local-fallback"
   };
 }
+
+/**
+ * Recurso 3: Geração de Marketing Multicanal com Lumen IA
+ */
+export async function generateMarketingContent({ product }) {
+  const prompt = `Analise o produto abaixo para e-commerce:\n` +
+    `- Título: "${product?.title || 'Produto Fabril'}"\n` +
+    `- Categoria: "${product?.category || 'Geral'}"\n` +
+    `- Descrição: "${(product?.description || '').slice(0, 300)}"\n\n` +
+    `Retorne APENAS um JSON válido no seguinte formato exato (sem marcadores fora do JSON):\n` +
+    `{\n` +
+    `  "titleML": "Título Otimizado para Mercado Livre (máx 60 caracteres com palavra-chave)",\n` +
+    `  "titleShopee": "Título Otimizado para Shopee com Ganchos de Promoção",\n` +
+    `  "titleAmazon": "Título Completo e Profissional para Amazon Brasil",\n` +
+    `  "instagramCaption": "Legenda engajadora com emojis, chamada para ação e hashtags estratégicas (#decoracao #homedecor #ofertas)",\n` +
+    `  "videoScript": "Roteiro de 15s para Reels/TikTok:\\n[0-3s] Hook: Você não vai acreditar nesse produto!\\n[3-10s] Mostre detalhes e qualidade fabril.\\n[10-15s] CTA: Garanta o seu com desconto no link da bio!"\n` +
+    `}`;
+
+  try {
+    const res = await askLumenAssistant({
+      tool: "marketing-multicanal",
+      input: prompt
+    });
+
+    if (res.success && res.content) {
+      const jsonMatch = res.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          success: true,
+          titleML: parsed.titleML || product?.title,
+          titleShopee: parsed.titleShopee || product?.title,
+          titleAmazon: parsed.titleAmazon || product?.title,
+          instagramCaption: cleanSocialText(parsed.instagramCaption || ""),
+          videoScript: cleanSocialText(parsed.videoScript || ""),
+          provider: res.provider
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Erro ao gerar kit de marketing:", err);
+  }
+
+  // Fallback local se a IA falhar
+  const t = product?.title || 'Produto Exclusivo de Fábrica';
+  return {
+    success: true,
+    titleML: `${t} Premium Direto da Fábrica NFe`,
+    titleShopee: `${t} Alta Qualidade Envio Imediato Promoção`,
+    titleAmazon: `${t} - Qualidade Premium com Garantia de Fábrica`,
+    instagramCaption: `✨ Olhe só esse detalhe incrível! O ${t} chegou para transformar o seu ambiente com sofisticação e alta qualidade de fábrica.\n\n🚚 Envio imediato e embalagem super segura!\n\n👇 Clique no link da bio para garantir o seu antes que esgoste!\n\n#decoracao #homedecor #design #qualidade #envioimediato`,
+    videoScript: `🎬 [0-3s] Procurando o toque final que faltava no seu espaço?\n[3-10s] Olha o acabamento perfeito do ${t}, feito com materiais nobres e corte a laser!\n[10-15s] Garanta o seu agora mesmo direto da fábrica pelo link no perfil!`,
+    provider: "local-fallback"
+  };
+}
+
+/**
+ * Recurso 5: Sugestão de Precificação Inteligente com Lumen IA
+ */
+export async function generateSmartPricingSuggestion({ product, marketplace = 'ml_classic', currentPrice }) {
+  const cost = product?.pricingType === 'custom_m2'
+    ? (parseFloat(product?.pricePerM2) || 0)
+    : (parseFloat(product?.wholesalePrice) || parseFloat(product?.price) || 0);
+
+  const channelName = marketplace === 'ml_premium'
+    ? 'Mercado Livre Premium (Comissão 19% + R$6,00 taxa fixa)'
+    : marketplace === 'shopee'
+    ? 'Shopee Brasil (Comissão 14% + R$4,00 taxa fixa)'
+    : 'Mercado Livre Clássico (Comissão 14% + R$6,00 taxa fixa)';
+
+  const prompt = `Analise a estrutura de custos e sugira o preço de venda ideal para e-commerce:\n` +
+    `- Produto: "${product?.title || 'Produto Fabril'}"\n` +
+    `- Custo Atacado de Fábrica: R$ ${cost.toFixed(2)}\n` +
+    `- Canal de Venda Selecionado: "${channelName}"\n` +
+    `- Preço Praticado Atual: R$ ${(currentPrice || cost * 2.2).toFixed(2)}\n\n` +
+    `Regras de Precificação:\n` +
+    `1. Sugira um Preço de Venda (R$) que garanta entre 20% e 35% de Margem Líquida Real após descontar as taxas do marketplace.\n` +
+    `2. Retorne APENAS um JSON no seguinte formato (sem marcadores fora do JSON):\n` +
+    `{\n` +
+    `  "recommendedPrice": 99.90,\n` +
+    `  "strategyReason": "Explicação curta e direta de 1 frase sobre por que este valor é ideal."\n` +
+    `}`;
+
+  try {
+    const res = await askLumenAssistant({
+      tool: "inteligencia-lucro",
+      input: prompt
+    });
+
+    if (res.success && res.content) {
+      const jsonMatch = res.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const recPrice = parseFloat(parsed.recommendedPrice);
+        if (!isNaN(recPrice) && recPrice > cost) {
+          return {
+            success: true,
+            recommendedPrice: recPrice,
+            strategyReason: cleanSocialText(parsed.strategyReason || "Preço otimizado para competitividade e margem saudável."),
+            provider: res.provider
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Erro ao gerar sugestão de preço:", err);
+  }
+
+  // Fallback cálculo matemático puro (Margem de ~30% líquida)
+  let feePct = 0.14;
+  let fixedFee = 6.0;
+  if (marketplace === 'ml_premium') { feePct = 0.19; fixedFee = 6.0; }
+  else if (marketplace === 'shopee') { feePct = 0.14; fixedFee = 4.0; }
+
+  // Target net profit = 30% of sale price
+  // SalePrice - cost - (SalePrice * feePct + fixedFee) = SalePrice * 0.30
+  // SalePrice * (1 - feePct - 0.30) = cost + fixedFee
+  // SalePrice = (cost + fixedFee) / (0.70 - feePct)
+  const targetMargin = 0.30;
+  const denom = (1.0 - feePct - targetMargin);
+  const calcPrice = denom > 0 ? (cost + fixedFee) / denom : cost * 2.2;
+  const roundedPrice = Math.ceil(calcPrice) - 0.10; // ex: 99.90
+
+  return {
+    success: true,
+    recommendedPrice: roundedPrice > cost ? roundedPrice : cost * 2,
+    strategyReason: "Preço calculado para garantir 30% de margem líquida real descontando taxas do marketplace.",
+    provider: "local-fallback"
+  };
+}
+
 

@@ -1039,20 +1039,30 @@ export const StoreProvider = ({ children }) => {
         const { data: dbSettings, error: setErr } = await client.from('company_settings').select('*').limit(1);
         if (!setErr && dbSettings && dbSettings.length > 0) {
           const s = dbSettings[0];
+          const socLinks = typeof s.social_links === 'string' ? JSON.parse(s.social_links) : (s.social_links || {});
+          const mySites = typeof s.my_sites === 'string' ? JSON.parse(s.my_sites) : (s.my_sites || []);
+
           setCompanySettingsState((prev) => {
             const mergedSettings = {
               ...prev,
-              ...(s.name ? { name: s.name } : {}),
-              ...(s.subtitle ? { subtitle: s.subtitle } : {}),
-              ...(s.cnpj ? { cnpj: s.cnpj } : {}),
-              ...(s.phone ? { phone: s.phone } : {}),
-              ...(s.email ? { email: s.email } : {}),
-              ...(s.address ? { address: s.address } : {}),
-              ...(s.my_sites ? { mySites: typeof s.my_sites === 'string' ? JSON.parse(s.my_sites) : s.my_sites } : {}),
-              ...(s.social_links ? { socialLinks: typeof s.social_links === 'string' ? JSON.parse(s.social_links) : s.social_links } : {}),
-              ...(s.hero_settings ? { heroSettings: typeof s.hero_settings === 'string' ? JSON.parse(s.hero_settings) : s.hero_settings } : {}),
-              ...(s.legal_terms ? { termsContent: s.legal_terms } : {}),
-              ...(s.legal_privacy ? { privacyContent: s.legal_privacy } : {})
+              name: s.name || prev.name,
+              subtitle: s.subtitle || socLinks.subtitle || prev.subtitle,
+              cnpj: s.cnpj || prev.cnpj,
+              phone: s.phone || prev.phone,
+              email: s.email || prev.email,
+              address: s.address || prev.address,
+              mySites: Array.isArray(mySites) && mySites.length > 0 ? mySites : prev.mySites,
+              socialLinks: {
+                instagram: socLinks.instagram || prev.socialLinks?.instagram || '',
+                facebook: socLinks.facebook || prev.socialLinks?.facebook || '',
+                whatsapp: socLinks.whatsapp || prev.socialLinks?.whatsapp || '',
+                youtube: socLinks.youtube || prev.socialLinks?.youtube || ''
+              },
+              heroSettings: s.hero_settings
+                ? (typeof s.hero_settings === 'string' ? JSON.parse(s.hero_settings) : s.hero_settings)
+                : (socLinks.heroSettings || prev.heroSettings),
+              termsContent: s.legal_terms || prev.termsContent,
+              privacyContent: s.legal_privacy || prev.privacyContent
             };
             if (typeof window !== 'undefined') {
               localStorage.setItem('smd_company_settings', JSON.stringify(mergedSettings));
@@ -1149,17 +1159,21 @@ export const StoreProvider = ({ children }) => {
       }
 
       // 4. Sync Company Settings
+      const payloadSocialLinks = {
+        ...(companySettings.socialLinks || {}),
+        subtitle: companySettings.subtitle || '',
+        heroSettings: companySettings.heroSettings || {}
+      };
+
       await client.from('company_settings').upsert({
         id: 1,
         name: companySettings.name || '',
-        subtitle: companySettings.subtitle || '',
         cnpj: companySettings.cnpj || '',
         phone: companySettings.phone || '',
         email: companySettings.email || '',
         address: companySettings.address || '',
         my_sites: companySettings.mySites || [],
-        social_links: companySettings.socialLinks || {},
-        hero_settings: companySettings.heroSettings || {},
+        social_links: payloadSocialLinks,
         legal_terms: companySettings.termsContent || '',
         legal_privacy: companySettings.privacyContent || '',
         items_per_row: itemsPerRow,
@@ -1674,21 +1688,26 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
       const updated = { ...prev, ...newSettings };
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_company_settings', JSON.stringify(updated));
+        broadcastSync('companySettings', updated);
       }
 
       const client = getSupabaseClient();
       if (client) {
+        const payloadSocialLinks = {
+          ...(updated.socialLinks || {}),
+          subtitle: updated.subtitle || '',
+          heroSettings: updated.heroSettings || {}
+        };
+
         client.from('company_settings').upsert({
           id: 1,
           name: updated.name || '',
-          subtitle: updated.subtitle || '',
           cnpj: updated.cnpj || '',
           phone: updated.phone || '',
           email: updated.email || '',
           address: updated.address || '',
           my_sites: updated.mySites || [],
-          social_links: updated.socialLinks || {},
-          hero_settings: updated.heroSettings || {},
+          social_links: payloadSocialLinks,
           legal_terms: updated.termsContent || '',
           legal_privacy: updated.privacyContent || '',
           items_per_row: itemsPerRow,

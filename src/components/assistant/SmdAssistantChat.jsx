@@ -50,10 +50,10 @@ function buildGreeting(mem) {
 }
 
 const SUGGESTIONS = [
+  "Qual o status do meu pedido em produção?",
+  "Como gerar kit de marketing e legendas no Lumen?",
+  "Qual o cálculo de lucro para Mercado Livre e Shopee?",
   "Quais produtos temos no catálogo atual?",
-  "Como funciona o envio cego com minha etiqueta?",
-  "Como calcular orçamentos no sistema?",
-  "Como cadastrar novos produtos no catálogo?",
 ];
 
 export function SmdAssistantChat() {
@@ -72,10 +72,26 @@ export function SmdAssistantChat() {
       ? materials.map((m) => `- ${m.name}`).join('\n')
       : 'Nenhum material de fábrica cadastrado no momento.';
 
+    const orderList = orders && orders.length > 0
+      ? orders.map((o) => {
+          const statusMap = {
+            draft: 'Rascunho / Carrinho',
+            pending: 'Pendente de Pagamento',
+            in_production: 'Em Produção na Fábrica',
+            shipped: 'Enviado (Em trânsito)',
+            delivered: 'Entregue',
+            cancelled: 'Cancelado'
+          };
+          const statusLabel = statusMap[o.status] || o.status || 'Em Processamento';
+          return `- Pedido #${o.id || o.orderNumber}: Status = "${statusLabel}", Total = R$ ${(parseFloat(o.total) || 0).toFixed(2)}, Data = ${o.date || 'Hoje'}, Rastreio = ${o.trackingCode || 'Aguardando envio'}`;
+        }).join('\n')
+      : 'Nenhum pedido cadastrado no momento.';
+
     return `Modo de Visualização Ativo: ${modeText}\n` +
            `Usuário Conectado: ${userText}\n\n` +
            `📦 PRODUTOS REALMENTE CADASTRADOS NO CATÁLOGO ATUAL:\n${prodList}\n\n` +
-           `🛠️ MATERIAIS REALMENTE DISPONÍVEIS NA FÁBRICA:\n${matList}`;
+           `🛠️ MATERIAIS REALMENTE DISPONÍVEIS NA FÁBRICA:\n${matList}\n\n` +
+           `🚚 PEDIDOS DO USUÁRIO EM ACOMPANHAMENTO:\n${orderList}`;
   };
 
   const [messages, setMessages] = useState(() => {
