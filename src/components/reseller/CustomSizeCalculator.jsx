@@ -15,8 +15,11 @@ import {
   Copy,
   Check,
   MessageSquare,
-  Layers
+  Layers,
+  Wand2,
+  Brain
 } from 'lucide-react';
+import { suggestMaterialAndPitchForCustomSign } from '../../lib/smdAssistIa';
 
 export const CustomSizeCalculator = ({ product, onClose }) => {
   const { addToCart, showNotification, materials } = useStore();
@@ -30,6 +33,9 @@ export const CustomSizeCalculator = ({ product, onClose }) => {
   const [backgroundType, setBackgroundType] = useState('transparente'); // transparente, preto, madeira, recortado
   const [vectorFile, setVectorFile] = useState(null);
   const [copiedQuote, setCopiedQuote] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [iaSuggestion, setIaSuggestion] = useState(null);
 
   // Material Selection State (Pulls from Admin-registered materials table)
   const [selectedMaterialId, setSelectedMaterialId] = useState(() => materials[0]?.id || '');
@@ -40,6 +46,39 @@ export const CustomSizeCalculator = ({ product, onClose }) => {
     style: 'dourado',
     leadTimeDays: 3
   };
+
+  // Lumen IA Automatic Material & Niche Recommendation Logic (Always Active)
+  React.useEffect(() => {
+    const rawText = customText || '';
+    const text = rawText.toLowerCase().trim();
+    
+    // Check for outdoor / heavy duty / facade niches
+    const isOutdoor = 
+      text.includes('oficina') || text.includes('auto') || text.includes('loja') || text.includes('deposit') ||
+      text.includes('farmac') || text.includes('mercad') || text.includes('padar') || text.includes('bar') ||
+      text.includes('restaur') || text.includes('post');
+
+    if (isOutdoor) {
+      const acmMat = materials.find(m => m.name?.toLowerCase().includes('acm'));
+      setIaSuggestion({
+        targetMatId: acmMat?.id || selectedMaterialId,
+        materialName: 'ACM (Alumínio Composto - Sol & Chuva)',
+        reasoning: 'Resistência máxima a intempéries em fachadas externas, mantendo a estrutura intacta sem desbotar.',
+        icon: '🛡️'
+      });
+    } else {
+      // Default recommendation for all brands, offices, lawyers (ADVOGADA / ADIVOGADA), clinics, salons, etc.
+      const acrilicoMat = materials.find(m => m.name?.toLowerCase().includes('acrílico') || m.name?.toLowerCase().includes('acrilico'));
+      setIaSuggestion({
+        targetMatId: acrilicoMat?.id || selectedMaterialId,
+        materialName: 'Acrílico Premium (Luxo Espelhado)',
+        reasoning: rawText 
+          ? `Para escritórios e marcas ("${rawText}"), o Acrílico Espelhado transmite acabamento nobre de luxo e permite margem de lucro de até 300%!` 
+          : 'Transmite acabamento nobre de alto padrão e permite margem de lucro de até 300% no cliente final!',
+        icon: '💎'
+      });
+    }
+  }, [customText, materials]);
 
   // Convert input values to centimeters (cm) and square meters (m²)
   const getWidthInCm = () => {
@@ -92,6 +131,63 @@ export const CustomSizeCalculator = ({ product, onClose }) => {
     setCopiedQuote(true);
     setTimeout(() => setCopiedQuote(false), 2500);
     showNotification('📱 Orçamento com material copiado! Cole no WhatsApp do seu cliente.');
+  };
+
+  const handleSendDirectToWhatsapp = async (useIaPitch = true) => {
+    let messageText = '';
+
+    if (useIaPitch) {
+      setIsGeneratingScript(true);
+      try {
+        const res = await suggestMaterialAndPitchForCustomSign({
+          brandText: customText,
+          widthCm: getWidthInCm(),
+          heightCm: getHeightInCm(),
+          selectedMaterialName: selectedMaterial.name,
+          totalPrice: suggestedTotal
+        });
+        if (res && res.whatsappScript) {
+          messageText = res.whatsappScript;
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsGeneratingScript(false);
+      }
+    }
+
+    if (!messageText) {
+      messageText = `🎨 *ORÇAMENTO PRODUTO SOB MEDIDA*\n-----------------------------------\n📍 *Produto:* ${product?.title || 'Logomarca 3D'}\n🧩 *Material:* ${selectedMaterial.name}\n📐 *Medidas:* ${widthInput} ${unit} x ${heightInput} ${unit} (${widthCm}x${heightCm}cm - ${calculatedM2.toFixed(3)}m²)\n✨ *Texto/Arte:* ${customText || "Personalizado"}\n-----------------------------------\n💰 *Valor Total para o Cliente:* R$ ${suggestedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n💳 Em até 12x no cartão de crédito!\n🚀 Produção direta de fábrica com garantia total.`;
+    }
+
+    const encoded = encodeURIComponent(messageText);
+    const waUrl = `https://api.whatsapp.com/send?text=${encoded}`;
+    window.open(waUrl, '_blank');
+    showNotification('📲 Abrindo WhatsApp com a proposta formatada!');
+  };
+
+  const handleCopyIaCommercialPitch = async () => {
+    setIsGeneratingScript(true);
+    try {
+      const res = await suggestMaterialAndPitchForCustomSign({
+        brandText: customText,
+        widthCm: getWidthInCm(),
+        heightCm: getHeightInCm(),
+        selectedMaterialName: selectedMaterial.name,
+        totalPrice: suggestedTotal
+      });
+
+      if (res && res.whatsappScript) {
+        await navigator.clipboard.writeText(res.whatsappScript);
+        setCopiedScript(true);
+        setTimeout(() => setCopiedScript(false), 2500);
+        showNotification('✨ Script Comercial IA de Alto Fechamento copiado para o WhatsApp!');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsGeneratingScript(false);
+    }
   };
 
   const handleAddCustomToCart = () => {
@@ -190,6 +286,32 @@ export const CustomSizeCalculator = ({ product, onClose }) => {
                   placeholder="ex: BARBEARIA SILVA"
                   className="input-field font-extrabold uppercase text-sm py-2"
                 />
+
+                {/* Lumen IA Material Recommendation Card */}
+                {iaSuggestion && (
+                  <div className="bg-purple-500/10 border border-purple-500/30 p-2.5 rounded-xl flex items-center justify-between gap-2 text-xs mt-2 animate-fade-in">
+                    <div className="space-y-0.5">
+                      <span className="font-extrabold text-purple-600 dark:text-purple-300 text-[10px] uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles size={12} className="text-amber-400 animate-pulse" /> Lumen IA: Recomendação para "{customText}"
+                      </span>
+                      <p className="text-[11px] text-[var(--text-main)] leading-tight">
+                        {iaSuggestion.icon} <strong>{iaSuggestion.materialName}</strong>: {iaSuggestion.reasoning}
+                      </p>
+                    </div>
+                    {selectedMaterialId !== iaSuggestion.targetMatId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedMaterialId(iaSuggestion.targetMatId);
+                          showNotification(`Material alterado para ${iaSuggestion.materialName}!`);
+                        }}
+                        className="btn-gold py-1.5 px-2.5 text-[10px] font-extrabold shrink-0 shadow-sm flex items-center gap-1"
+                      >
+                        Aplicar IA
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Unit Selector & Dimensions Input */}
@@ -373,14 +495,44 @@ export const CustomSizeCalculator = ({ product, onClose }) => {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleCopyWhatsappQuote}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md"
-                  >
-                    {copiedQuote ? <Check size={15} /> : <MessageSquare size={15} />}
-                    {copiedQuote ? "Orçamento Copiado!" : "📱 Copiar Orçamento WhatsApp"}
-                  </button>
+                  <div className="space-y-2">
+                    {/* Direct WhatsApp Open Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleSendDirectToWhatsapp(true)}
+                      disabled={isGeneratingScript}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer border border-emerald-400/30 active:scale-[0.98] disabled:opacity-50"
+                    >
+                      {isGeneratingScript ? (
+                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <MessageSquare size={16} className="text-emerald-200 animate-pulse" />
+                      )}
+                      <span>📲 Enviar Proposta IA Direto para o WhatsApp</span>
+                    </button>
+
+                    {/* Copy Actions */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyWhatsappQuote}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-1.5 px-2 rounded-lg text-[10px] flex items-center justify-center gap-1 transition-all border border-slate-700 shadow-sm"
+                      >
+                        {copiedQuote ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                        {copiedQuote ? "Copiado!" : "Copiar Texto Simples"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyIaCommercialPitch}
+                        disabled={isGeneratingScript}
+                        className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 font-bold py-1.5 px-2 rounded-lg text-[10px] flex items-center justify-center gap-1 transition-all border border-purple-500/30 shadow-sm disabled:opacity-50"
+                      >
+                        {copiedScript ? <Check size={13} className="text-emerald-300" /> : <Sparkles size={13} className="text-amber-300" />}
+                        {copiedScript ? "Script Copiado!" : "Copiar Script IA"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-700">

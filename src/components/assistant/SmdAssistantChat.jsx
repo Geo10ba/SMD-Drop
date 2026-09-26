@@ -44,16 +44,18 @@ function buildGreeting(mem) {
   const period = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
   const name = mem?.userName ? `, ${mem.userName}` : "";
   if (mem?.lastTopic) {
-    return `${period}${name}! 👋 Bem-vindo de volta ao Lumen! Você estava me perguntando sobre "${mem.lastTopic.trim()}" — quer continuar ou tem alguma dúvida nova?`;
+    return `${period}${name}! 👋 Eu sou o Lumen, seu Mentor de Vendas na SMD Drop! ⚡ Você estava me perguntando sobre "${mem.lastTopic.trim()}" — quer continuar de onde parou ou tem uma nova dúvida?`;
   }
-  return `${period}${name}! 👋 Eu sou o Lumen, seu assistente na plataforma SMD Drop. Como posso te ajudar hoje?`;
+  return `${period}${name}! 👋 Eu sou o Lumen, seu Mentor de Vendas e Assistente Inteligente na SMD Drop! ⚡\n\nEstou aqui para te ajudar a escolher os melhores produtos de fábrica, calcular lucros, quebrar objeções de clientes e vender sem estoque no Mercado Livre, Shopee e Instagram. Como posso te ajudar hoje?`;
 }
 
 const SUGGESTIONS = [
-  "Qual o status do meu pedido em produção?",
-  "Como gerar kit de marketing e legendas no Lumen?",
-  "Qual o cálculo de lucro para Mercado Livre e Shopee?",
-  "Quais produtos temos no catálogo atual?",
+  "🚀 Como fazer minha 1ª venda de R$ 1.000 como revendedor?",
+  "💰 Como calcular meu Lucro Real no Mercado Livre e Shopee?",
+  "🎯 Como responder cliente que diz 'o preço tá caro'?",
+  "📦 Como funciona o Envio Cego com a minha etiqueta?",
+  "🚚 Qual o status do meu pedido em produção?",
+  "📸 Como usar as fotos HD e vídeos do Kit Mídia?"
 ];
 
 export function SmdAssistantChat() {
@@ -61,16 +63,36 @@ export function SmdAssistantChat() {
   const [isOpen, setIsOpen] = useState(false);
 
   const getLiveSystemContext = () => {
-    const modeText = viewMode === 'factory' ? 'Fábrica / Administração' : 'Revendedor / Catálogo de Atacado';
-    const userText = currentUser ? `${currentUser.name} (${currentUser.role || 'revendedor'})` : 'Revendedor Visitante';
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
+    const modeText = viewMode === 'factory' ? 'Painel do Fabricante (Gestão Fábrica)' : 'Portal do Revendedor (Catálogo Atacado)';
+    
+    // Detect open modal or product title currently on user screen
+    let activeProductText = 'Nenhum produto específico aberto no momento.';
+    if (typeof document !== 'undefined') {
+      const modalHeader = document.querySelector('[class*="Modal"] h3, [class*="modal"] h3, .glass-panel h3');
+      if (modalHeader && modalHeader.textContent && modalHeader.textContent.trim().length > 3) {
+        activeProductText = `📌 PRODUTO/TELA EM DESTAQUE NA TELA DO USUÁRIO AGORA: "${modalHeader.textContent.trim()}"`;
+      }
+    }
 
-    const prodList = products && products.length > 0
-      ? products.map((p) => `- ${p.title} (Categoria: ${p.category || 'Geral'})`).join('\n')
-      : 'Nenhum produto cadastrado no momento.';
+    const userText = currentUser 
+      ? `${currentUser.name} (${currentUser.role || 'revendedor'}, Nível VIP: ${currentUser.tier || 'Bronze'}, Desconto VIP: ${currentUser.discountPercent || 0}%)`
+      : 'Revendedor Visitante (Não Logado)';
+
+    const cartSummary = cart && cart.length > 0
+      ? `${cart.length} item(ns) adicionado(s) (Subtotal Atacado: R$ ${cart.reduce((acc, i) => acc + (parseFloat(i.wholesalePrice || i.price || 0) * (i.quantity || 1)), 0).toFixed(2)})`
+      : 'Carrinho de compras vazio.';
+
+    const activeProds = (products || []).filter(p => p.status === 'approved' || p.status === 'ativo' || (!p.status && p.inStock));
+    const draftProds = (products || []).filter(p => p.status === 'rascunho' || p.status === 'draft' || (!p.status && !p.inStock));
+
+    const prodList = activeProds.length > 0
+      ? activeProds.map((p) => `- ${p.title} (Categoria: ${p.category || 'Geral'}, Custo Atacado: R$ ${parseFloat(p.wholesalePrice || p.pricePerM2 || 0).toFixed(2)})`).join('\n')
+      : 'Nenhum produto ativo no catálogo público.';
 
     const matList = materials && materials.length > 0
-      ? materials.map((m) => `- ${m.name}`).join('\n')
-      : 'Nenhum material de fábrica cadastrado no momento.';
+      ? materials.map((m) => `- ${m.name} (Atacado: R$ ${parseFloat(m.wholesalePricePerM2 || 0).toFixed(2)}/m²)`).join('\n')
+      : 'Nenhum material de fábrica cadastrado.';
 
     const orderList = orders && orders.length > 0
       ? orders.map((o) => {
@@ -83,15 +105,19 @@ export function SmdAssistantChat() {
             cancelled: 'Cancelado'
           };
           const statusLabel = statusMap[o.status] || o.status || 'Em Processamento';
-          return `- Pedido #${o.id || o.orderNumber}: Status = "${statusLabel}", Total = R$ ${(parseFloat(o.total) || 0).toFixed(2)}, Data = ${o.date || 'Hoje'}, Rastreio = ${o.trackingCode || 'Aguardando envio'}`;
+          return `- Pedido #${o.id || o.orderNumber}: Status = "${statusLabel}", Total Atacado = R$ ${(parseFloat(o.wholesaleTotal || o.total || 0)).toFixed(2)}, Rastreio = ${o.trackingCode || 'Aguardando envio'}`;
         }).join('\n')
       : 'Nenhum pedido cadastrado no momento.';
 
-    return `Modo de Visualização Ativo: ${modeText}\n` +
-           `Usuário Conectado: ${userText}\n\n` +
-           `📦 PRODUTOS REALMENTE CADASTRADOS NO CATÁLOGO ATUAL:\n${prodList}\n\n` +
-           `🛠️ MATERIAIS REALMENTE DISPONÍVEIS NA FÁBRICA:\n${matList}\n\n` +
-           `🚚 PEDIDOS DO USUÁRIO EM ACOMPANHAMENTO:\n${orderList}`;
+    return `📍 LOCALIZAÇÃO E CONTEXTO EM TEMPO REAL NA TELA DO USUÁRIO:\n` +
+           `- Modo da Aplicação: ${modeText}\n` +
+           `- Rota/URL: ${currentPath}\n` +
+           `- Carrinho de Compras: ${cartSummary}\n` +
+           `- ${activeProductText}\n\n` +
+           `👤 PERFIL DO REVENDEDOR CONECTADO:\n${userText}\n\n` +
+           `📦 PRODUTOS ATIVOS NO CATÁLOGO OFICIAL (${activeProds.length} ativos, ${draftProds.length} rascunhos):\n${prodList}\n\n` +
+           `🛠️ MATERIAIS DE FÁBRICA DISPONÍVEIS:\n${matList}\n\n` +
+           `🚚 HISTÓRICO DE PEDIDOS DO USUÁRIO:\n${orderList}`;
   };
 
   const [messages, setMessages] = useState(() => {

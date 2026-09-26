@@ -41,7 +41,7 @@ export const MaterialManagerModal = ({ isOpen, onClose }) => {
   const handleStartEdit = (mat) => {
     setEditingId(mat.id);
     setEditName(mat.name);
-    setEditFactoryCost(mat.factoryCostPerM2 || 180);
+    setEditFactoryCost(mat.factoryCostPerM2 ?? 180);
     setEditWholesale(mat.wholesalePricePerM2);
     setEditSuggested(mat.suggestedPricePerM2);
     setEditStyle(mat.style || 'dourado');
@@ -232,7 +232,7 @@ export const MaterialManagerModal = ({ isOpen, onClose }) => {
               </thead>
               <tbody className="divide-y divide-[var(--border-color)] text-[var(--text-main)]">
                 {materials.map((mat) => {
-                  const factoryCost = mat.factoryCostPerM2 || 180;
+                  const factoryCost = mat.factoryCostPerM2 ?? 180;
                   const wholesalePrice = mat.wholesalePricePerM2;
                   const factoryProfit = wholesalePrice - factoryCost;
                   const profitMargin = wholesalePrice > 0 ? ((factoryProfit / wholesalePrice) * 100).toFixed(1) : 0;

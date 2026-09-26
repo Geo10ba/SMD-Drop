@@ -1,47 +1,23 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { Download, FileSpreadsheet, CheckCircle2, Sparkles, Building2 } from 'lucide-react';
+import { Download, FileSpreadsheet, CheckCircle2, Sparkles, Building2, ShoppingBag, ShieldCheck, Video, Tag } from 'lucide-react';
+import { downloadMarketplaceCSV } from '../../lib/marketplaceExporters';
 
 export const ExportCatalogModal = ({ isOpen, onClose }) => {
   const { products, showNotification } = useStore();
-  const [platform, setPlatform] = useState('shopify'); // shopify, nuvemshop, yampi
+  const [platform, setPlatform] = useState('shopee'); // shopee, tiktok, mercadolivre, shopify, nuvemshop, yampi
   const [markupMultiplier, setMarkupMultiplier] = useState(2.2);
 
   if (!isOpen) return null;
 
   const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-
-    if (platform === 'shopify') {
-      csvContent += "Handle,Title,Body (HTML),Vendor,Type,Tags,Published,Option1 Name,Option1 Value,Variant SKU,Variant Grams,Variant Inventory Qty,Variant Inventory Policy,Variant Fulfillment Service,Variant Price,Variant Compare At Price,Variant Requires Shipping,Variant Taxable,Image Src\n";
-      
-      products.forEach((p) => {
-        const handle = p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        const price = p.pricingType === 'custom_m2' ? (p.pricePerM2 * markupMultiplier).toFixed(2) : (p.wholesalePrice * markupMultiplier).toFixed(2);
-        const compareAtPrice = (price * 1.25).toFixed(2);
-
-        csvContent += `"${handle}","${p.title}","${p.description}","SMD Drop","${p.category}","Dropship,Fabrica",TRUE,"Title","Default Title","${p.ean || p.id}",500,99,"deny","manual",${price},${compareAtPrice},TRUE,TRUE,"${p.image}"\n`;
-      });
+    const ok = downloadMarketplaceCSV(platform, products, markupMultiplier);
+    if (ok) {
+      showNotification(`Catálogo CSV para ${platform.toUpperCase()} exportado com sucesso! (${products.length} produtos)`);
+      onClose();
     } else {
-      // Nuvemshop / Yampi
-      csvContent += "Identificador,Nome,Categoria,Preco,Preco_Promocional,Estoque,Descricao,Imagem\n";
-      products.forEach((p) => {
-        const price = p.pricingType === 'custom_m2' ? (p.pricePerM2 * markupMultiplier).toFixed(2) : (p.wholesalePrice * markupMultiplier).toFixed(2);
-        const compareAtPrice = (price * 1.25).toFixed(2);
-        csvContent += `"${p.id}","${p.title}","${p.category}",${compareAtPrice},${price},99,"${p.description}","${p.image}"\n`;
-      });
+      showNotification('Erro ao gerar planilha de exportação.', 'error');
     }
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `catalogo_fabrica_${platform}_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    showNotification(`Catálogo CSV para ${platform.toUpperCase()} exportado com sucesso!`);
-    onClose();
   };
 
   return (
@@ -50,15 +26,15 @@ export const ExportCatalogModal = ({ isOpen, onClose }) => {
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold">
               <FileSpreadsheet size={22} />
             </div>
             <div>
-              <span className="badge-emerald uppercase tracking-wider text-[10px] mb-1 inline-block">
+              <span className="badge-indigo uppercase tracking-wider text-[10px] mb-1 inline-block">
                 EXPORTADOR DE CATÁLOGO EM MASSA (CSV)
               </span>
               <h3 className="text-xl font-bold text-[var(--text-main)] font-['Outfit']">
-                Exportar para E-Commerce
+                Exportar para E-Commerce & Marketplaces
               </h3>
             </div>
           </div>
@@ -73,44 +49,117 @@ export const ExportCatalogModal = ({ isOpen, onClose }) => {
             <label className="block font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
               1. Selecione a Plataforma de Venda
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setPlatform('shopify')}
-                className={`p-3 rounded-xl border font-bold text-center transition-all ${
-                  platform === 'shopify'
-                    ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text-main)]'
+                onClick={() => setPlatform('shopee')}
+                className={`p-2.5 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
+                  platform === 'shopee'
+                    ? 'border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400 font-extrabold shadow-sm'
                     : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)]'
                 }`}
               >
-                Shopify
+                <ShoppingBag size={15} /> Shopee (Criação)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPlatform('tiktok')}
+                className={`p-2.5 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
+                  platform === 'tiktok'
+                    ? 'border-rose-500 bg-rose-500/10 text-rose-500 font-extrabold shadow-sm'
+                    : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)]'
+                }`}
+              >
+                🎵 TikTok Shop
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPlatform('mercadolivre')}
+                className={`p-2.5 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
+                  platform === 'mercadolivre'
+                    ? 'border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 font-extrabold shadow-sm'
+                    : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)]'
+                }`}
+              >
+                💛 Mercado Livre
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPlatform('shopify')}
+                className={`p-2.5 rounded-xl border font-bold text-center transition-all ${
+                  platform === 'shopify'
+                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 font-extrabold shadow-sm'
+                    : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)]'
+                }`}
+              >
+                🟢 Shopify
               </button>
 
               <button
                 type="button"
                 onClick={() => setPlatform('nuvemshop')}
-                className={`p-3 rounded-xl border font-bold text-center transition-all ${
+                className={`p-2.5 rounded-xl border font-bold text-center transition-all ${
                   platform === 'nuvemshop'
-                    ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text-main)]'
+                    ? 'border-blue-500 bg-blue-500/10 text-blue-600 font-extrabold shadow-sm'
                     : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)]'
                 }`}
               >
-                Nuvemshop
+                🔵 Nuvemshop
               </button>
 
               <button
                 type="button"
                 onClick={() => setPlatform('yampi')}
-                className={`p-3 rounded-xl border font-bold text-center transition-all ${
+                className={`p-2.5 rounded-xl border font-bold text-center transition-all ${
                   platform === 'yampi'
-                    ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text-main)]'
+                    ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold shadow-sm'
                     : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)]'
                 }`}
               >
-                Yampi / Cartpanda
+                🟣 Yampi / Cartpanda
               </button>
             </div>
           </div>
+
+          {/* Compatibility Notices */}
+          {platform === 'shopee' && (
+            <div className="bg-orange-500/10 border border-orange-500/30 p-3 rounded-xl space-y-1 text-[11px] text-orange-700 dark:text-orange-300">
+              <div className="flex items-center gap-1.5 font-bold text-orange-600 dark:text-orange-400">
+                <ShieldCheck size={15} />
+                <span>Shopee Criação Básica em Massa (Universal)</span>
+              </div>
+              <p>
+                Utiliza o padrão universal de cadastro da Shopee sem IDs de loja, funcionando em qualquer conta de vendedor.
+              </p>
+            </div>
+          )}
+
+          {platform === 'tiktok' && (
+            <div className="bg-rose-500/10 border border-rose-500/30 p-3 rounded-xl space-y-1 text-[11px] text-rose-700 dark:text-rose-300">
+              <div className="flex items-center gap-1.5 font-bold text-rose-600 dark:text-rose-400">
+                <ShieldCheck size={15} />
+                <span>TikTok Shop Batch Upload Template</span>
+              </div>
+              <p>
+                Planilha no formato oficial do TikTok Seller Center para importação de catálogo com peso, medidas e imagens.
+              </p>
+            </div>
+          )}
+
+          {platform === 'mercadolivre' && (
+            <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-xl space-y-1 text-[11px] text-yellow-700 dark:text-yellow-300">
+              <div className="flex items-center gap-1.5 font-bold text-yellow-600 dark:text-yellow-400">
+                <ShieldCheck size={15} />
+                <span>Mercado Livre - Carga em Massa (Títulos até 60 chars)</span>
+              </div>
+              <p>
+                Títulos ajustados para o limite do Mercado Livre com peso em gramas e links das fotos em HD.
+              </p>
+            </div>
+          )}
 
           {/* Markup Multiplier */}
           <div>
@@ -141,14 +190,14 @@ export const ExportCatalogModal = ({ isOpen, onClose }) => {
 
           <div className="bg-[var(--bg-surface-hover)] p-4 rounded-xl border border-[var(--border-color)] space-y-1 text-[11px] text-[var(--text-muted)]">
             <p className="font-semibold text-[var(--text-main)]">📦 Resumo da Exportação:</p>
-            <p>• {products.length} produtos cadastrados com descrições, fotos HD e NCM.</p>
+            <p>• {products.length} produtos cadastrados com descrições, fotos HD e dimensões.</p>
             <p>• Preços de venda ajustados automaticamente para {markupMultiplier}x do custo de fábrica.</p>
           </div>
 
           <div className="pt-2">
             <button
               onClick={handleExportCSV}
-              className="w-full btn-gold justify-center py-3 text-sm font-bold shadow-lg"
+              className="w-full btn-gold justify-center py-3 text-sm font-bold shadow-lg flex items-center gap-2"
             >
               <Download size={16} /> Baixar Planilha CSV para {platform.toUpperCase()}
             </button>
@@ -158,3 +207,4 @@ export const ExportCatalogModal = ({ isOpen, onClose }) => {
     </div>
   );
 };
+

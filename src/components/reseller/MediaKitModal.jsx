@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, Scale, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2 } from 'lucide-react';
+import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2, FileSpreadsheet, ShoppingBag } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { ResellerProductImagesModal } from './ResellerProductImagesModal';
 import { generateMarketingContent } from '../../lib/smdAssistIa';
+import { downloadShopeeMassCreationCSV } from '../../lib/shopeeExporter';
 
 export const MediaKitModal = ({ product, onClose }) => {
   const { showNotification } = useStore();
@@ -174,7 +175,7 @@ export const MediaKitModal = ({ product, onClose }) => {
           {activeTab === 'general' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Left Column: Photos Preview & Quick Data */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
                   <ImageIcon size={14} className="text-indigo-500" /> Foto Principal
                 </h4>
@@ -183,7 +184,7 @@ export const MediaKitModal = ({ product, onClose }) => {
                   <img
                     src={product.image || images[0]}
                     alt={product.title}
-                    className="w-full h-48 object-cover"
+                    className="w-full h-44 object-cover"
                   />
                 </div>
 
@@ -198,11 +199,23 @@ export const MediaKitModal = ({ product, onClose }) => {
                   </div>
                 </div>
 
+                {/* Individual Shopee Export Button */}
+                <button
+                  onClick={() => {
+                    const ok = downloadShopeeMassCreationCSV([product], 2.2);
+                    if (ok) showNotification(`Planilha Shopee de "${product.title}" baixada com sucesso!`);
+                  }}
+                  className="w-full btn-orange justify-center text-xs font-bold py-2.5 flex items-center gap-2 shadow-sm"
+                  title="Baixar este produto formatado para o Carregamento em Massa da Shopee"
+                >
+                  <FileSpreadsheet size={15} /> Baixar Planilha Shopee (Criação)
+                </button>
+
                 <button
                   onClick={() => showNotification('Download de fotos em HD iniciado em ZIP!')}
-                  className="w-full btn-secondary justify-center text-xs font-bold py-2.5"
+                  className="w-full btn-secondary justify-center text-xs font-bold py-2"
                 >
-                  <Download size={15} /> Baixar Pacote de Fotos ({images.length} fotos)
+                  <Download size={14} /> Baixar Fotos ({images.length} fotos)
                 </button>
 
                 {product.video && (

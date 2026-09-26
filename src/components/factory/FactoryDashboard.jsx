@@ -45,6 +45,8 @@ import { CategoryManagerModal } from './CategoryManagerModal';
 import { EditProductModal } from './EditProductModal';
 import { ApproveRejectProductModal } from './ApproveRejectProductModal';
 import { MaterialManagerModal } from './MaterialManagerModal';
+import { FactoryCostsModal, FactoryCostsContent } from './FactoryCostsModal';
+import { PricingAuditModal } from './PricingAuditModal';
 import { MagicImportModal } from '../reseller/MagicImportModal';
 import { Wand2, Clock, CheckCircle, XCircle as XCircleIcon } from 'lucide-react';
 import { parseShopeeFiles } from '../../lib/shopeeImporter';
@@ -93,6 +95,8 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
   };
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isMaterialManagerOpen, setIsMaterialManagerOpen] = useState(false);
+  const [isFactoryCostsOpen, setIsFactoryCostsOpen] = useState(false);
+  const [isPricingAuditOpen, setIsPricingAuditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [evaluatingPendingProduct, setEvaluatingPendingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -179,9 +183,9 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Filtered product lists
-  const draftProducts = products.filter(p => p.status === 'rascunho' || p.status === 'draft' || !p.status);
-  const activeCatalogProducts = products.filter(p => p.status === 'approved');
+  // Filtered product lists (Separação estrita entre Ativos e Rascunhos)
+  const draftProducts = products.filter(p => p.status === 'rascunho' || p.status === 'draft' || (!p.status && !p.inStock));
+  const activeCatalogProducts = products.filter(p => p.status === 'approved' || p.status === 'ativo' || (!p.status && p.inStock));
 
   const filteredDrafts = draftProducts.filter(p => {
     const matchesSearch = p.title.toLowerCase().includes(draftSearchTerm.toLowerCase()) ||
@@ -320,8 +324,13 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
   const marketplaceOrdersCount = orders.filter((o) => o.dispatchMode === 'marketplace_label').length;
   const directOrdersCount = orders.filter((o) => o.dispatchMode === 'direct_blind_shipping').length;
 
-  // Filtered Products for Management
-  const filteredProducts = products.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Filtered Products for Management in Catálogo Tab (Apenas produtos ATIVOS)
+  const filteredProducts = activeCatalogProducts.filter(p => {
+    const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                          (p.shopeeId && String(p.shopeeId).includes(searchTerm));
+    return matchesSearch;
+  });
 
   // SVG Chart Data (Factory Monthly Volume calculated dynamically from real orders)
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -382,6 +391,22 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsFactoryCostsOpen(true)}
+              className="bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 py-2.5 px-4 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all"
+              title="Configurar custos fixos mensais da empresa, imposto NFe e lista de matérias-primas"
+            >
+              <Building2 size={16} /> ⚙️ Custos da Fábrica & Insumos
+            </button>
+
+            <button
+              onClick={() => setIsPricingAuditOpen(true)}
+              className="bg-purple-600/30 text-purple-200 border border-purple-500/40 hover:bg-purple-600/40 py-2.5 px-4 rounded-xl text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition-all"
+              title="Auditar precificação de todos os produtos ativos contra custos reais e nobreza dos materiais"
+            >
+              <Sparkles size={16} className="text-amber-300" /> 🧠 Auditoria Precificação IA
+            </button>
+
             <button
               onClick={() => setIsMaterialManagerOpen(true)}
               className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 py-2.5 px-4 rounded-xl text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition-all"
@@ -475,7 +500,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
         </div>
 
         {/* Tab Navigation Menu Grid - Zero Horizontal Scroll */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 w-full pt-6 border-t border-slate-700/60 mt-6 text-xs font-bold">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 w-full pt-6 border-t border-slate-700/60 mt-6 text-xs font-bold">
           <button
             onClick={() => setActiveTab('analytics')}
             className={`py-2.5 px-3 rounded-xl transition-all flex items-center justify-between gap-1.5 border text-xs ${
@@ -589,6 +614,19 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
           >
             <span className="flex items-center gap-1.5 truncate">
               <Settings size={15} className="shrink-0" /> Configurações
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('custos')}
+            className={`py-2.5 px-3 rounded-xl transition-all flex items-center justify-between gap-1.5 border text-xs ${
+              activeTab === 'custos' 
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold shadow-md border-amber-400' 
+                : 'bg-slate-800/80 hover:bg-slate-700/90 text-slate-300 hover:text-white border-slate-700/80'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 truncate">
+              <Building2 size={15} className="shrink-0 text-amber-400" /> Custos & Insumos
             </span>
           </button>
         </div>
@@ -1119,16 +1157,19 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
         </div>
       )}
 
-      {/* TAB 3: PRODUCTS MANAGEMENT */}
+      {/* TAB 3: PRODUCTS MANAGEMENT (APENAS PRODUTOS ATIVOS NO CATÁLOGO) */}
       {activeTab === 'products' && (
         <div className="glass-panel p-6 space-y-4 animate-fade-in">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[var(--border-color)] pb-4">
             <div>
-              <h3 className="text-lg font-bold text-[var(--text-main)] font-['Outfit']">
-                Gestão Total do Catálogo de Produtos
+              <span className="badge-emerald uppercase tracking-wider text-[10px] font-bold mb-1 inline-flex items-center gap-1">
+                <CheckCircle2 size={13} /> PRODUTOS ATIVOS E PUBLICADOS ({activeCatalogProducts.length})
+              </span>
+              <h3 className="text-xl font-bold text-[var(--text-main)] font-['Outfit']">
+                Catálogo de Produtos Oficiais da Fábrica
               </h3>
-              <p className="text-xs text-[var(--text-muted)]">
-                Altere custos, valores por m², estoque e imagens de qualquer item cadastrado na fábrica.
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Estes produtos estão <strong>ATIVOS</strong> e visíveis no catálogo oficial para os revendedores realizarem compras de atacado.
               </p>
             </div>
 
@@ -1137,7 +1178,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
                 <Search size={14} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
                 <input
                   type="text"
-                  placeholder="Buscar produto..."
+                  placeholder="Buscar produto ativo por título, SKU ou ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="input-field pl-9 py-1.5 text-xs font-medium"
@@ -1149,69 +1190,98 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
-                <tr>
-                  <th className="p-3">Produto</th>
-                  <th className="p-3">Categoria</th>
-                  <th className="p-3">Tipo Precificação</th>
-                  <th className="p-3">Custo Fábrica</th>
-                  <th className="p-3">Preço Sugerido</th>
-                  <th className="p-3">Estoque</th>
-                  <th className="p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-color)] text-[var(--text-main)]">
-                {filteredProducts.map((p) => (
-                  <tr key={p.id} className="hover:bg-[var(--bg-surface-hover)] transition-colors">
-                    <td className="p-3 font-semibold flex items-center gap-3">
-                      <img src={p.image} alt={p.title} className="w-10 h-10 rounded-lg object-cover border border-[var(--border-color)]" />
-                      <span>{p.title}</span>
-                    </td>
-                    <td className="p-3 text-[var(--text-muted)] font-medium">{p.category}</td>
-                    <td className="p-3">
-                      {p.pricingType === 'custom_m2' ? (
-                        <span className="badge-gold text-[10px]">Sob Medida (m²)</span>
-                      ) : (
-                        <span className="badge-emerald text-[10px]">Preço Fixo</span>
-                      )}
-                    </td>
-                    <td className="p-3 font-bold font-mono">
-                      {p.pricingType === 'custom_m2' ? `R$ ${p.pricePerM2.toFixed(2)}/m²` : `R$ ${p.wholesalePrice.toFixed(2)}`}
-                    </td>
-                    <td className="p-3 text-emerald-600 dark:text-emerald-400 font-bold font-mono">
-                      {p.pricingType === 'custom_m2' ? `R$ ${p.suggestedPricePerM2.toFixed(2)}/m²` : `R$ ${p.suggestedRetailPrice.toFixed(2)}`}
-                    </td>
-                    <td className="p-3 font-bold">
-                      {p.pricingType === 'custom_m2' ? "Corte a Laser" : `${p.factoryStock} un`}
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setEditingProduct(p)}
-                          className="btn-secondary text-[11px] font-bold py-1 px-3"
-                        >
-                          <Edit2 size={13} /> Editar
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Deseja mover "${p.title}" de volta para os RASCUNHOS? O produto ficará oculto no catálogo até ser ativado novamente.`)) {
-                              moveProductToDraft(p.id);
-                            }
-                          }}
-                          className="bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-500 font-bold text-[11px] py-1 px-2.5 rounded-lg flex items-center gap-1 transition-all"
-                          title="Mover de volta para Rascunho"
-                        >
-                          <FileEdit size={13} /> Rascunho
-                        </button>
-                      </div>
-                    </td>
+          {filteredProducts.length === 0 ? (
+            <div className="text-center py-12 space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto text-2xl font-bold">
+                📦
+              </div>
+              <h4 className="text-base font-bold text-[var(--text-main)] font-['Outfit']">
+                Nenhum Produto Ativo Encontrado no Catálogo
+              </h4>
+              <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
+                Você possui <strong>{draftProducts.length}</strong> rascunho(s) aguardando ativação! Acesse a aba "Rascunhos" para publicar os produtos no catálogo oficial.
+              </p>
+              <button
+                onClick={() => setActiveTab('drafts')}
+                className="btn-gold text-xs font-bold py-2 px-4 shadow-md inline-flex items-center gap-1.5 mt-2"
+              >
+                <FileSpreadsheet size={15} /> Ver Rascunhos ({draftProducts.length}) →
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
+                  <tr>
+                    <th className="p-3">Produto</th>
+                    <th className="p-3">Categoria</th>
+                    <th className="p-3">Tipo Precificação</th>
+                    <th className="p-3">Custo Fábrica</th>
+                    <th className="p-3">Preço Sugerido</th>
+                    <th className="p-3">Estoque</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-color)] text-[var(--text-main)]">
+                  {filteredProducts.map((p) => (
+                    <tr key={p.id} className="hover:bg-[var(--bg-surface-hover)] transition-colors">
+                      <td className="p-3 font-semibold flex items-center gap-3">
+                        <img src={p.image} alt={p.title} className="w-10 h-10 rounded-lg object-cover border border-[var(--border-color)]" />
+                        <div>
+                          <span className="font-bold block">{p.title}</span>
+                          {p.sku && <span className="text-[10px] text-[var(--text-muted)] font-mono">SKU: {p.sku}</span>}
+                        </div>
+                      </td>
+                      <td className="p-3 text-[var(--text-muted)] font-medium">{p.category}</td>
+                      <td className="p-3">
+                        {p.pricingType === 'custom_m2' ? (
+                          <span className="badge-gold text-[10px]">Sob Medida (m²)</span>
+                        ) : (
+                          <span className="badge-emerald text-[10px]">Preço Fixo</span>
+                        )}
+                      </td>
+                      <td className="p-3 font-bold font-mono">
+                        {p.pricingType === 'custom_m2' ? `R$ ${p.pricePerM2.toFixed(2)}/m²` : `R$ ${p.wholesalePrice.toFixed(2)}`}
+                      </td>
+                      <td className="p-3 text-emerald-600 dark:text-emerald-400 font-bold font-mono">
+                        {p.pricingType === 'custom_m2' ? `R$ ${p.suggestedPricePerM2.toFixed(2)}/m²` : `R$ ${p.suggestedRetailPrice.toFixed(2)}`}
+                      </td>
+                      <td className="p-3 font-bold">
+                        {p.pricingType === 'custom_m2' ? "Corte a Laser" : `${p.factoryStock} un`}
+                      </td>
+                      <td className="p-3">
+                        <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-extrabold whitespace-nowrap">
+                          🟢 Ativo no Catálogo
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setEditingProduct(p)}
+                            className="btn-secondary text-[11px] font-bold py-1 px-3"
+                          >
+                            <Edit2 size={13} /> Editar
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Deseja mover "${p.title}" de volta para os RASCUNHOS? O produto ficará oculto no catálogo até ser ativado novamente.`)) {
+                                moveProductToDraft(p.id);
+                              }
+                            }}
+                            className="bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-500 font-bold text-[11px] py-1 px-2.5 rounded-lg flex items-center gap-1 transition-all"
+                            title="Mover de volta para Rascunho"
+                          >
+                            <FileEdit size={13} /> Rascunho
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -1313,6 +1383,41 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
             <button type="submit" className="btn-gold py-2.5 px-6 font-bold shadow-md text-xs flex items-center gap-1.5 shrink-0">
               <Save size={16} /> Salvar Todas as Configurações
             </button>
+          </div>
+
+          {/* Box 0: Fast Access to Factory Costs & AI Pricing Audit */}
+          <div className="bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/10 p-5 rounded-2xl border border-amber-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="badge-gold uppercase tracking-wider text-[10px] inline-block">
+                  RECURSO EXCLUSIVO DA FÁBRICA
+                </span>
+                <h4 className="text-base font-bold text-[var(--text-main)] font-['Outfit']">
+                  Custos Fixos, Tabela de Insumos & Precificação Inteligente IA
+                </h4>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Cadastre os custos operacionais da empresa e matérias-primas (Acrílico Espelhado vs MDF) para a Lumen IA sugerir margens reais e evitar prejuízos.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsFactoryCostsOpen(true)}
+                className="btn-gold py-3 px-4 text-xs font-extrabold flex items-center justify-center gap-2 shadow-md"
+              >
+                <Building2 size={16} /> ⚙️ Gerenciar Custos Fixos & Insumos da Fábrica
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPricingAuditOpen(true)}
+                className="btn-purple py-3 px-4 text-xs font-extrabold flex items-center justify-center gap-2 shadow-md text-white"
+              >
+                <Sparkles size={16} className="text-amber-300" /> 🧠 Auditar Precificação de Todos os Produtos com IA
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1770,6 +1875,13 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
         </form>
       )}
 
+      {/* TAB 7: FACTORY COSTS & RAW MATERIALS MANAGEMENT */}
+      {activeTab === 'custos' && (
+        <div className="glass-panel p-6 space-y-6 animate-fade-in">
+          <FactoryCostsContent />
+        </div>
+      )}
+
       {/* TAB: PENDING PRODUCTS FOR ADMIN APPROVAL & PRICING */}
       {activeTab === 'pending' && (
         <div className="glass-panel p-6 space-y-4 animate-fade-in">
@@ -1911,6 +2023,18 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
       <MaterialManagerModal
         isOpen={isMaterialManagerOpen}
         onClose={() => setIsMaterialManagerOpen(false)}
+      />
+
+      {/* Factory Costs & Company Overhead Management Modal */}
+      <FactoryCostsModal
+        isOpen={isFactoryCostsOpen}
+        onClose={() => setIsFactoryCostsOpen(false)}
+      />
+
+      {/* AI Pricing & Profit Audit Modal */}
+      <PricingAuditModal
+        isOpen={isPricingAuditOpen}
+        onClose={() => setIsPricingAuditOpen(false)}
       />
     </div>
   );

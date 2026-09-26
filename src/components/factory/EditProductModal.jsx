@@ -3,15 +3,17 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { 
   Edit2, Tag, Image as ImageIcon, Save, Trash2, Sparkles, Eye, X, 
-  Layers, Package, FileText, Plus, Check, AlertCircle, RefreshCw, Star, FileEdit, Play, Loader2
+  Layers, Package, FileText, Plus, Check, AlertCircle, RefreshCw, Star, FileEdit, Play, Loader2, CheckCircle2, ShieldAlert, Diamond
 } from 'lucide-react';
-import { generateProductDescriptionAndNcm } from '../../lib/smdAssistIa';
+import { generateProductDescriptionAndNcm, analyzeFactoryProductCostAndPriceWithIA } from '../../lib/smdAssistIa';
 
 export const EditProductModal = ({ product, onClose }) => {
-  const { updateProduct, deleteProduct, categories, addCategory, showNotification } = useStore();
+  const { updateProduct, deleteProduct, categories, addCategory, showNotification, companySettings, materials } = useStore();
 
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'variations' | 'logistics' | 'fiscal' | 'gallery'
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [isAnalyzingPricing, setIsAnalyzingPricing] = useState(false);
+  const [pricingAnalysisResult, setPricingAnalysisResult] = useState(null);
 
   // General fields
   const [title, setTitle] = useState('');
@@ -57,6 +59,11 @@ export const EditProductModal = ({ product, onClose }) => {
   const [images, setImages] = useState([]);
   const [newImageUrl, setNewImageUrl] = useState('');
 
+  // Physical product specs for IA pricing
+  const [selectedMaterial, setSelectedMaterial] = useState('ACM (Alumínio Composto)');
+  const [productLengthCm, setProductLengthCm] = useState(20);
+  const [productWidthCm, setProductWidthCm] = useState(10);
+
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
@@ -99,6 +106,42 @@ export const EditProductModal = ({ product, onClose }) => {
 
       setImage(product.image || '');
       setImages(Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || '']);
+
+      const titleLower = (product.title || '').toLowerCase();
+      const descLower = (product.description || '').toLowerCase();
+      const fullText = `${titleLower} ${descLower}`;
+      const catLower = (product.category || '').toLowerCase();
+
+      // Extract physical dimension from description/title text if present (e.g. "30cm", "30 cm", "30x30")
+      let extractedSize = 0;
+      const match2d = fullText.match(/(\d+(?:[.,]\d+)?)\s*(?:cm|m)?\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(?:cm|m)?/i);
+      const match1d = fullText.match(/(?:tamanho|medida|di[âa]metro|medindo)?:?\s*(\d+(?:[.,]\d+)?)\s*cm/i);
+
+      if (match2d) {
+        const s1 = parseFloat(match2d[1].replace(',', '.'));
+        if (!isNaN(s1) && s1 > 0 && s1 <= 100) extractedSize = s1;
+      } else if (match1d) {
+        const s1 = parseFloat(match1d[1].replace(',', '.'));
+        if (!isNaN(s1) && s1 > 0 && s1 <= 100) extractedSize = s1;
+      }
+
+      const isRelogioOrDecor = fullText.includes('relógio') || fullText.includes('relogio') || fullText.includes('clock') || fullText.includes('quadro');
+      const isPlacaOrSmall = fullText.includes('placa') || catLower.includes('plate') || fullText.includes('toilette') || fullText.includes('sinaliz') || fullText.includes('banheiro');
+
+      if (isRelogioOrDecor) {
+        setSelectedMaterial('MDF');
+        const finalSize = extractedSize || 30;
+        setProductLengthCm(finalSize);
+        setProductWidthCm(finalSize);
+      } else if (isPlacaOrSmall) {
+        setSelectedMaterial('ACM (Alumínio Composto)');
+        setProductLengthCm(20);
+        setProductWidthCm(10);
+      } else {
+        setSelectedMaterial(product.material || 'MDF');
+        setProductLengthCm(extractedSize || product.productLengthCm || 20);
+        setProductWidthCm(extractedSize || product.productWidthCm || 20);
+      }
     }
   }, [product]);
 
@@ -260,6 +303,40 @@ export const EditProductModal = ({ product, onClose }) => {
       showNotification('Erro ao gerar com a IA. Tente novamente.', 'error');
     } finally {
       setIsGeneratingAi(false);
+    }
+  };
+
+  const handleAnalyzePricingWithIa = async () => {
+    setIsAnalyzingPricing(true);
+    showNotification('⚡ Lumen IA analisando matéria-prima, custos fabris e valor percebido...', 'info');
+    try {
+      const res = await analyzeFactoryProductCostAndPriceWithIA({
+        product: {
+          title,
+          category,
+          material: selectedMaterial,
+          description,
+          wholesalePrice,
+          suggestedRetailPrice,
+          pricePerM2,
+          productLengthCm: parseNum(productLengthCm, 20),
+          productWidthCm: parseNum(productWidthCm, 10)
+        },
+        companyCosts: companySettings,
+        materials
+      });
+
+      if (res && res.success) {
+        setPricingAnalysisResult(res);
+        showNotification('✨ Análise de precificação e percepção de material gerada!');
+      } else {
+        showNotification('Erro ao analisar precificação com a IA.', 'error');
+      }
+    } catch (err) {
+      console.error('Erro ao analisar precificação:', err);
+      showNotification('Erro na análise de precificação.', 'error');
+    } finally {
+      setIsAnalyzingPricing(false);
     }
   };
 
@@ -661,6 +738,154 @@ export const EditProductModal = ({ product, onClose }) => {
                       )}
                     </div>
                   )}
+
+                  {/* Lumen IA Material & Perceived Value Pricing Assistant */}
+                  <div className="pt-1">
+                    {/* Selector de Material & Tamanho Físico Real do Produto */}
+                    <div className="bg-purple-500/10 border border-purple-500/30 p-3 rounded-xl mb-2.5 space-y-2 text-xs">
+                      <div className="flex items-center justify-between border-b border-purple-500/20 pb-1.5">
+                        <span className="font-extrabold text-purple-600 dark:text-purple-300 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                          <Layers size={13} className="text-amber-400" /> Matéria-Prima & Medidas Físicas do Produto
+                        </span>
+                        <span className="text-[10px] text-[var(--text-muted)] font-medium">Medidas reais da peça (sem caixa de frete)</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-0.5">Material do Produto</label>
+                          <select
+                            value={selectedMaterial}
+                            onChange={(e) => setSelectedMaterial(e.target.value)}
+                            className="input-field py-1 text-xs font-semibold"
+                          >
+                            <option value="ACM (Alumínio Composto)">ACM (Alumínio Composto - Sol & Chuva)</option>
+                            <option value="Acrílico Premium (Luxo)">Acrílico Premium (Luxo Espelhado)</option>
+                            <option value="PVC Expandido (Branco)">PVC Expandido (Branco)</option>
+                            <option value="MDF">MDF Cru / Pintado</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-0.5">Comprimento Peça (cm)</label>
+                          <input
+                            type="number"
+                            value={productLengthCm}
+                            onChange={(e) => setProductLengthCm(e.target.value)}
+                            placeholder="20"
+                            className="input-field py-1 text-xs font-bold font-mono text-purple-600 dark:text-purple-300"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-0.5">Largura Peça (cm)</label>
+                          <input
+                            type="number"
+                            value={productWidthCm}
+                            onChange={(e) => setProductWidthCm(e.target.value)}
+                            placeholder="10"
+                            className="input-field py-1 text-xs font-bold font-mono text-purple-600 dark:text-purple-300"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAnalyzePricingWithIa}
+                      disabled={isAnalyzingPricing}
+                      className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-extrabold py-3 px-4 text-xs flex items-center justify-center gap-2 shadow-lg rounded-xl transition-all cursor-pointer border border-purple-400/30 active:scale-[0.98] disabled:opacity-50"
+                    >
+                      {isAnalyzingPricing ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          <span>Lumen IA Analisando Matéria-Prima & Percepção de Valor...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={16} className="text-amber-300 animate-pulse" />
+                          <span>✨ Analisar Precificação Inteligente com Lumen IA</span>
+                        </>
+                      )}
+                    </button>
+
+                    {pricingAnalysisResult && (
+                      <div className="bg-purple-500/10 border border-purple-500/30 p-3.5 rounded-xl space-y-2 text-xs mt-3 animate-fade-in">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1 uppercase text-[10px]">
+                            💎 Percepção do Material: {pricingAnalysisResult.materialPerception}
+                          </span>
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                            pricingAnalysisResult.status === 'alerta_prejuizo'
+                              ? 'bg-rose-500/20 text-rose-600 border-rose-500/40'
+                              : pricingAnalysisResult.status === 'preco_submedido_dinheiro_mesa'
+                              ? 'bg-amber-500/20 text-amber-600 border-amber-500/40'
+                              : 'bg-emerald-500/20 text-emerald-600 border-emerald-500/40'
+                          }`}>
+                            {pricingAnalysisResult.statusLabel}
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-[var(--text-main)] leading-relaxed">
+                          {pricingAnalysisResult.analysisSummary}
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 font-mono text-xs text-white">
+                          {/* Estratégia A: Valor Agregado */}
+                          <div className="bg-slate-900/90 dark:bg-slate-950 p-2.5 rounded-xl border border-amber-500/40 shadow-inner space-y-1.5">
+                            <span className="text-amber-400 block text-[10px] font-bold uppercase tracking-wider font-sans">
+                              💎 Estratégia A: Valor Agregado {selectedMaterial?.includes('ACM') ? '(Sol & Chuva)' : selectedMaterial?.includes('Acrílico') ? '(Luxo Espelhado)' : '(Design Decorativo)'}
+                            </span>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-300 font-sans">Atacado:</span>
+                              <strong className="text-amber-300 font-extrabold">R$ {(pricingAnalysisResult.premiumWholesalePrice || pricingAnalysisResult.recommendedWholesalePrice || 0).toFixed(2)}</strong>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-300 font-sans">Varejo:</span>
+                              <strong className="text-emerald-400 font-extrabold">R$ {(pricingAnalysisResult.premiumRetailPrice || pricingAnalysisResult.suggestedRetailPrice || 0).toFixed(2)}</strong>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const w = pricingAnalysisResult.premiumWholesalePrice || pricingAnalysisResult.recommendedWholesalePrice;
+                                const r = pricingAnalysisResult.premiumRetailPrice || pricingAnalysisResult.suggestedRetailPrice;
+                                setWholesalePrice(w);
+                                setSuggestedRetailPrice(r);
+                                showNotification('Preços da Estratégia Valor Agregado (Sol & Chuva) aplicados!');
+                              }}
+                              className="w-full mt-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-1 px-2 rounded-lg text-[10px] font-sans flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-sm"
+                            >
+                              <CheckCircle2 size={12} /> Aplicar Valor Agregado
+                            </button>
+                          </div>
+
+                          {/* Estratégia B: Volume e Giro Rápido */}
+                          <div className="bg-slate-900/90 dark:bg-slate-950 p-2.5 rounded-xl border border-cyan-500/40 shadow-inner space-y-1.5">
+                            <span className="text-cyan-400 block text-[10px] font-bold uppercase tracking-wider font-sans">
+                              ⚡ Estratégia B: Volume & Giro Rápido
+                            </span>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-300 font-sans">Atacado:</span>
+                              <strong className="text-cyan-300 font-extrabold">R$ {(pricingAnalysisResult.volumeWholesalePrice || (pricingAnalysisResult.recommendedWholesalePrice * 0.8)).toFixed(2)}</strong>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-300 font-sans">Varejo:</span>
+                              <strong className="text-emerald-400 font-extrabold">R$ {(pricingAnalysisResult.volumeRetailPrice || (pricingAnalysisResult.suggestedRetailPrice * 0.8)).toFixed(2)}</strong>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const w = pricingAnalysisResult.volumeWholesalePrice || (pricingAnalysisResult.recommendedWholesalePrice * 0.8);
+                                const r = pricingAnalysisResult.volumeRetailPrice || (pricingAnalysisResult.suggestedRetailPrice * 0.8);
+                                setWholesalePrice(w);
+                                setSuggestedRetailPrice(r);
+                                showNotification('Preços da Estratégia Giro Rápido aplicados!');
+                              }}
+                              className="w-full mt-1 bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold py-1 px-2 rounded-lg text-[10px] font-sans flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-sm"
+                            >
+                              <CheckCircle2 size={12} /> Aplicar Giro Rápido
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div>
                     <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1">URL da Imagem Capa</label>

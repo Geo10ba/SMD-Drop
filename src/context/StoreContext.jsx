@@ -415,13 +415,14 @@ export const StoreProvider = ({ children }) => {
   };
 
   // Factory Materials Catalog (Official User Pricing Table Persisted in localStorage)
+  // Factory Materials Catalog (Official User Pricing Table Persisted in localStorage)
   const defaultInitialMaterials = [
     {
       id: 'mat-mdf-cru',
       name: 'MDF Cru',
-      factoryCostPerM2: 180.00, // Custo Real de Produção da Fábrica
-      wholesalePricePerM2: 530.00, // Preço de Venda da Fábrica (Atacado)
-      suggestedPricePerM2: 800.00,
+      factoryCostPerM2: 35.00, // Custo Real de Produção da Fábrica (R$ 35/m²)
+      wholesalePricePerM2: 180.00,
+      suggestedPricePerM2: 380.00,
       style: 'madeira',
       leadTimeDays: 2,
       description: 'Econômico / Básico para uso interno com acabamento natural.'
@@ -429,9 +430,9 @@ export const StoreProvider = ({ children }) => {
     {
       id: 'mat-pvc-branco',
       name: 'PVC Expandido (Branco)',
-      factoryCostPerM2: 210.00,
-      wholesalePricePerM2: 615.00,
-      suggestedPricePerM2: 950.00,
+      factoryCostPerM2: 55.00,
+      wholesalePricePerM2: 220.00,
+      suggestedPricePerM2: 450.00,
       style: 'prata',
       leadTimeDays: 2,
       description: 'Leve e resistente à umidade, ideal para letras e placas decorativas.'
@@ -439,9 +440,9 @@ export const StoreProvider = ({ children }) => {
     {
       id: 'mat-mdf-pvc-pintado',
       name: 'MDF ou PVC Pintado',
-      factoryCostPerM2: 240.00,
-      wholesalePricePerM2: 670.00,
-      suggestedPricePerM2: 1100.00,
+      factoryCostPerM2: 65.00,
+      wholesalePricePerM2: 260.00,
+      suggestedPricePerM2: 520.00,
       style: 'preto',
       leadTimeDays: 3,
       description: 'Personalizado com acabamento fosco ou brilhante e alta durabilidade.'
@@ -449,9 +450,9 @@ export const StoreProvider = ({ children }) => {
     {
       id: 'mat-acm',
       name: 'ACM (Alumínio Composto)',
-      factoryCostPerM2: 230.00,
-      wholesalePricePerM2: 670.00,
-      suggestedPricePerM2: 1000.00,
+      factoryCostPerM2: 85.00,
+      wholesalePricePerM2: 320.00,
+      suggestedPricePerM2: 680.00,
       style: 'prata',
       leadTimeDays: 3,
       description: 'Metálico e moderno, para fachadas, letreiros externos e painéis.'
@@ -459,9 +460,9 @@ export const StoreProvider = ({ children }) => {
     {
       id: 'mat-acrilico-luxo',
       name: 'Acrílico Premium (Luxo)',
-      factoryCostPerM2: 320.00,
-      wholesalePricePerM2: 920.00,
-      suggestedPricePerM2: 1380.00,
+      factoryCostPerM2: 140.00,
+      wholesalePricePerM2: 480.00,
+      suggestedPricePerM2: 960.00,
       style: 'dourado',
       leadTimeDays: 3,
       description: 'Corte a laser de alta precisão em acrílico cast nobre espelhado.'
@@ -474,7 +475,31 @@ export const StoreProvider = ({ children }) => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const repaired = parsed.map((m) => {
+              const match = defaultInitialMaterials.find(
+                (d) => d.id === m.id || d.name?.toLowerCase() === (m.name || '').toLowerCase()
+              );
+              let cost = Number(m.factoryCostPerM2 ?? 0);
+              const isCustom = Boolean(m.isCustomEdited);
+              if (!isCustom && match) {
+                // Auto-migrate legacy inflated costs (>= 180) to realistic raw sheet costs (35, 55, 65, 85, 140)
+                if (cost === 0 || cost >= 180) {
+                  cost = match.factoryCostPerM2;
+                }
+              }
+              if (cost === 0) cost = match?.factoryCostPerM2 || 35;
+              return {
+                ...m,
+                factoryCostPerM2: cost,
+                wholesalePricePerM2: match?.wholesalePricePerM2 || m.wholesalePricePerM2 || 180,
+                suggestedPricePerM2: match?.suggestedPricePerM2 || m.suggestedPricePerM2 || 380,
+                isCustomEdited: isCustom
+              };
+            });
+            localStorage.setItem('smd_materials', JSON.stringify(repaired));
+            return repaired;
+          }
         } catch (e) {}
       }
     }
@@ -501,10 +526,17 @@ export const StoreProvider = ({ children }) => {
       suggestedPricePerM2: Number(newMat.suggestedPricePerM2) || 800,
       style: newMat.style || 'dourado',
       leadTimeDays: Number(newMat.leadTimeDays) || 3,
-      description: newMat.description || 'Material fabril sob medida.'
+      description: newMat.description || 'Material fabril sob medida.',
+      isCustomEdited: true
     };
-    const updated = [item, ...materials];
-    setMaterials(updated);
+    setMaterialsState((prev) => {
+      const updated = [item, ...prev];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_materials', JSON.stringify(updated));
+        broadcastSync('materials', updated);
+      }
+      return updated;
+    });
     showNotification(`Material "${item.name}" adicionado com sucesso!`);
 
     syncToSupabase('materials', {
@@ -515,26 +547,40 @@ export const StoreProvider = ({ children }) => {
       suggested_price_per_m2: item.suggestedPricePerM2,
       style: item.style,
       lead_time_days: item.leadTimeDays,
-      description: item.description
+      description: item.description,
+      is_custom_edited: true
     });
   };
 
   const updateMaterial = (id, updatedFields) => {
-    const updated = materials.map((m) => (m.id === id ? { ...m, ...updatedFields } : m));
-    setMaterials(updated);
+    let updatedItem = null;
+    setMaterialsState((prev) => {
+      const updated = prev.map((m) => {
+        if (m.id === id) {
+          updatedItem = { ...m, ...updatedFields, isCustomEdited: true };
+          return updatedItem;
+        }
+        return m;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_materials', JSON.stringify(updated));
+        broadcastSync('materials', updated);
+      }
+      return updated;
+    });
     showNotification('Valores do material atualizados com sucesso!');
 
-    const target = updated.find((m) => m.id === id);
-    if (target) {
+    if (updatedItem) {
       syncToSupabase('materials', {
-        id: target.id,
-        name: target.name,
-        factory_cost_per_m2: target.factoryCostPerM2,
-        wholesale_price_per_m2: target.wholesalePricePerM2,
-        suggested_price_per_m2: target.suggestedPricePerM2,
-        style: target.style,
-        lead_time_days: target.leadTimeDays,
-        description: target.description
+        id: updatedItem.id,
+        name: updatedItem.name,
+        factory_cost_per_m2: Number(updatedItem.factoryCostPerM2),
+        wholesale_price_per_m2: Number(updatedItem.wholesalePricePerM2),
+        suggested_price_per_m2: Number(updatedItem.suggestedPricePerM2),
+        style: updatedItem.style,
+        lead_time_days: Number(updatedItem.leadTimeDays),
+        description: updatedItem.description,
+        is_custom_edited: true
       });
     }
   };
@@ -1083,16 +1129,31 @@ export const StoreProvider = ({ children }) => {
         // 5. Fetch Materials from Supabase
         const { data: dbMaterials, error: matErr } = await client.from('materials').select('*');
         if (!matErr && dbMaterials && dbMaterials.length > 0) {
-          const normalizedMats = dbMaterials.map((m) => ({
-            id: m.id,
-            name: m.name,
-            factoryCostPerM2: Number(m.factory_cost_per_m2 ?? 180),
-            wholesalePricePerM2: Number(m.wholesale_price_per_m2 ?? 530),
-            suggestedPricePerM2: Number(m.suggested_price_per_m2 ?? 800),
-            style: m.style || 'dourado',
-            leadTimeDays: Number(m.lead_time_days ?? 3),
-            description: m.description || ''
-          }));
+          const normalizedMats = dbMaterials.map((m) => {
+            const match = defaultInitialMaterials.find(
+              (d) => d.id === m.id || d.name?.toLowerCase() === (m.name || '').toLowerCase()
+            );
+            let cost = m.factory_cost_per_m2 !== null && m.factory_cost_per_m2 !== undefined ? Number(m.factory_cost_per_m2) : 0;
+            const isCustom = Boolean(m.is_custom_edited || m.isCustomEdited);
+            if (!isCustom && match) {
+              if (cost === 0 || (cost === 180 && match.factoryCostPerM2 !== 180)) {
+                cost = match.factoryCostPerM2;
+              }
+            }
+            if (cost === 0) cost = match?.factoryCostPerM2 || 180;
+
+            return {
+              id: m.id,
+              name: m.name,
+              factoryCostPerM2: cost,
+              wholesalePricePerM2: m.wholesale_price_per_m2 !== null && m.wholesale_price_per_m2 !== undefined ? Number(m.wholesale_price_per_m2) : (match?.wholesalePricePerM2 || 530),
+              suggestedPricePerM2: m.suggested_price_per_m2 !== null && m.suggested_price_per_m2 !== undefined ? Number(m.suggested_price_per_m2) : (match?.suggestedPricePerM2 || 800),
+              style: m.style || match?.style || 'dourado',
+              leadTimeDays: Number(m.lead_time_days ?? match?.leadTimeDays ?? 3),
+              description: m.description || match?.description || '',
+              isCustomEdited: isCustom
+            };
+          });
           setMaterialsState(normalizedMats);
           if (typeof window !== 'undefined') localStorage.setItem('smd_materials', JSON.stringify(normalizedMats));
         }
@@ -1644,6 +1705,10 @@ export const StoreProvider = ({ children }) => {
         { title: "Portal de Atacado Fabril", url: "https://atacado.smddrop.com.br" },
         { title: "Catálogo Acrílico & Neon", url: "https://acrilico.smddrop.com.br" }
       ],
+      monthlyFixedCost: 15000,
+      taxRatePct: 6,
+      defaultPackagingCost: 4.5,
+      targetMinFactoryMarginPct: 35,
       termsContent: `1. ACEITAÇÃO DOS TERMOS E CONDIÇÕES
 Ao utilizar a plataforma SMD Drop, o contratante (Revendedor) declara ter lido, compreendido e aceito integralmente estes Termos de Uso. A SMD Drop atua como parceira fabril e prestadora de serviços de fabricação, processamento e postagem de pedidos em modalidade de logística cega (Blind Shipping).
 
@@ -1783,6 +1848,7 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         setItemsPerRow,
         companySettings,
         updateCompanySettings,
+        setCompanySettings: updateCompanySettings,
         resetSystemForProduction,
         syncAllToSupabase,
         getSupabaseCredentials,
