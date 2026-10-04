@@ -13,10 +13,15 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
 
   // Extracted Product Form (Initialized from initialData synchronously)
   const [form, setForm] = useState(() => {
+    const initImgs = Array.isArray(initialData?.images) && initialData.images.length > 0
+      ? initialData.images
+      : (initialData?.image ? [initialData.image] : []);
+
     const raw = {
       title: initialData?.title || '',
       description: initialData?.description || '',
-      image: initialData?.image || '',
+      image: initImgs[0] || initialData?.image || '',
+      images: initImgs,
       video: initialData?.video || '',
       category: categories[0] || 'Logomarcas & Letreiros',
       pricingType: 'fixed',
@@ -41,11 +46,16 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
   useEffect(() => {
     if (initialData && initialData.title) {
       setForm((prev) => {
+        const incomingImgs = Array.isArray(initialData.images) && initialData.images.length > 0
+          ? initialData.images
+          : (initialData.image ? [initialData.image] : prev.images || []);
+
         const raw = {
           ...prev,
           title: initialData.title || prev.title,
           description: initialData.description || prev.description,
-          image: initialData.image || prev.image,
+          image: incomingImgs[0] || initialData.image || prev.image,
+          images: incomingImgs,
           video: initialData.video || prev.video,
           suggestedRetailPrice: initialData.suggestedRetailPrice || prev.suggestedRetailPrice,
           wholesalePrice: initialData.wholesalePrice || prev.wholesalePrice,
@@ -62,9 +72,9 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
 
   const isAdmin = currentUser?.role === 'admin' || viewMode === 'factory';
 
-  // Enhanced Bookmarklet JS Code supporting Video capture
+  // Multi-Image & HD Quality Enhanced Bookmarklet JS Code
   const targetOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-  const bookmarkletCode = `javascript:(function(){try{var g=function(p){var m=document.querySelector('meta[property="'+p+'"]')||document.querySelector('meta[name="'+p+'"]');return m?m.content:''};var t=g('og:title')||(document.querySelector('h1')&&document.querySelector('h1').innerText)||document.title;var getDesc=function(){var og=g('og:description')||g('twitter:description')||g('description');if(og&&og.trim().length>10)return og.trim();var sel=['.ui-pdp-description__content','.ui-pdp-description','#description','#productDescription','#feature-bullets','._2uL-YH','.product-detail','[class*="description"]'];for(var i=0;i<sel.length;i++){var el=document.querySelector(sel[i]);if(el&&el.innerText&&el.innerText.trim().length>10){return el.innerText.trim()}}return''};var d=getDesc();var i=g('og:image')||'';if(!i){var im=document.querySelector('img[src]');if(im)i=im.src}var getVid=function(){var ogv=g('og:video')||g('og:video:url')||g('og:video:secure_url');if(ogv)return ogv;var vEl=document.querySelector('video source[src]')||document.querySelector('video[src]');if(vEl&&(vEl.src||vEl.getAttribute('src')))return vEl.src||vEl.getAttribute('src');var ifr=document.querySelector('iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="vimeo"]');if(ifr&&ifr.src)return ifr.src;return''};var v=getVid();var pe=Array.from(document.querySelectorAll('*')).find(function(el){return el.children.length<3&&el.innerText&&/R\\$\\s?\\d/.test(el.innerText)});var p='';if(pe){var mm=pe.innerText.match(/R\\$\\s?([\\d\\.]+,\\d{2}|[\\d\\.]+)/);if(mm)p=mm[1].replace(/\\./g,'').replace(',','.')}var u=window.location.href;var pl='outro';if(/shopee\\./i.test(u))pl='shopee';else if(/mercadoli/i.test(u))pl='mercadolivre';else if(/amazon\\./i.test(u))pl='amazon';var ct=t.replace(/\\s*[\\|\\-]\\s*(Shopee|Mercado Livre|Amazon).*$/i,'').trim();var url='${targetOrigin}?auto=1&magic=1&title='+encodeURIComponent(ct)+'&desc='+encodeURIComponent(d)+'&price='+encodeURIComponent(p)+'&img='+encodeURIComponent(i)+'&video='+encodeURIComponent(v)+'&url='+encodeURIComponent(u)+'&platform='+pl;alert('Capturando Produto e Vídeo...');var w=window.open(url,'_blank');if(!w)window.location.href=url}catch(e){alert('Erro ao capturar: '+e.message)}})();`;
+  const bookmarkletCode = `javascript:(function(){try{var g=function(p){var m=document.querySelector('meta[property="'+p+'"]')||document.querySelector('meta[name="'+p+'"]');return m?m.content:''};var t=g('og:title')||(document.querySelector('h1')&&document.querySelector('h1').innerText)||document.title;var getDesc=function(){var og=g('og:description')||g('twitter:description')||g('description');if(og&&og.trim().length>10)return og.trim();var sel=['.ui-pdp-description__content','.ui-pdp-description','#description','#productDescription','#feature-bullets','._2uL-YH','.product-detail','[class*="description"]'];for(var i=0;i<sel.length;i++){var el=document.querySelector(sel[i]);if(el&&el.innerText&&el.innerText.trim().length>10){return el.innerText.trim()}}return''};var d=getDesc();var getImgs=function(){var list=[];var add=function(u){if(!u||typeof u!=='string')return;u=u.trim();if(!u.startsWith('http'))return;if(/sprite|logo|avatar|icon|badge|rating|pixel|button|loading|gif/i.test(u))return;if(u.includes('etsystatic.com')){u=u.replace(/\\/il_\\d+x[N\\d]+\\./i,'/il_1080xN.').replace(/\\/il_\\d+x\\d+\\./i,'/il_1080xN.')}if(u.includes('shopee')||u.includes('susercontent')){u=u.replace(/_tn$/i,'').replace(/_\\d+x\\d+/i,'_1080x1080')}if(u.includes('mlstatic.com')){u=u.replace(/-[I|V|O|E|C|D]\\.jpg/i,'-O.jpg')}if(u.includes('amazon.com')||u.includes('media-amazon')){u=u.replace(/\\._AC_S[A-Z0-9_,]+\\._/i,'._AC_SL1500_.')}if(list.indexOf(u)===-1&&list.length<10){list.push(u)}};var og=g('og:image');if(og)add(og);var sel=['ul.carousel-pane-list li img','.carousel-pane-list img','img[src*="etsystatic.com"]','.ui-pdp-gallery__figure img','.ui-pdp-gallery__thumbnail img','img.ui-pdp-image','div[style*="background-image"]','img[src*="susercontent.com"]','img[src*="cf.shopee"]','#altImages img','#landingImage','img[src*="media-amazon.com"]','.image-view-item img'];for(var k=0;k<sel.length;k++){var els=document.querySelectorAll(sel[k]);for(var j=0;j<els.length;j++){var el=els[j];var src=el.getAttribute('data-zoom-image')||el.getAttribute('data-large-img')||el.getAttribute('data-src')||el.src;if(!src&&el.style&&el.style.backgroundImage){var bgm=el.style.backgroundImage.match(/url\\(['"]?(.*?)['"]?\\)/);if(bgm)src=bgm[1]}if(src)add(src)}}if(list.length<3){var allImgs=document.querySelectorAll('img');for(var m=0;m<allImgs.length;m++){var imgEl=allImgs[m];if(imgEl.naturalWidth>=150||imgEl.width>=150||(imgEl.src&&imgEl.src.includes('http'))){add(imgEl.src)}}}return list};var imgs=getImgs();var i=imgs[0]||'';var getVid=function(){var ogv=g('og:video')||g('og:video:url')||g('og:video:secure_url');if(ogv)return ogv;var vEl=document.querySelector('video source[src]')||document.querySelector('video[src]');if(vEl&&(vEl.src||vEl.getAttribute('src')))return vEl.src||vEl.getAttribute('src');var ifr=document.querySelector('iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="vimeo"]');if(ifr&&ifr.src)return ifr.src;return''};var v=getVid();var pe=Array.from(document.querySelectorAll('*')).find(function(el){return el.children.length<3&&el.innerText&&/R\\$\\s?\\d/.test(el.innerText)});var p='';if(pe){var mm=pe.innerText.match(/R\\$\\s?([\\d\\.]+,\\d{2}|[\\d\\.]+)/);if(mm)p=mm[1].replace(/\\./g,'').replace(',','.')}var u=window.location.href;var pl='outro';if(/shopee\\./i.test(u))pl='shopee';else if(/mercadoli/i.test(u))pl='mercadolivre';else if(/amazon\\./i.test(u))pl='amazon';var ct=t.replace(/\\s*[\\|\\-]\\s*(Shopee|Mercado Livre|Amazon).*$/i,'').trim();var url='${targetOrigin}?auto=1&magic=1&title='+encodeURIComponent(ct)+'&desc='+encodeURIComponent(d)+'&price='+encodeURIComponent(p)+'&img='+encodeURIComponent(i)+'&imgs='+encodeURIComponent(imgs.join('|||'))+'&video='+encodeURIComponent(v)+'&url='+encodeURIComponent(u)+'&platform='+pl;alert('⚡ Capturando Produto, '+imgs.length+' Fotos HD e Vídeo...');var w=window.open(url,'_blank');if(!w)window.location.href=url}catch(e){alert('Erro ao capturar: '+e.message)}})();`;
 
   const handleCopyBookmarklet = () => {
     navigator.clipboard.writeText(bookmarkletCode);
@@ -119,6 +129,10 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
     if (!form.title) return;
 
     const fiscal = resolveSmartFiscalDetails(form);
+    const finalImgs = Array.isArray(form.images) && form.images.length > 0
+      ? form.images
+      : (form.image ? [form.image] : []);
+
     const payload = {
       title: form.title,
       category: form.category,
@@ -129,8 +143,8 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
       pricePerM2: Number(form.wholesalePrice),
       suggestedPricePerM2: Number(form.suggestedRetailPrice),
       description: form.description || `Produto ${form.title} fabricado com qualidade fabril.`,
-      image: form.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
-      images: form.image ? [form.image] : [],
+      image: finalImgs[0] || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
+      images: finalImgs,
       video: form.video || "",
       resellerNotes: form.resellerNotes || "",
       ...fiscal
@@ -242,6 +256,34 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
                       <Video size={12} /> Vídeo do produto capturado!
                     </span>
                   )}
+                  {form.images && form.images.length > 1 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-500 font-bold mt-0.5 ml-2">
+                      📸 {form.images.length} Fotos HD Capturadas!
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {form.images && form.images.length > 1 && (
+              <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-amber-500 text-xs flex items-center gap-1.5 uppercase">
+                    📸 Galeria de Fotos HD Capturadas ({form.images.length} fotos)
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                    Foto #1 = Capa do Anúncio
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-thin">
+                  {form.images.map((imgUrl, idx) => (
+                    <div key={idx} className="relative shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-[var(--border-color)] group shadow-sm bg-slate-900">
+                      <img src={imgUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                      <span className="absolute bottom-0 left-0 right-0 bg-slate-950/80 text-white text-[9px] font-bold text-center py-0.5">
+                        #{idx + 1}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

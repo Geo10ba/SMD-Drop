@@ -849,7 +849,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[750px]">
                   <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
                     <tr>
                       <th className="p-3 w-10 text-center">
@@ -1089,7 +1089,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[700px]">
               <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
                 <tr>
                   <th className="p-3">Pedido</th>
@@ -1210,7 +1210,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs min-w-[750px]">
                 <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
                   <tr>
                     <th className="p-3">Produto</th>
@@ -1300,7 +1300,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[750px]">
               <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
                 <tr>
                   <th className="p-3">Revendedor / Empresa</th>

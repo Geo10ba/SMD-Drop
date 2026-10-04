@@ -6,7 +6,19 @@ import { ShoppingBag, Layers, Tag, Check, AlertCircle, X, ChevronRight } from 'l
 export const VariationSelectionModal = ({ product, onClose }) => {
   const { addToCart } = useStore();
 
-  const variations = Array.isArray(product?.variations) ? product.variations : [];
+  const getVariations = (p) => {
+    if (!p) return [];
+    if (Array.isArray(p.variations) && p.variations.length > 0) return p.variations;
+    if (typeof p.variations === 'string' && p.variations.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(p.variations);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  };
+
+  const variations = getVariations(product);
   
   const [selectedVarIndex, setSelectedVarIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -32,15 +44,19 @@ export const VariationSelectionModal = ({ product, onClose }) => {
   };
 
   const handleAddToCart = () => {
+    const varWholesale = Number(selectedVar.wholesalePrice) || Number(product.wholesalePrice) || 0;
+    const varRetail = Number(selectedVar.price) || Number(product.suggestedRetailPrice) || 0;
+    const finalSellingPrice = Number(customSellingPrice) || varRetail;
+
     addToCart({
       ...product,
       id: `${product.id}-var-${selectedVar.id || selectedVarIndex}`,
       title: `${product.title} (${selectedVar.name})`,
       selectedVariation: selectedVar,
       variationName: selectedVar.name,
-      wholesalePrice: selectedVar.wholesalePrice || product.wholesalePrice,
-      suggestedRetailPrice: selectedVar.price || product.suggestedRetailPrice,
-      customSellingPrice: Number(customSellingPrice) || selectedVar.price || product.suggestedRetailPrice,
+      wholesalePrice: varWholesale,
+      suggestedRetailPrice: varRetail,
+      customSellingPrice: finalSellingPrice,
       quantity: Number(quantity) || 1
     });
     onClose();

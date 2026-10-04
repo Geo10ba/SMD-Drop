@@ -10,10 +10,11 @@ export const ExportCatalogModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleExportCSV = () => {
-    const ok = downloadMarketplaceCSV(platform, products, markupMultiplier);
+  const handleExportCSV = async () => {
+    const ok = await downloadMarketplaceCSV(platform, products, markupMultiplier);
     if (ok) {
-      showNotification(`Catálogo CSV para ${platform.toUpperCase()} exportado com sucesso! (${products.length} produtos)`);
+      const ext = platform === 'shopee' ? 'XLSX' : 'CSV';
+      showNotification(`Catálogo ${ext} para ${platform.toUpperCase()} exportado com sucesso! (${products.length} produtos)`);
       onClose();
     } else {
       showNotification('Erro ao gerar planilha de exportação.', 'error');

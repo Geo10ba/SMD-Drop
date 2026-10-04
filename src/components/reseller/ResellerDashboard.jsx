@@ -113,7 +113,7 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex flex-wrap items-center bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700">
+          <div className="flex overflow-x-auto whitespace-nowrap scrollbar-none items-center bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700 max-w-full">
             <button
               onClick={() => setActiveTab('analytics')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
@@ -368,7 +368,7 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs min-w-[700px]">
                 <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
                   <tr>
                     <th className="p-3">Produto Sugerido</th>
@@ -562,7 +562,7 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[650px]">
               <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
                 <tr>
                   <th className="p-3">Código Pedido</th>

@@ -202,14 +202,15 @@ export const generateMercadoLivreCSV = (products = [], markupMultiplier = 2.2) =
 /**
  * Universal Download Function for any Supported Platform
  */
-export const downloadMarketplaceCSV = (platform, products, markupMultiplier = 2.2, filename = null) => {
+export const downloadMarketplaceCSV = async (platform, products, markupMultiplier = 2.2, filename = null) => {
+  if (platform === 'shopee') {
+    return await downloadShopeeMassCreationCSV(products, markupMultiplier, filename);
+  }
+
   let csvStr = null;
   let defaultPrefix = platform;
 
-  if (platform === 'shopee') {
-    csvStr = generateShopeeMassCreationCSV(products, markupMultiplier);
-    defaultPrefix = 'shopee_criacao_massa';
-  } else if (platform === 'tiktok') {
+  if (platform === 'tiktok') {
     csvStr = generateTikTokShopCSV(products, markupMultiplier);
     defaultPrefix = 'tiktok_shop_massa';
   } else if (platform === 'mercadolivre') {
@@ -254,3 +255,4 @@ export const downloadMarketplaceCSV = (platform, products, markupMultiplier = 2.
   URL.revokeObjectURL(url);
   return true;
 };
+

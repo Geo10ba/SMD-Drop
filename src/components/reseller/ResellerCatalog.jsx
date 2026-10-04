@@ -74,7 +74,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
     setCustomPrices((prev) => ({ ...prev, [productId]: val }));
   };
 
-  const hero = companySettings?.heroSettings || {
+  const DEFAULT_HERO_SETTINGS = {
     enabled: true,
     badge: "OPORTUNIDADE DE RENDA EXTRA • FABRICAÇÃO PRÓPRIA B2B",
     title: "Venda Produtos de Acrílico & Neon LED Sem Estoque e Lucre de R$ 3.000 a R$ 15.000/mês!",
@@ -86,6 +86,21 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
     bullet2Subtitle: "Sua marca na etiqueta",
     bullet3Title: "Margem de 300%",
     bullet3Subtitle: "Preços direto de fábrica"
+  };
+
+  const rawHero = companySettings?.heroSettings || {};
+  const hero = {
+    enabled: rawHero.enabled !== undefined ? rawHero.enabled : DEFAULT_HERO_SETTINGS.enabled,
+    badge: rawHero.badge || DEFAULT_HERO_SETTINGS.badge,
+    title: rawHero.title || DEFAULT_HERO_SETTINGS.title,
+    subtitle: rawHero.subtitle || DEFAULT_HERO_SETTINGS.subtitle,
+    ctaText: rawHero.ctaText || DEFAULT_HERO_SETTINGS.ctaText,
+    bullet1Title: rawHero.bullet1Title || DEFAULT_HERO_SETTINGS.bullet1Title,
+    bullet1Subtitle: rawHero.bullet1Subtitle || DEFAULT_HERO_SETTINGS.bullet1Subtitle,
+    bullet2Title: rawHero.bullet2Title || DEFAULT_HERO_SETTINGS.bullet2Title,
+    bullet2Subtitle: rawHero.bullet2Subtitle || DEFAULT_HERO_SETTINGS.bullet2Subtitle,
+    bullet3Title: rawHero.bullet3Title || DEFAULT_HERO_SETTINGS.bullet3Title,
+    bullet3Subtitle: rawHero.bullet3Subtitle || DEFAULT_HERO_SETTINGS.bullet3Subtitle
   };
 
   // Reset pagination when filters change
@@ -391,6 +406,20 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
             }`}>
               {paginatedProducts.map((product) => {
                 const isM2 = product.pricingType === 'custom_m2';
+                const productVariations = Array.isArray(product.variations) && product.variations.length > 0
+                  ? product.variations
+                  : (typeof product.variations === 'string' && product.variations.trim().startsWith('[')
+                      ? (() => { try { const p = JSON.parse(product.variations); return Array.isArray(p) ? p : []; } catch(e) { return []; } })()
+                      : []);
+                
+                const hasVars = productVariations.length > 0;
+                const wholesalePrices = hasVars 
+                  ? productVariations.map(v => Number(v.wholesalePrice ?? v.price * 0.45 ?? 0)).filter(v => v > 0)
+                  : [];
+                
+                const minW = wholesalePrices.length > 0 ? Math.min(...wholesalePrices) : (product.wholesalePrice || 0);
+                const maxW = wholesalePrices.length > 0 ? Math.max(...wholesalePrices) : (product.wholesalePrice || 0);
+
                 return (
                   <div
                     key={product.id}
@@ -411,6 +440,10 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                         {isM2 ? (
                           <span className="badge-gold font-bold text-[10px] shadow-md">
                             Sob Medida (m²)
+                          </span>
+                        ) : hasVars ? (
+                          <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md uppercase tracking-wider">
+                            ✨ {productVariations.length} Variações
                           </span>
                         ) : (
                           <span className="badge-emerald font-bold text-[10px] shadow-md">
@@ -465,25 +498,36 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                               <div className="flex items-center justify-between text-[11px]">
                                 <span className="font-bold text-[var(--text-muted)] uppercase text-[10px]">Atacado:</span>
                                 <span className="font-extrabold text-[var(--text-main)] font-['Outfit'] text-xs">
-                                  R$ {product.wholesalePrice?.toFixed(2)}
+                                  {hasVars
+                                    ? (minW === maxW ? `R$ ${minW.toFixed(2)}` : `R$ ${minW.toFixed(2)} ~ R$ ${maxW.toFixed(2)}`)
+                                    : `R$ ${(product.wholesalePrice || 0).toFixed(2)}`}
                                 </span>
                               </div>
 
                               {/* Sua Venda Field */}
-                              <div className="flex items-center justify-between gap-1 pt-1 border-t border-[var(--border-color)]">
-                                <span className="text-[10px] font-bold text-[var(--text-main)] whitespace-nowrap">Sua Venda:</span>
-                                <div className="relative w-20 shrink-0">
-                                  <span className="absolute left-1.5 top-0.5 text-[9px] font-bold text-[var(--text-muted)]">R$</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min={product.wholesalePrice}
-                                    value={customPrices[product.id] !== undefined ? customPrices[product.id] : product.suggestedRetailPrice}
-                                    onChange={(e) => handleCustomPriceChange(product.id, Number(e.target.value))}
-                                    className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-md py-0.5 pl-5 pr-1 text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 text-right focus:outline-none focus:border-amber-500 shadow-inner"
-                                  />
+                              {hasVars ? (
+                                <div className="flex items-center justify-between gap-1 pt-1 border-t border-[var(--border-color)]">
+                                  <span className="text-[10px] font-bold text-[var(--text-main)] whitespace-nowrap">Modelos:</span>
+                                  <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 truncate">
+                                    ✨ {productVariations.length} opções p/ escolher
+                                  </span>
                                 </div>
-                              </div>
+                              ) : (
+                                <div className="flex items-center justify-between gap-1 pt-1 border-t border-[var(--border-color)]">
+                                  <span className="text-[10px] font-bold text-[var(--text-main)] whitespace-nowrap">Sua Venda:</span>
+                                  <div className="relative w-20 shrink-0">
+                                    <span className="absolute left-1.5 top-0.5 text-[9px] font-bold text-[var(--text-muted)]">R$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min={product.wholesalePrice}
+                                      value={customPrices[product.id] !== undefined ? customPrices[product.id] : product.suggestedRetailPrice}
+                                      onChange={(e) => handleCustomPriceChange(product.id, Number(e.target.value))}
+                                      className="w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-md py-0.5 pl-5 pr-1 text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 text-right focus:outline-none focus:border-amber-500 shadow-inner"
+                                    />
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )
                         ) : (
@@ -522,7 +566,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                           ) : (
                             <button
                               onClick={() => {
-                                if (product.variations && product.variations.length > 0) {
+                                if (hasVars) {
                                   setVariationProduct(product);
                                 } else {
                                   addToCart({ ...product, customSellingPrice: customPrices[product.id] });
@@ -531,7 +575,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                               className="btn-gold py-1.5 px-2 text-[11px] font-extrabold flex-1 flex items-center justify-center gap-1 truncate shadow-md"
                             >
                               <ShoppingBag size={13} className="shrink-0" />
-                              <span className="truncate">Comprar</span>
+                              <span className="truncate">{hasVars ? 'Escolher Opção' : 'Comprar'}</span>
                             </button>
                           )
                         ) : (

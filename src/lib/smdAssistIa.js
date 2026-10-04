@@ -15,9 +15,9 @@ const _r1 = "sk-b3c99d6fbb7414b1";
 const _r2 = "p58row-0425b688";
 const ROUTER_KEY = import.meta.env?.VITE_ROUTER_KEY || `${_r1}-${_r2}`;// Modelos ativos e testados no Groq & 9Router (Multi-camadas de Redundância)
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant",
-  "mixtral-8x7b-32768"
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
+  "qwen/qwen3.8-27b"
 ];
 const ROUTER_MODELS = ["meu-claude-gratis"];
 
@@ -77,7 +77,7 @@ const SYSTEM_PROMPTS = {
     "Crie 3 roteiros dinâmicos e curtos para vídeos demonstrativos.",
 
   "desc-otimizada":
-    "Você é um especialista em e-commerce e tributação NFe. Responda APENAS o código JSON exato sem texto ou explicações antes ou depois.",
+    "Você é um especialista em e-commerce e copywriting comercial para produtos físicos. Responda APENAS o código JSON exato sem texto explicativo antes ou depois.",
 
   "marketing-multicanal":
     "Você é um especialista em marketing multicanal para e-commerce. Responda APENAS o código JSON exato sem texto ou explicações antes ou depois.",
@@ -223,13 +223,20 @@ export async function askLumenAssistant({ tool = "suporte-sistema", input = "", 
  * Função utilitária para gerar Descrição Comercial Otimizada e Dados Fiscais NFe via IA (Groq / 9Router)
  */
 export async function generateProductDescriptionAndNcm({ title, category, description, ncm, pricingType }) {
-  const prompt = `Você é um especialista em e-commerce e tributação/dados fiscais NCM no Brasil.\n` +
-    `Analise o produto abaixo:\n` +
+  const cleanOriginalDesc = (description || '').replace(/<!--SMD_META:[\s\S]*?-->/g, '').trim();
+
+  const prompt = `Você é um copywriter especialista em e-commerce e dados fiscais de produtos no Brasil.\n` +
+    `Sua missão é ANALISAR a descrição capturada e o título do produto abaixo para REINVENTAR E ENRIQUECER a descrição comercial de venda, mantendo os detalhes técnicos originais e tornando-a altamente vendedora.\n\n` +
+    `DADOS DO PRODUTO CAPTURADO:\n` +
     `- Título: "${title || 'Produto Fabril'}"\n` +
     `- Categoria: "${category || 'Geral'}"\n` +
-    `- Descrição atual: "${description || ''}"\n` +
+    `- Descrição Original Capturada: "${cleanOriginalDesc || 'Produto de alta qualidade para decoração e letreiros.'}"\n` +
     `- NCM atual: "${ncm || ''}"\n\n` +
-    `Retorne APENAS um JSON no seguinte formato exato (sem marcadores de texto fora do JSON):\n` +
+    `REGRAS DE OURO:\n` +
+    `1. Analise o texto original capturado acima e extraia todos os detalhes relevantes (formatos, arquivos, corte a laser, especificações).\n` +
+    `2. Monte uma descrição comercial impactante com Emojis, Título em Destaque, Lista de Benefícios e Ficha Técnica baseada no texto original.\n` +
+    `3. NUNCA responda como assistente de suporte ou mensagens conversacionais (como 'como posso ajudar' ou 'acompanhar pedidos'). Responda APENAS o JSON.\n\n` +
+    `Retorne APENAS um JSON no formato exato abaixo:\n` +
     `{\n` +
     `  "ncm": "3926.90.90",\n` +
     `  "cest": "28.061.00",\n` +
@@ -238,15 +245,14 @@ export async function generateProductDescriptionAndNcm({ title, category, descri
     `  "cfopDiff": "6101",\n` +
     `  "csosn": "102 - Tributada pelo Simples Nacional sem permissão de crédito",\n` +
     `  "origin": "0 - Nacional, exceto as indicadas nos códigos 3, 4, 5 e 8",\n` +
-    `  "description": "🔥 TITULO COMERCIAL GRANDE\\n\\n✨ Destaques & Especificações..."\n` +
+    `  "description": "🔥 TITULO COMERCIAL DENTRO DA DESCRIÇÃO\\n\\n✨ Destaques & Especificações..."\n` +
     `}\n\n` +
     `Tabela NCM / CEST Referência Brasil:\n` +
     `- Plásticos / Acrílicos: NCM "3926.90.90", CEST "28.061.00"\n` +
     `- MDF / Madeira / Fibra: NCM "4421.99.00", CEST "28.057.00"\n` +
     `- LED / Neon / Iluminação: NCM "8539.51.00", CEST "28.038.00"\n` +
     `- Relógios: NCM "9105.29.00", CEST "28.061.00"\n` +
-    `- Metal / ACM: NCM "8306.29.00", CEST "28.061.00"\n` +
-    `Gere uma descrição comercial profissional com especificações para emissão de Nota Fiscal NFe.`;
+    `- Metal / ACM: NCM "8306.29.00", CEST "28.061.00"`;
 
   const resolveFallbackFiscal = (t, c, curNcm) => {
     const str = `${t || ''} ${c || ''}`.toLowerCase();
@@ -278,17 +284,41 @@ export async function generateProductDescriptionAndNcm({ title, category, descri
     };
   };
 
+  const buildSmartCommercialDesc = (parsedDesc, fallbackFiscal) => {
+    const isConversational = (txt) => {
+      if (!txt) return true;
+      const lower = txt.toLowerCase();
+      return lower.includes('como posso te ajudar') ||
+             lower.includes('status detalhado') ||
+             lower.includes('estou por aqui') ||
+             lower.includes('painel de pedidos');
+    };
+
+    if (parsedDesc && !isConversational(parsedDesc) && parsedDesc.trim().length > 30) {
+      return cleanSocialText(parsedDesc);
+    }
+
+    // Smart fallback preserving original captured text
+    const extraDetails = cleanOriginalDesc ? `\n\n📌 Detalhes e Especificações do Produto Capturado:\n${cleanOriginalDesc}` : '';
+    return `🔥 ${(title || 'PRODUTO FABRIL').toUpperCase()} - EDIÇÃO EXCLUSIVA DE FÁBRICA\n\n` +
+      `✨ Destaques & Especificações do Produto:\n` +
+      `• Produzido com materiais nobres de primeira linha e acabamento refinado.\n` +
+      `• Alta precisão e durabilidade para decoração e uso profissional.\n` +
+      `• Embalagem neutra reforçada anti-impacto (Envio Direto Cego ao cliente final).${extraDetails}\n\n` +
+      `📦 Acompanha nota fiscal NFe completa (NCM ${fallbackFiscal.ncm}) e garantia contra defeitos.`;
+  };
+
   try {
     const res = await askLumenAssistant({
       tool: "desc-otimizada",
       input: prompt
     });
 
-    if (res.success && res.content) {
+    if (res.success && res.content && res.provider !== 'local-assistant') {
       const fallback = resolveFallbackFiscal(title, category, ncm);
-      try {
-        const jsonMatch = res.content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
+      const jsonMatch = res.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
           const parsed = JSON.parse(jsonMatch[0]);
           return {
             success: true,
@@ -299,36 +329,21 @@ export async function generateProductDescriptionAndNcm({ title, category, descri
             cfopDiff: parsed.cfopDiff || fallback.cfopDiff,
             csosn: parsed.csosn || fallback.csosn,
             origin: parsed.origin || fallback.origin,
-            description: cleanSocialText(parsed.description || res.content),
+            description: buildSmartCommercialDesc(parsed.description, fallback),
             provider: res.provider
           };
-        }
-      } catch (e) {}
-
-      return {
-        success: true,
-        ...fallback,
-        description: cleanSocialText(res.content),
-        provider: res.provider
-      };
+        } catch (e) {}
+      }
     }
   } catch (err) {
     console.warn("Erro ao gerar IA:", err);
   }
 
   const fallback = resolveFallbackFiscal(title, category, ncm);
-  const fallbackDesc = `🔥 ${(title || 'PRODUTO FABRIL').toUpperCase()} - PRODUTO PREMIUM DE FÁBRICA\n\n` +
-    `✨ Destaques & Especificações Técnicas:\n` +
-    `• Acabamento de altíssima precisão com corte a laser.\n` +
-    `• Matéria-prima nobre e espessura reforçada de alta durabilidade.\n` +
-    `• Envio em embalagem reforçada anti-impacto (Envio Cego sem marca).\n` +
-    `• Pronta entrega e envio imediato direto da fábrica.\n\n` +
-    `📦 Garantia total contra defeitos de fabricação e acompanhado de Dados Fiscais NFe completos (NCM ${fallback.ncm}).`;
-
   return {
     success: true,
     ...fallback,
-    description: fallbackDesc,
+    description: buildSmartCommercialDesc(null, fallback),
     provider: "local-fallback"
   };
 }

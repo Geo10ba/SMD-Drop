@@ -19,14 +19,30 @@ const getInitialBookmarkletData = () => {
       const title = params.get('title') || '';
       const desc = params.get('desc') || '';
       const img = params.get('img') || '';
+      const imgsParam = params.get('imgs') || '';
       const video = params.get('video') || '';
       const priceStr = params.get('price') || '';
       const price = priceStr ? parseFloat(priceStr) : 120;
 
+      let imagesList = [];
+      if (imgsParam) {
+        try {
+          if (imgsParam.startsWith('[')) {
+            imagesList = JSON.parse(imgsParam);
+          } else {
+            imagesList = imgsParam.split('|||').map((u) => u.trim()).filter(Boolean);
+          }
+        } catch (e) {}
+      }
+      if (imagesList.length === 0 && img) {
+        imagesList = [img];
+      }
+
       return {
         title: title || 'Produto Capturado Mágico',
         description: desc || (title ? `Produto ${title} fabricado em material nobre com corte a laser.` : 'Descrição importada do anúncio.'),
-        image: img || 'https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80',
+        image: imagesList[0] || img || 'https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80',
+        images: imagesList,
         video: video || '',
         suggestedRetailPrice: price || 120,
         wholesalePrice: Math.round((price || 120) * 0.45)
@@ -90,6 +106,7 @@ export function serializeProductForSupabase(p) {
     parentSku: p.parentSku || p.parent_sku || '',
     variations: p.variations || [],
     images: p.images || [p.image || p.image_url],
+    video: p.video || '',
     weightKg: fiscal.weightKg,
     dimensions: fiscal.dimensions,
     ncm: fiscal.ncm,
@@ -136,6 +153,25 @@ export function deserializeProductFromSupabase(p) {
   }
 
   const imgs = meta.images || p.images || [p.image_url || p.image || ''];
+  const videoUrl = meta.video || p.video || '';
+
+  let variationsList = [];
+  if (Array.isArray(meta.variations) && meta.variations.length > 0) {
+    variationsList = meta.variations;
+  } else if (typeof meta.variations === 'string' && meta.variations.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(meta.variations);
+      if (Array.isArray(parsed)) variationsList = parsed;
+    } catch (e) {}
+  } else if (Array.isArray(p.variations) && p.variations.length > 0) {
+    variationsList = p.variations;
+  } else if (typeof p.variations === 'string' && p.variations.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(p.variations);
+      if (Array.isArray(parsed)) variationsList = parsed;
+    } catch (e) {}
+  }
+
   const fiscal = resolveSmartFiscalDetails({
     title: p.title,
     category: p.category_name || p.category,
@@ -164,7 +200,8 @@ export function deserializeProductFromSupabase(p) {
     description: cleanDesc,
     image: p.image_url || p.image || (imgs && imgs[0]) || '',
     images: imgs,
-    variations: meta.variations || p.variations || [],
+    video: videoUrl,
+    variations: variationsList,
     shopeeId: meta.shopeeId || p.shopee_id || '',
     parentSku: meta.parentSku || p.parent_sku || '',
     weightKg: fiscal.weightKg,
@@ -1046,10 +1083,13 @@ export const StoreProvider = ({ children }) => {
           localProds.forEach(lp => {
             if (!mergedProdsMap.has(lp.id)) {
               mergedProdsMap.set(lp.id, lp);
+              safeSyncProductToSupabase(lp);
             } else {
               const existingInDb = mergedProdsMap.get(lp.id);
               if (lp.status === 'approved' && existingInDb.status !== 'approved') {
-                mergedProdsMap.set(lp.id, { ...existingInDb, ...lp, status: 'approved' });
+                const updated = { ...existingInDb, ...lp, status: 'approved' };
+                mergedProdsMap.set(lp.id, updated);
+                safeSyncProductToSupabase(updated);
               }
             }
           });
@@ -1104,9 +1144,25 @@ export const StoreProvider = ({ children }) => {
                 whatsapp: socLinks.whatsapp || prev.socialLinks?.whatsapp || '',
                 youtube: socLinks.youtube || prev.socialLinks?.youtube || ''
               },
-              heroSettings: s.hero_settings
-                ? (typeof s.hero_settings === 'string' ? JSON.parse(s.hero_settings) : s.hero_settings)
-                : (socLinks.heroSettings || prev.heroSettings),
+              heroSettings: (() => {
+                const defaultHero = {
+                  enabled: true,
+                  badge: "OPORTUNIDADE DE RENDA EXTRA • FABRICAÇÃO PRÓPRIA B2B",
+                  title: "Venda Produtos de Acrílico & Neon LED Sem Estoque e Lucre de R$ 3.000 a R$ 15.000/mês!",
+                  subtitle: "A fábrica SMD Drop cuida de tudo para você: nós produzimos sob medida, embalamos em caixa neutra e despachamos direto para o seu cliente final com a sua etiqueta do Mercado Livre, Shopee ou Amazon.",
+                  ctaText: "✨ Criar Conta Grátis e Liberar Atacado em 30s →",
+                  bullet1Title: "Zero Estoque",
+                  bullet1Subtitle: "Só pague após vender",
+                  bullet2Title: "Envio Cego Neutro",
+                  bullet2Subtitle: "Sua marca na etiqueta",
+                  bullet3Title: "Margem de 300%",
+                  bullet3Subtitle: "Preços direto de fábrica"
+                };
+                const fetchedHero = s.hero_settings
+                  ? (typeof s.hero_settings === 'string' ? JSON.parse(s.hero_settings) : s.hero_settings)
+                  : (socLinks.heroSettings || prev.heroSettings || {});
+                return { ...defaultHero, ...fetchedHero };
+              })(),
               termsContent: s.legal_terms || prev.termsContent,
               privacyContent: s.legal_privacy || prev.privacyContent
             };
@@ -1179,11 +1235,21 @@ export const StoreProvider = ({ children }) => {
           if (typeof window !== 'undefined') localStorage.setItem('smd_users', JSON.stringify(normalizedUsers));
         }
       } catch (err) {
-        console.warn('Supabase initial fetch fallback:', err);
+        console.warn('[Supabase Sync Hydration Error]:', err);
       }
     };
 
     fetchSupabaseData();
+
+    if (typeof window !== 'undefined') {
+      const handleWindowFocus = () => fetchSupabaseData();
+      window.addEventListener('focus', handleWindowFocus);
+      const syncInterval = setInterval(fetchSupabaseData, 15000);
+      return () => {
+        window.removeEventListener('focus', handleWindowFocus);
+        clearInterval(syncInterval);
+      };
+    }
   }, []);
 
   // Sync all current state to Supabase
@@ -1394,24 +1460,42 @@ export const StoreProvider = ({ children }) => {
     safeSyncProductToSupabase(newProduct);
   };
 
-  // Suggest Product by Reseller (Requires Admin Approval)
+  // Suggest / Register Product by Reseller (Direct active publication & DB sync)
   const suggestProductByReseller = (productData) => {
     const fiscal = resolveSmartFiscalDetails(productData);
-    const newPending = {
-      id: "pending-" + Date.now(),
+    const retailPrice = Number(productData.suggestedRetailPrice) || 120;
+    const wholesalePrice = Number(productData.wholesalePrice) || Math.round(retailPrice * 0.45);
+
+    const newProduct = {
+      id: "prod-" + Date.now(),
       createdAt: new Date().toISOString(),
       resellerId: currentUser?.id || 'anon',
       resellerName: currentUser?.name || 'Revendedor Convidado',
       resellerEmail: currentUser?.email || '',
-      status: "pending_approval",
-      wholesalePrice: 0,
+      status: "approved",
+      inStock: true,
+      wholesalePrice: wholesalePrice,
+      suggestedRetailPrice: retailPrice,
+      pricePerM2: wholesalePrice,
+      suggestedPricePerM2: retailPrice,
+      factoryStock: 100,
       resellerNotes: productData.resellerNotes || '',
-      images: productData.images || (productData.image ? [productData.image] : []),
+      image: productData.image || (productData.images && productData.images[0]) || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
+      images: productData.images && productData.images.length > 0 ? productData.images : [productData.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80"],
+      mediaKit: {
+        photos: productData.images || (productData.image ? [productData.image] : []),
+        copyTitle: productData.title,
+        copyDescription: productData.description
+      },
       ...fiscal,
       ...productData
     };
-    setPendingProducts((prev) => [newPending, ...prev]);
-    showNotification(`Produto "${productData.title}" enviado para aprovação da fábrica!`, 'gold');
+
+    setProducts((prev) => [newProduct, ...prev]);
+    setPendingProducts((prev) => [newProduct, ...prev]);
+    showNotification(`✨ Produto "${productData.title}" cadastrado e sincronizado com o banco de dados!`, 'gold');
+
+    safeSyncProductToSupabase(newProduct);
   };
 
   // Approve Reseller Suggested Product (Admin action with pricing and factory notes)

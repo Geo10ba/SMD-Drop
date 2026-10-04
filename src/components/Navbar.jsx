@@ -194,12 +194,12 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
                     title="Criar Conta Grátis de Revendedor"
                   >
                     <UserPlus size={15} />
-                    <span>Criar Conta</span>
+                    <span className="hidden sm:inline">Criar Conta</span>
                   </button>
 
                   <button
                     onClick={() => onOpenRegister('login')}
-                    className="btn-secondary text-xs py-1.5 px-2.5 text-amber-600 dark:text-amber-400 font-bold shrink-0"
+                    className="btn-secondary text-xs py-1.5 px-2 text-amber-600 dark:text-amber-400 font-bold shrink-0"
                     title="Acessar Conta de Revendedor"
                   >
                     Entrar

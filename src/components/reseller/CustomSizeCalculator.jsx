@@ -453,14 +453,14 @@ export const CustomSizeCalculator = ({ product, onClose }) => {
                 <div className={`h-32 sm:h-36 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden transition-all shadow-inner ${getBgStyle()}`}>
                   <div className="absolute inset-0 bg-[radial-gradient(#ffffff15_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
                   
-                  <div className="relative z-10 text-center px-3">
+                  <div className="relative z-10 text-center px-3 max-w-full">
                     <h2
-                      className={`text-xl sm:text-2xl font-extrabold uppercase tracking-widest ${getAcrylicStyle()}`}
+                      className={`text-base sm:text-2xl font-extrabold uppercase tracking-widest break-words line-clamp-2 ${getAcrylicStyle()}`}
                       style={{ fontFamily: fontFamily }}
                     >
                       {customText || "SUA LOGO AQUI"}
                     </h2>
-                    <p className="text-[10px] text-slate-400 mt-1 font-mono font-medium truncate max-w-xs">
+                    <p className="text-[10px] text-slate-400 mt-1 font-mono font-medium truncate max-w-xs mx-auto">
                       [ {selectedMaterial.name} ]
                     </p>
                   </div>

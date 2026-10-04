@@ -201,14 +201,14 @@ export const MediaKitModal = ({ product, onClose }) => {
 
                 {/* Individual Shopee Export Button */}
                 <button
-                  onClick={() => {
-                    const ok = downloadShopeeMassCreationCSV([product], 2.2);
-                    if (ok) showNotification(`Planilha Shopee de "${product.title}" baixada com sucesso!`);
+                  onClick={async () => {
+                    const ok = await downloadShopeeMassCreationCSV([product], 2.2);
+                    if (ok) showNotification(`Planilha Shopee (Excel .xlsx) de "${product.title}" baixada com sucesso!`);
                   }}
                   className="w-full btn-orange justify-center text-xs font-bold py-2.5 flex items-center gap-2 shadow-sm"
                   title="Baixar este produto formatado para o Carregamento em Massa da Shopee"
                 >
-                  <FileSpreadsheet size={15} /> Baixar Planilha Shopee (Criação)
+                  <FileSpreadsheet size={15} /> Baixar Planilha Shopee (Excel .XLSX)
                 </button>
 
                 <button
@@ -220,11 +220,42 @@ export const MediaKitModal = ({ product, onClose }) => {
 
                 {product.video && (
                   <div className="bg-purple-500/10 p-3 rounded-xl border border-purple-500/30 space-y-2 text-xs">
-                    <span className="font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5 uppercase text-[10px]">
-                      <Video size={14} /> Vídeo Demonstrativo do Produto
-                    </span>
-                    <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
-                      <video src={product.video} controls className="w-full h-full object-contain" />
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5 uppercase text-[10px]">
+                        <Video size={14} /> Vídeo Demonstrativo do Produto
+                      </span>
+                      <a
+                        href={product.video}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-purple-600 dark:text-purple-300 font-bold hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink size={12} /> Abrir Vídeo
+                      </a>
+                    </div>
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center relative">
+                      {product.video.includes('youtube.com') || product.video.includes('youtu.be') ? (
+                        <iframe
+                          src={product.video.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                          title="Vídeo do Produto"
+                          className="w-full h-full border-0"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <video
+                          src={product.video}
+                          controls
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                          className="w-full h-full object-contain"
+                        >
+                          <source src={product.video} type="video/mp4" />
+                          Seu navegador não suporta a exibição deste vídeo.
+                        </video>
+                      )}
                     </div>
                   </div>
                 )}

@@ -57,6 +57,7 @@ export const EditProductModal = ({ product, onClose }) => {
   const [status, setStatus] = useState('approved');
   const [image, setImage] = useState('');
   const [images, setImages] = useState([]);
+  const [video, setVideo] = useState('');
   const [newImageUrl, setNewImageUrl] = useState('');
 
   // Physical product specs for IA pricing
@@ -80,6 +81,7 @@ export const EditProductModal = ({ product, onClose }) => {
       setShopeeId(product.shopeeId || '');
       setPricingType(product.pricingType || 'fixed');
       setDescription(product.description || '');
+      setVideo(product.video || '');
 
       setWholesalePrice(product.wholesalePrice || 0);
       setSuggestedRetailPrice(product.suggestedRetailPrice || 0);
@@ -395,6 +397,7 @@ export const EditProductModal = ({ product, onClose }) => {
       csosn,
       origin,
       status,
+      video: video || '',
       image: image || images[0] || '',
       images: images.length > 0 ? images : [image]
     });
@@ -410,11 +413,11 @@ export const EditProductModal = ({ product, onClose }) => {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[99999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col p-5 sm:p-6 shadow-2xl relative my-auto animate-none">
+    <div className="fixed inset-0 z-[99999] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-5xl w-full max-h-[94vh] flex flex-col p-4 sm:p-6 shadow-2xl relative my-auto animate-none">
         
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
+        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold shrink-0">
               <Edit2 size={22} />
@@ -441,7 +444,7 @@ export const EditProductModal = ({ product, onClose }) => {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-1 border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
+        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-none gap-1 sm:gap-1.5 border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('general')}
@@ -642,6 +645,19 @@ export const EditProductModal = ({ product, onClose }) => {
                         <option value="rascunho">📦 Rascunho (Oculto da Loja)</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[var(--text-muted)] uppercase mb-1 flex items-center gap-1">
+                      <Play size={13} className="text-purple-500" /> URL do Vídeo (MP4 / YouTube / Etsy)
+                    </label>
+                    <input
+                      type="url"
+                      value={video}
+                      onChange={(e) => setVideo(e.target.value)}
+                      placeholder="https://v.etsystatic.com/...mp4 ou YouTube"
+                      className="input-field font-mono text-xs"
+                    />
                   </div>
                 </div>
 
@@ -1065,7 +1081,7 @@ export const EditProductModal = ({ product, onClose }) => {
                 </div>
               ) : (
                 <div className="overflow-x-auto border border-[var(--border-color)] rounded-xl">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead className="bg-[var(--bg-surface-hover)] border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold text-[10px]">
                       <tr>
                         <th className="p-2.5">Nome da Variação</th>
