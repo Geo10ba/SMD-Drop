@@ -5,7 +5,12 @@ import {
   Edit2, Tag, Image as ImageIcon, Save, Trash2, Sparkles, Eye, X, 
   Layers, Package, FileText, Plus, Check, AlertCircle, RefreshCw, Star, FileEdit, Play, Loader2, CheckCircle2, ShieldAlert, Diamond
 } from 'lucide-react';
-import { generateProductDescriptionAndNcm, analyzeFactoryProductCostAndPriceWithIA } from '../../lib/smdAssistIa';
+import { 
+  generateProductDescriptionAndNcm, 
+  analyzeFactoryProductCostAndPriceWithIA,
+  calculateProportionalVariationsPricingWithIA,
+  analyzeVariationProgression
+} from '../../lib/smdAssistIa';
 
 export const EditProductModal = ({ product, onClose }) => {
   const { updateProduct, deleteProduct, categories, addCategory, showNotification, companySettings, materials } = useStore();
@@ -14,6 +19,9 @@ export const EditProductModal = ({ product, onClose }) => {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isAnalyzingPricing, setIsAnalyzingPricing] = useState(false);
   const [pricingAnalysisResult, setPricingAnalysisResult] = useState(null);
+  const [isCalculatingVariations, setIsCalculatingVariations] = useState(false);
+  const [variationPricingReport, setVariationPricingReport] = useState(null);
+  const [selectedBaseVarIndex, setSelectedBaseVarIndex] = useState(0);
 
   // General fields
   const [title, setTitle] = useState('');
@@ -65,6 +73,15 @@ export const EditProductModal = ({ product, onClose }) => {
   const [productLengthCm, setProductLengthCm] = useState(20);
   const [productWidthCm, setProductWidthCm] = useState(10);
 
+  // Helper to safely parse decimal numbers with commas or dots
+  const parseNum = (val, fallback = 0) => {
+    if (val === undefined || val === null || val === '') return fallback;
+    if (typeof val === 'number') return isNaN(val) ? fallback : val;
+    const cleaned = String(val).replace(',', '.').trim();
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? fallback : parsed;
+  };
+
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
@@ -90,7 +107,24 @@ export const EditProductModal = ({ product, onClose }) => {
       setPricePerM2(product.pricePerM2 || 530);
       setSuggestedPricePerM2(product.suggestedPricePerM2 || 800);
 
-      setVariations(Array.isArray(product.variations) ? product.variations : []);
+      const rawVars = Array.isArray(product.variations) ? product.variations : [];
+      setVariations(rawVars);
+
+      let initialBaseIdx = 0;
+      if (rawVars.length > 1) {
+        const prog = analyzeVariationProgression(rawVars);
+        if (prog && prog.items && prog.items.length === rawVars.length) {
+          const minIdx = prog.items.reduce((minI, cur, i, arr) => cur.val < arr[minI].val ? i : minI, 0);
+          initialBaseIdx = minIdx;
+        }
+      }
+      setSelectedBaseVarIndex(initialBaseIdx);
+
+      const baseItem = rawVars[initialBaseIdx];
+      const bW = parseNum(baseItem?.wholesalePrice, 0);
+      const bR = parseNum(baseItem?.price, 0);
+      setWholesalePrice(bW > 0 ? bW : (product.wholesalePrice || 0));
+      setSuggestedRetailPrice(bR > 0 ? bR : (product.suggestedRetailPrice || 0));
 
       setWeightKg(product.weightKg || 0.5);
       setLengthCm(product.dimensions?.length || product.lengthCm || 30);
@@ -147,21 +181,12 @@ export const EditProductModal = ({ product, onClose }) => {
     }
   }, [product]);
 
-  if (!product) return null;
-
   // Bulk Percentage Adjustment State
   const [bulkPercent, setBulkPercent] = useState(10);
   const [bulkTarget, setBulkTarget] = useState('wholesale'); // 'wholesale' | 'retail' | 'stock'
   const [bulkStockValue, setBulkStockValue] = useState(100);
 
-  // Helper to safely parse decimal numbers with commas or dots
-  const parseNum = (val, fallback = 0) => {
-    if (val === undefined || val === null || val === '') return fallback;
-    if (typeof val === 'number') return isNaN(val) ? fallback : val;
-    const cleaned = String(val).replace(',', '.').trim();
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? fallback : parsed;
-  };
+  if (!product) return null;
 
   // Variation handlers
   const handleUpdateVariation = (index, field, value) => {
@@ -171,15 +196,21 @@ export const EditProductModal = ({ product, onClose }) => {
     
     setVariations(next);
 
+    // Sincroniza preço base se a variação editada for a variação de referência base
+    if (index === selectedBaseVarIndex) {
+      if (field === 'wholesalePrice') setWholesalePrice(parsedVal);
+      if (field === 'price') setSuggestedRetailPrice(parsedVal);
+    }
+
     // Recalculate total stock and summary prices
     const totalStock = next.reduce((acc, v) => acc + (parseInt(parseNum(v.stock, 0), 10) || 0), 0);
     const validPrices = next.map(v => parseNum(v.price, 0)).filter(p => p > 0);
     const validWholesales = next.map(v => parseNum(v.wholesalePrice, 0)).filter(w => w > 0);
 
-    if (validPrices.length > 0) {
+    if (validPrices.length > 0 && index !== selectedBaseVarIndex) {
       setSuggestedRetailPrice(Math.min(...validPrices));
     }
-    if (validWholesales.length > 0) {
+    if (validWholesales.length > 0 && index !== selectedBaseVarIndex) {
       setWholesalePrice(Math.min(...validWholesales));
     }
     setFactoryStock(totalStock);
@@ -245,6 +276,66 @@ export const EditProductModal = ({ product, onClose }) => {
 
   const handleDeleteVariation = (index) => {
     setVariations(variations.filter((_, i) => i !== index));
+  };
+
+  const handleRecalculateVariationsProportionally = async (overrideBaseWholesale = null, overrideBaseRetail = null) => {
+    if (variations.length === 0) {
+      showNotification('Nenhuma variação cadastrada para calcular.', 'error');
+      return;
+    }
+
+    const baseVar = variations[selectedBaseVarIndex] || variations[0];
+
+    const baseW = overrideBaseWholesale !== null 
+      ? parseNum(overrideBaseWholesale, 0) 
+      : (parseNum(baseVar?.wholesalePrice, 0) > 0 
+          ? parseNum(baseVar.wholesalePrice, 0) 
+          : parseNum(wholesalePrice, 0));
+
+    if (baseW <= 0) {
+      showNotification('Informe um Custo de Atacado base maior que zero no campo.', 'error');
+      return;
+    }
+
+    const baseR = overrideBaseRetail !== null 
+      ? parseNum(overrideBaseRetail, 0) 
+      : (parseNum(baseVar?.price, 0) > 0 
+          ? parseNum(baseVar.price, 0) 
+          : parseNum(suggestedRetailPrice, 0));
+
+    setIsCalculatingVariations(true);
+    showNotification('⚡ Lumen IA calculando proporções das variações...', 'info');
+
+    try {
+      const res = await calculateProportionalVariationsPricingWithIA({
+        productTitle: title || product.title,
+        baseWholesalePrice: baseW,
+        baseRetailPrice: baseR,
+        variations,
+        baseVariationIndex: selectedBaseVarIndex,
+        material: selectedMaterial
+      });
+
+      if (res && res.success && Array.isArray(res.variations)) {
+        setVariations(res.variations);
+        setVariationPricingReport(res);
+
+        const currentBase = res.variations[selectedBaseVarIndex] || res.variations[0];
+        if (currentBase) {
+          setWholesalePrice(currentBase.wholesalePrice);
+          if (currentBase.price) setSuggestedRetailPrice(currentBase.price);
+        }
+
+        showNotification(`✨ ${res.variations.length} variações calculadas proporcionalmente pela IA!`);
+      } else {
+        showNotification(res?.error || 'Erro ao calcular proporções.', 'error');
+      }
+    } catch (err) {
+      console.error('Erro ao calcular variações:', err);
+      showNotification('Erro ao calcular proporções das variações.', 'error');
+    } finally {
+      setIsCalculatingVariations(false);
+    }
   };
 
   // Image gallery handlers
@@ -359,13 +450,36 @@ export const EditProductModal = ({ product, onClose }) => {
         stock: finalStock
       };
     } else if (updatedVariations.length > 1) {
+      const validWholesales = updatedVariations.map(v => parseNum(v.wholesalePrice, 0)).filter(w => w > 0);
+      if (validWholesales.length === 0 && finalWholesalePrice > 0) {
+        // Se as variações não tinham atacado preenchido, auto-distribui proporcionalmente por progressão ou revenda
+        const prog = analyzeVariationProgression(updatedVariations);
+        const baseRet = finalRetailPrice || 120;
+        const minIdx = prog?.items ? prog.items.reduce((minI, cur, i, arr) => cur.val < arr[minI].val ? i : minI, 0) : 0;
+        const baseVal = prog?.items?.[minIdx]?.val || 1;
+
+        updatedVariations = updatedVariations.map((v, idx) => {
+          let factor = 1.0;
+          if (prog?.items?.[idx]) {
+            factor = prog.items[idx].val / baseVal;
+          } else if (parseNum(v.price, 0) > 0 && baseRet > 0) {
+            factor = parseNum(v.price, 0) / baseRet;
+          }
+          return {
+            ...v,
+            wholesalePrice: Math.round(finalWholesalePrice * factor * 100) / 100,
+            price: parseNum(v.price, 0) > 0 ? parseNum(v.price, 0) : Math.round(baseRet * factor * 100) / 100
+          };
+        });
+      }
+
       const validPrices = updatedVariations.map(v => parseNum(v.price, 0)).filter(p => p > 0);
       if (validPrices.length > 0 && finalRetailPrice === 0) {
         finalRetailPrice = Math.min(...validPrices);
       }
-      const validWholesales = updatedVariations.map(v => parseNum(v.wholesalePrice, 0)).filter(w => w > 0);
-      if (validWholesales.length > 0 && finalWholesalePrice === 0) {
-        finalWholesalePrice = Math.min(...validWholesales);
+      const allWholesales = updatedVariations.map(v => parseNum(v.wholesalePrice, 0)).filter(w => w > 0);
+      if (allWholesales.length > 0 && finalWholesalePrice === 0) {
+        finalWholesalePrice = Math.min(...allWholesales);
       }
     }
 
@@ -752,6 +866,62 @@ export const EditProductModal = ({ product, onClose }) => {
                           * Nota: Os valores acima representam o valor mínimo e a soma total das {variations.length} variações da aba "Variações Shopee".
                         </p>
                       )}
+
+                      {/* Botão de Cálculo Proporcional Inteligente com Lumen IA */}
+                      {variations.length > 1 && (
+                        <div className="mt-3 pt-3 border-t border-emerald-500/20 bg-emerald-500/5 -mx-4 -mb-4 p-3.5 rounded-b-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                              <Sparkles size={14} className="text-amber-500" />
+                              Atacado Proporcional Inteligente ({variations.length} Variações)
+                            </span>
+                            <span className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[9px] font-extrabold px-2 py-0.5 rounded-full">
+                              Base: {variations[selectedBaseVarIndex]?.name || '1ª Variação'} = R$ {wholesalePrice || 0}
+                            </span>
+                          </div>
+
+                          <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">
+                            Detecta medidas nos nomes (ex: 60cm a 90cm) ou proporções de revenda e calcula os custos de atacado de todas as variações proporcionalmente com a inteligência do Lumen IA.
+                          </p>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRecalculateVariationsProportionally()}
+                            disabled={isCalculatingVariations}
+                            className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-500 hover:from-emerald-500 hover:to-amber-400 text-white font-extrabold py-2 px-3 text-xs flex items-center justify-center gap-1.5 shadow-md rounded-lg transition-all cursor-pointer active:scale-[0.99] disabled:opacity-50"
+                          >
+                            {isCalculatingVariations ? (
+                              <>
+                                <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                <span>Calculando Proporções com Lumen IA...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles size={13} className="text-amber-200" />
+                                <span>🪄 Aplicar Atacado Proporcional nas {variations.length} Variações com IA</span>
+                              </>
+                            )}
+                          </button>
+
+                          {variationPricingReport && (
+                            <div className="p-2 bg-[var(--bg-surface)] border border-emerald-500/30 rounded-lg text-[10px] text-[var(--text-main)] space-y-1 animate-fade-in">
+                              <div className="flex items-center justify-between font-bold text-emerald-600 dark:text-emerald-400">
+                                <span>✓ {variationPricingReport.detectedMetric}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTab('variations')}
+                                  className="text-amber-500 underline hover:text-amber-600 font-extrabold"
+                                >
+                                  Ver Tabela de Variações →
+                                </button>
+                              </div>
+                              <p className="text-[10px] text-[var(--text-muted)] italic">
+                                {variationPricingReport.analysisSummary}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -863,6 +1033,9 @@ export const EditProductModal = ({ product, onClose }) => {
                                 const r = pricingAnalysisResult.premiumRetailPrice || pricingAnalysisResult.suggestedRetailPrice;
                                 setWholesalePrice(w);
                                 setSuggestedRetailPrice(r);
+                                if (variations.length > 1) {
+                                  handleRecalculateVariationsProportionally(w, r);
+                                }
                                 showNotification('Preços da Estratégia Valor Agregado (Sol & Chuva) aplicados!');
                               }}
                               className="w-full mt-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-1 px-2 rounded-lg text-[10px] font-sans flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-sm"
@@ -891,6 +1064,9 @@ export const EditProductModal = ({ product, onClose }) => {
                                 const r = pricingAnalysisResult.volumeRetailPrice || (pricingAnalysisResult.suggestedRetailPrice * 0.8);
                                 setWholesalePrice(w);
                                 setSuggestedRetailPrice(r);
+                                if (variations.length > 1) {
+                                  handleRecalculateVariationsProportionally(w, r);
+                                }
                                 showNotification('Preços da Estratégia Giro Rápido aplicados!');
                               }}
                               className="w-full mt-1 bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold py-1 px-2 rounded-lg text-[10px] font-sans flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-sm"
@@ -968,6 +1144,114 @@ export const EditProductModal = ({ product, onClose }) => {
                   <Plus size={15} /> Nova Variação
                 </button>
               </div>
+
+              {/* Intelligent Proportional Sizing & IA Pricing Toolbar */}
+              {variations.length > 0 && (
+                <div className="bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-amber-500/10 p-3.5 rounded-xl border border-purple-500/30 space-y-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 border-b border-purple-500/20 pb-2">
+                    <span className="font-extrabold text-[var(--text-main)] text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                      <Sparkles size={15} className="text-amber-400" />
+                      Cálculo Proporcional Inteligente por Medidas / IA (Lumen IA)
+                    </span>
+                    <span className="text-[10px] text-purple-600 dark:text-purple-300 font-bold bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                      Escala por Medidas Físicas (ex: 60cm a 90cm)
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                    A IA analisa os nomes das variações, extrai as medidas físicas em cm ou m² (ex: 60cm, 70cm, 80cm, 90cm) e calcula os custos de atacado e preços de revenda proporcionalmente com base na variação selecionada.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1">
+                        Variação Base de Referência
+                      </label>
+                      <select
+                        value={selectedBaseVarIndex}
+                        onChange={(e) => {
+                          const idx = Number(e.target.value);
+                          setSelectedBaseVarIndex(idx);
+                          if (variations[idx]?.wholesalePrice) {
+                            setWholesalePrice(variations[idx].wholesalePrice);
+                          }
+                          if (variations[idx]?.price) {
+                            setSuggestedRetailPrice(variations[idx].price);
+                          }
+                        }}
+                        className="input-field py-1.5 text-xs font-semibold"
+                      >
+                        {variations.map((v, idx) => {
+                          const prog = analyzeVariationProgression(variations);
+                          const itemInfo = prog?.items?.[idx];
+                          const isMin = prog?.items && idx === prog.items.reduce((minI, cur, i, arr) => cur.val < arr[minI].val ? i : minI, 0);
+                          return (
+                            <option key={v.id || idx} value={idx}>
+                              #{idx + 1}: {v.name} {itemInfo ? `[${itemInfo.label}]` : ''} {isMin ? '★ (Menor / Base Padrão)' : ''} — Atacado: R$ {(Number(v.wholesalePrice) || 0).toFixed(2)}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1">
+                        Custo Atacado Base R$
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={wholesalePrice}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setWholesalePrice(val);
+                          if (variations[selectedBaseVarIndex]) {
+                            const parsed = parseNum(val, 0);
+                            const next = [...variations];
+                            next[selectedBaseVarIndex] = { ...next[selectedBaseVarIndex], wholesalePrice: parsed };
+                            setVariations(next);
+                          }
+                        }}
+                        className="input-field py-1.5 text-xs font-extrabold font-mono text-amber-500"
+                        placeholder="28"
+                      />
+                    </div>
+
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => handleRecalculateVariationsProportionally()}
+                        disabled={isCalculatingVariations}
+                        className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-extrabold py-2 px-3 text-xs flex items-center justify-center gap-1.5 shadow-md rounded-lg transition-all cursor-pointer active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {isCalculatingVariations ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            <span>Calculando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={13} className="text-amber-200" />
+                            <span>🪄 Calcular com IA</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {variationPricingReport && (
+                    <div className="bg-[var(--bg-surface)] p-2.5 rounded-lg border border-purple-500/30 text-[11px] space-y-1 animate-fade-in">
+                      <div className="flex items-center justify-between font-bold text-purple-600 dark:text-purple-400 text-[10px] uppercase">
+                        <span>✓ Métrica: {variationPricingReport.detectedMetric}</span>
+                        <span className="text-amber-500 font-extrabold">Aplicado nas {variations.length} variações!</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-main)] leading-relaxed">
+                        {variationPricingReport.analysisSummary}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Bulk Percentage Adjustment Toolbar */}
               {variations.length > 0 && (
@@ -1097,12 +1381,42 @@ export const EditProductModal = ({ product, onClose }) => {
                       {variations.map((v, idx) => (
                         <tr key={v.id || idx} className="hover:bg-[var(--bg-surface-hover)] transition-colors">
                           <td className="p-2">
-                            <input
-                              type="text"
-                              value={v.name}
-                              onChange={(e) => handleUpdateVariation(idx, 'name', e.target.value)}
-                              className="input-field py-1 text-xs font-semibold"
-                            />
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={v.name}
+                                onChange={(e) => handleUpdateVariation(idx, 'name', e.target.value)}
+                                className="input-field py-1 text-xs font-semibold flex-1"
+                              />
+                              {idx === selectedBaseVarIndex ? (
+                                <span className="shrink-0 text-[10px] font-black text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30" title="Variação Base de Referência">
+                                  ★ Base
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedBaseVarIndex(idx);
+                                    if (v.wholesalePrice) setWholesalePrice(v.wholesalePrice);
+                                    if (v.price) setSuggestedRetailPrice(v.price);
+                                    showNotification(`"${v.name}" selecionada como Variação Base.`);
+                                  }}
+                                  className="shrink-0 text-[9px] font-bold text-[var(--text-muted)] hover:text-amber-500 bg-[var(--bg-surface-hover)] hover:bg-amber-500/10 px-1.5 py-0.5 rounded border border-[var(--border-color)] transition-colors cursor-pointer"
+                                  title="Tornar esta variação a base para o cálculo proporcional"
+                                >
+                                  Tornar Base
+                                </button>
+                              )}
+                            </div>
+                            {v.pricingFormula ? (
+                              <span className="inline-block mt-1 text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 max-w-full truncate" title={v.pricingFormula}>
+                                {v.pricingFormula}
+                              </span>
+                            ) : idx === selectedBaseVarIndex ? (
+                              <span className="inline-block mt-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                                ★ Base de Atacado: R$ {(Number(v.wholesalePrice) || Number(wholesalePrice) || 0).toFixed(2)}
+                              </span>
+                            ) : null}
                           </td>
                           <td className="p-2">
                             <input

@@ -15,9 +15,9 @@ const _r1 = "sk-b3c99d6fbb7414b1";
 const _r2 = "p58row-0425b688";
 const ROUTER_KEY = import.meta.env?.VITE_ROUTER_KEY || `${_r1}-${_r2}`;// Modelos ativos e testados no Groq & 9Router (Multi-camadas de Redundância)
 const GROQ_MODELS = [
-  "openai/gpt-oss-120b",
+  "qwen/qwen3.8-27b",
   "openai/gpt-oss-20b",
-  "qwen/qwen3.8-27b"
+  "openai/gpt-oss-120b"
 ];
 const ROUTER_MODELS = ["meu-claude-gratis"];
 
@@ -787,6 +787,315 @@ Podemos aprovar o layout para iniciar a produção hoje mesmo?`;
     whatsappScript
   };
 }
+
+/**
+ * Analisa uma lista de variações para identificar o parâmetro que REALMENTE varia entre elas.
+ * Ignora medidas estáticas constantes (ex: se todas têm "18cm", 18cm é fixo e é ignorado).
+ * Detecta:
+ * - 2D: "20x30", "30x40" -> área varia
+ * - 1D: "60cm", "70cm", "80cm" -> comprimento varia
+ * - Quantidades / Membros: "02 - 18cm", "03 - 18cm", "07 - 18cm" -> 2, 3, 7 varia
+ */
+export function analyzeVariationProgression(variations, selectedBaseIndex = 0) {
+  if (!Array.isArray(variations) || variations.length === 0) return null;
+
+  const allParsed = variations.map(v => {
+    const name = String(v?.name || '').trim();
+    const tokens = [];
+
+    // Padrão 2D (ex: 20x30, 20x30cm)
+    const m2d = name.match(/(\d+(?:[.,]\d+)?)\s*(?:cm)?\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?/i);
+    if (m2d) {
+      const v1 = parseFloat(m2d[1].replace(',', '.'));
+      const v2 = parseFloat(m2d[2].replace(',', '.'));
+      if (!isNaN(v1) && !isNaN(v2) && v1 > 0 && v2 > 0) {
+        tokens.push({ type: '2d', val: Math.round(v1 * v2 * 100) / 100, label: `${v1}x${v2}cm`, raw: m2d[0] });
+      }
+    }
+
+    // Números individuais com ou sem unidade
+    const regex = /(\d+(?:[.,]\d+)?)\s*(cm|m|mm)?\b/gi;
+    let m;
+    while ((m = regex.exec(name)) !== null) {
+      const num = parseFloat(m[1].replace(',', '.'));
+      const unit = (m[2] || '').toLowerCase();
+      let valInCm = num;
+      if (unit === 'm') valInCm = num * 100;
+      else if (unit === 'mm') valInCm = num / 10;
+      tokens.push({ type: unit ? 'dim' : 'num', val: valInCm, numOnly: num, unit: unit, raw: m[0].trim() });
+    }
+    return tokens;
+  });
+
+  // 1. Verificar se todas têm dimensão 2D e se os valores de área variam
+  const twoD = allParsed.map(tList => tList.find(t => t.type === '2d'));
+  if (twoD.every(Boolean) && new Set(twoD.map(t => t.val)).size > 1) {
+    return {
+      type: '2d',
+      metricLabel: 'Área 2D em cm²',
+      items: twoD.map(t => ({ val: t.val, label: t.label, type: '2d' }))
+    };
+  }
+
+  // 2. Procurar qual token varia de verdade (ignorando números estáticos como "18cm" presentes em todas)
+  const maxTokens = Math.max(...allParsed.map(t => t.length), 0);
+  let bestItems = null;
+  let bestType = 'num';
+  let bestMetricLabel = 'Tamanho / Peças';
+
+  for (let pos = 0; pos < maxTokens; pos++) {
+    const column = allParsed.map(tList => tList[pos]);
+    if (column.every(Boolean)) {
+      const vals = column.map(t => t.val);
+      const uniqueVals = new Set(vals);
+      if (uniqueVals.size > 1) {
+        const isDim = column.some(t => t.unit);
+        bestType = isDim ? 'dim' : 'num';
+        bestMetricLabel = isDim ? 'Medidas lineares (cm)' : 'Quantidade de peças / membros';
+        bestItems = column.map(t => ({
+          val: t.val,
+          label: t.unit ? `${t.numOnly}${t.unit}` : `${t.numOnly} integrantes/peças`,
+          type: bestType
+        }));
+        break;
+      }
+    }
+  }
+
+  // 3. Fallbacks se posicional não achar
+  if (!bestItems) {
+    const dims = allParsed.map(tList => tList.find(t => t.type === 'dim'));
+    if (dims.every(Boolean) && new Set(dims.map(t => t.val)).size > 1) {
+      bestItems = dims.map(t => ({ val: t.val, label: `${t.numOnly}${t.unit}`, type: 'dim' }));
+      bestMetricLabel = 'Medidas lineares';
+      bestType = 'dim';
+    }
+  }
+
+  if (!bestItems) {
+    const nums = allParsed.map(tList => tList.find(t => t.type === 'num'));
+    if (nums.every(Boolean) && new Set(nums.map(t => t.val)).size > 1) {
+      bestItems = nums.map(t => ({ val: t.val, label: `${t.numOnly} un`, type: 'num' }));
+      bestMetricLabel = 'Quantidade de unidades / membros';
+      bestType = 'num';
+    }
+  }
+
+  if (bestItems) {
+    return {
+      type: bestType,
+      metricLabel: bestMetricLabel,
+      items: bestItems
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Função retrocompatível para extração simples de dimensão
+ */
+export function extractVariationDimension(nameStr) {
+  if (!nameStr) return null;
+  const progression = analyzeVariationProgression([{ name: nameStr }]);
+  return progression?.items?.[0] || null;
+}
+
+/**
+ * Calcula a precificação proporcional das variações com base na variação de referência e medidas / IA.
+ */
+export async function calculateProportionalVariationsPricingWithIA({
+  productTitle = '',
+  baseWholesalePrice = 0,
+  baseRetailPrice = 0,
+  variations = [],
+  baseVariationIndex = 0,
+  material = 'MDF'
+}) {
+  if (!Array.isArray(variations) || variations.length === 0) {
+    return {
+      success: false,
+      error: 'Nenhuma variação informada para calcular.',
+      variations: []
+    };
+  }
+
+  const baseW = Number(baseWholesalePrice) || 0;
+  if (baseW <= 0) {
+    return {
+      success: false,
+      error: 'Informe um valor de Custo de Atacado base maior que zero.',
+      variations
+    };
+  }
+
+  // 1. Analisar progressão entre todas as variações juntas
+  const progression = analyzeVariationProgression(variations, baseVariationIndex);
+
+  let safeBaseIdx = Math.max(0, Math.min(baseVariationIndex, variations.length - 1));
+  
+  // Se o usuário não trocou o índice e o índice 0 não for o menor, sugerir/usar o menor como base
+  if (progression && progression.items && progression.items.length === variations.length) {
+    const minIdx = progression.items.reduce((minI, cur, i, arr) => cur.val < arr[minI].val ? i : minI, 0);
+    if (baseVariationIndex === 0 && minIdx !== 0) {
+      safeBaseIdx = minIdx;
+    }
+  }
+
+  const baseVar = variations[safeBaseIdx] || variations[0];
+  let baseR = Number(baseRetailPrice) || Number(baseVar?.price) || Math.round((baseW / 0.45) * 100) / 100;
+  if (baseR <= 0) baseR = Math.round((baseW * 2.2) * 100) / 100;
+
+  let metricDescription = '';
+  let updatedVariations = [];
+
+  // 2. Cálculo Determinístico Local Robusto
+  if (progression && progression.items && progression.items.length === variations.length) {
+    const baseItem = progression.items[safeBaseIdx];
+    const baseVal = baseItem.val;
+
+    metricDescription = `${progression.metricLabel} (Base: ${baseItem.label} = R$ ${baseW.toFixed(2)})`;
+
+    updatedVariations = variations.map((v, idx) => {
+      const item = progression.items[idx];
+      const factor = item.val / baseVal;
+      const pctDiff = Math.round((factor - 1) * 100);
+
+      const isBase = (idx === safeBaseIdx);
+      const calculatedWholesale = isBase ? baseW : Math.round(baseW * factor * 100) / 100;
+      const existingRetail = Number(v.price) || 0;
+      const calculatedRetail = existingRetail > 0 ? existingRetail : Math.round(baseR * factor * 100) / 100;
+
+      const formulaNote = isBase
+        ? `Base (${item.label})`
+        : `${pctDiff > 0 ? '+' : ''}${pctDiff}% (${item.label})`;
+
+      return {
+        ...v,
+        wholesalePrice: calculatedWholesale,
+        price: calculatedRetail,
+        detectedDim: item.label,
+        pricingFormula: formulaNote
+      };
+    });
+  } else {
+    // Caso não haja números variáveis, checar se a revenda difere
+    const retailPrices = variations.map((v) => Number(v.price) || 0);
+    const hasDifferentRetails = retailPrices.some((p) => p > 0 && p !== retailPrices[0]);
+    const baseVarRetail = Number(baseVar.price) || baseR;
+
+    if (hasDifferentRetails && baseVarRetail > 0) {
+      metricDescription = `Proporção relativa aos preços de revenda (base: R$ ${baseVarRetail.toFixed(2)})`;
+      const ratio = baseW / baseVarRetail;
+
+      updatedVariations = variations.map((v, idx) => {
+        const vRetail = Number(v.price) || baseVarRetail;
+        const factor = vRetail / baseVarRetail;
+        const calculatedWholesale = Math.round(vRetail * ratio * 100) / 100;
+        const pctDiff = Math.round((factor - 1) * 100);
+
+        return {
+          ...v,
+          wholesalePrice: calculatedWholesale,
+          pricingFormula: idx === safeBaseIdx ? 'Base de Revenda' : `${pctDiff > 0 ? '+' : ''}${pctDiff}% revenda`
+        };
+      });
+    } else {
+      metricDescription = 'Valor único de atacado replicado para todas as variações';
+      updatedVariations = variations.map((v, idx) => ({
+        ...v,
+        wholesalePrice: baseW,
+        price: Number(v.price) || baseR,
+        pricingFormula: idx === safeBaseIdx ? 'Variação Base' : 'Atacado Padrão'
+      }));
+    }
+  }
+
+  // 3. Chamada à Lumen IA (com modelo rápido qwen3.8-27b) para refinar e dar o parecer técnico
+  const prompt =
+    `Você é o Lumen IA, especialista em precificação para fábrica e corte a laser / marcenaria.\n` +
+    `PRODUTO: "${productTitle}" (Material: ${material})\n` +
+    `VALOR ATACADO BASE: R$ ${baseW.toFixed(2)} definido para a variação base "${baseVar.name}".\n` +
+    `VALOR REVENDA BASE: R$ ${baseR.toFixed(2)}\n\n` +
+    `VARIAÇÕES DO PRODUTO:\n` +
+    variations.map((v, i) => `${i + 1}. "${v.name}" (Preço Atual: R$ ${v.price || 0})`).join('\n') +
+    `\n\n` +
+    `INSTRUÇÕES DE PRECIFICAÇÃO:\n` +
+    `1. Analise o que varia nos nomes (seja tamanho cm, quantidade de membros da família, peças ou modelo).\n` +
+    `2. Se há números fixos iguais em todos (como altura 18cm), ignore o número fixo e use o número que varia (ex: 2, 3, 4, 6, 7, 8 membros).\n` +
+    `3. Calcule o custo de atacado e sugestão de revenda proporcionalmente para CADA UMA das ${variations.length} variações.\n` +
+    `4. Retorne APENAS um JSON no seguinte formato (sem texto antes ou depois):\n` +
+    `{\n` +
+    `  "detectedMetric": "Explicação da métrica (ex: Escala de 2 a 8 membros da família / medidas em cm)",\n` +
+    `  "analysisSummary": "Explicação do cálculo proporcional aplicado pela fábrica.",\n` +
+    `  "variations": [\n` +
+    variations.map((v, idx) =>
+      `    { "index": ${idx}, "name": "${v.name}", "wholesalePrice": 0, "price": 0, "formula": "..." }`
+    ).join(',\n') +
+    `\n  ]\n` +
+    `}`;
+
+  try {
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout IA')), 6500));
+    const apiPromise = askLumenAssistant({
+      tool: 'inteligencia-lucro',
+      input: prompt
+    });
+
+    const res = await Promise.race([apiPromise, timeoutPromise]);
+
+    if (res && res.success && res.content) {
+      const jsonMatch = res.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed.variations) && parsed.variations.length === variations.length) {
+          const aiMerged = variations.map((v, idx) => {
+            const aiItem = parsed.variations.find((item) => item.index === idx || item.name === v.name) || parsed.variations[idx];
+            const aiW = Number(aiItem?.wholesalePrice);
+            const aiR = Number(aiItem?.price);
+            const fallbackItem = updatedVariations[idx];
+
+            const isBase = (idx === safeBaseIdx);
+            const finalWholesale = isBase 
+              ? baseW 
+              : (!isNaN(aiW) && aiW > 0 ? aiW : fallbackItem.wholesalePrice);
+
+            const existingRetail = Number(v.price) || 0;
+            const finalRetail = existingRetail > 0 ? existingRetail : (!isNaN(aiR) && aiR > 0 ? aiR : fallbackItem.price);
+
+            return {
+              ...v,
+              wholesalePrice: finalWholesale,
+              price: finalRetail,
+              pricingFormula: isBase ? `Base (${fallbackItem.detectedDim || v.name})` : (aiItem?.formula || fallbackItem.pricingFormula)
+            };
+          });
+
+          return {
+            success: true,
+            detectedMetric: parsed.detectedMetric || metricDescription,
+            analysisSummary: cleanSocialText(parsed.analysisSummary || 'Cálculo proporcional aplicado com precisão por IA.'),
+            variations: aiMerged,
+            provider: res.provider
+          };
+        }
+      }
+    }
+  } catch (err) {
+    // Timeout ou erro da API — fallback determinístico é imediato e garantido!
+  }
+
+  const sampleSummary = updatedVariations.slice(0, 4).map((v) => `${v.name}: R$ ${Number(v.wholesalePrice).toFixed(2)}`).join(' | ');
+
+  return {
+    success: true,
+    detectedMetric: metricDescription,
+    analysisSummary: `Escala calculada com base na variação de referência (${baseVar.name}: R$ ${baseW.toFixed(2)}). Preços ajustados proporcionalmente (${sampleSummary}).`,
+    variations: updatedVariations,
+    provider: 'local-deterministic'
+  };
+}
+
 
 
 

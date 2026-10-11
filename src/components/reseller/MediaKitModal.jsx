@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2, FileSpreadsheet, ShoppingBag } from 'lucide-react';
+import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2, FileSpreadsheet, ShoppingBag, Upload } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { ResellerProductImagesModal } from './ResellerProductImagesModal';
 import { generateMarketingContent } from '../../lib/smdAssistIa';
-import { downloadShopeeMassCreationCSV } from '../../lib/shopeeExporter';
+import { downloadShopeeMassCreationCSV, saveCustomShopeeTemplate, getCustomShopeeTemplateMeta, clearCustomShopeeTemplate } from '../../lib/shopeeExporter';
 
 export const MediaKitModal = ({ product, onClose }) => {
   const { showNotification } = useStore();
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'variations' | 'dimensions' | 'fiscal' | 'photos' | 'marketing'
+  const [customTemplateMeta, setCustomTemplateMeta] = useState(() => getCustomShopeeTemplateMeta());
   const [copiedTitle, setCopiedTitle] = useState(false);
   const [copiedDesc, setCopiedDesc] = useState(false);
   const [copiedItem, setCopiedItem] = useState(null);
@@ -200,16 +201,63 @@ export const MediaKitModal = ({ product, onClose }) => {
                 </div>
 
                 {/* Individual Shopee Export Button */}
-                <button
-                  onClick={async () => {
-                    const ok = await downloadShopeeMassCreationCSV([product], 2.2);
-                    if (ok) showNotification(`Planilha Shopee (Excel .xlsx) de "${product.title}" baixada com sucesso!`);
-                  }}
-                  className="w-full btn-orange justify-center text-xs font-bold py-2.5 flex items-center gap-2 shadow-sm"
-                  title="Baixar este produto formatado para o Carregamento em Massa da Shopee"
-                >
-                  <FileSpreadsheet size={15} /> Baixar Planilha Shopee (Excel .XLSX)
-                </button>
+                <div className="space-y-1.5">
+                  <button
+                    onClick={async () => {
+                      const ok = await downloadShopeeMassCreationCSV([product], 2.2);
+                      if (ok) showNotification(`Planilha Shopee (Excel .xlsx) de "${product.title}" baixada com sucesso!`);
+                    }}
+                    className="w-full btn-orange justify-center text-xs font-bold py-2.5 flex items-center gap-2 shadow-sm"
+                    title="Baixar este produto formatado para o Carregamento em Massa da Shopee"
+                  >
+                    <FileSpreadsheet size={15} /> Baixar Planilha Shopee (Excel .XLSX)
+                  </button>
+
+                  {customTemplateMeta ? (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-[11px] flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                        <Check size={13} className="shrink-0" />
+                        <span>Modelo Ativo: <strong>Loja #{customTemplateMeta.shopId}</strong> ({customTemplateMeta.channelsCount} fretes)</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          clearCustomShopeeTemplate();
+                          setCustomTemplateMeta(null);
+                          showNotification('Modelo personalizado removido. Usando modelo padrão.');
+                        }}
+                        className="text-[10px] text-[var(--text-muted)] hover:text-red-500 underline ml-2 cursor-pointer"
+                        title="Remover e usar modelo padrão"
+                      >
+                        Trocar
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="block w-full text-center py-1.5 px-2 rounded-lg border border-dashed border-orange-500/40 hover:border-orange-500 bg-orange-500/5 hover:bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[11px] cursor-pointer transition-colors">
+                      <span className="flex items-center justify-center gap-1.5 font-medium">
+                        <Upload size={12} /> Sincronizar Modelo da Minha Loja Shopee (.xlsx)
+                      </span>
+                      <span className="block text-[9px] text-[var(--text-muted)] mt-0.5">
+                        Clique em "Baixar modelo" na Shopee e anexe aqui para 100% de compatibilidade
+                      </span>
+                      <input
+                        type="file"
+                        accept=".xlsx"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const res = await saveCustomShopeeTemplate(file);
+                          if (res.success) {
+                            setCustomTemplateMeta(getCustomShopeeTemplateMeta());
+                            showNotification(`Modelo da Loja #${res.shopId} sincronizado! Pode baixar a planilha agora.`);
+                          } else {
+                            showNotification(res.message || 'Erro ao carregar modelo.', 'error');
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
 
                 <button
                   onClick={() => showNotification('Download de fotos em HD iniciado em ZIP!')}
