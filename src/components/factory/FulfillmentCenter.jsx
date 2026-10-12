@@ -165,13 +165,13 @@ export const FulfillmentCenter = ({ onClose }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                      Itens do Pedido ({order.items.length})
+                      Itens do Pedido ({(order.items || []).length})
                     </h4>
-                    {order.items.map((item, idx) => (
+                    {(order.items || []).map((item, idx) => (
                       <div key={idx} className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] text-xs space-y-1">
                         <div className="flex justify-between font-bold text-[var(--text-main)]">
                           <span>{item.title}</span>
-                          <span className="font-mono">R$ {item.unitWholesalePrice.toFixed(2)}</span>
+                          <span className="font-mono">R$ {(Number(item.unitWholesalePrice) || 0).toFixed(2)}</span>
                         </div>
                         {item.pricingType === 'custom_m2' && (
                           <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold space-y-0.5 pt-1">
@@ -232,7 +232,7 @@ export const FulfillmentCenter = ({ onClose }) => {
                   <div className="text-xs">
                     <span className="text-[var(--text-muted)]">Fatura Atacado: </span>
                     <strong className="text-base text-[var(--text-main)] font-mono font-extrabold">
-                      R$ {order.wholesaleTotal.toFixed(2)}
+                      R$ {(Number(order.wholesaleTotal) || 0).toFixed(2)}
                     </strong>
                   </div>
 
@@ -272,6 +272,15 @@ export const FulfillmentCenter = ({ onClose }) => {
                         className="btn-primary text-xs font-bold py-2 px-3"
                       >
                         <CheckCircle2 size={15} /> Despachar
+                      </button>
+                    )}
+
+                    {order.status === 'despachado' && (
+                      <button
+                        onClick={() => updateOrderStatus(order.id, 'entregue')}
+                        className="btn-emerald text-xs font-bold py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-sm flex items-center gap-1"
+                      >
+                        <CheckCircle2 size={15} /> Concluir Entrega
                       </button>
                     )}
                   </div>

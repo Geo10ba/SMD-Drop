@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Truck, CheckCircle2, Clock, PackageCheck, MapPin, Search, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
 export const TrackingModal = ({ isOpen, onClose, initialTrackingCode = '' }) => {
   const { orders } = useStore();
   const [searchCode, setSearchCode] = useState(initialTrackingCode || 'ML-BR9821039');
+
+  useEffect(() => {
+    if (initialTrackingCode) {
+      setSearchCode(initialTrackingCode);
+    }
+  }, [initialTrackingCode]);
 
   if (!isOpen) return null;
 

@@ -4,7 +4,7 @@ import { useStore } from '../../context/StoreContext';
 import { Tag, Plus, Edit2, Trash2, Check, X, FolderTree, Sparkles } from 'lucide-react';
 
 export const CategoryManagerModal = ({ isOpen, onClose }) => {
-  const { categories, addCategory, editCategory, deleteCategory } = useStore();
+  const { categories, addCategory, editCategory, deleteCategory, autoTranslateAllCategories } = useStore();
 
   const [newCatName, setNewCatName] = useState('');
   const [editingCat, setEditingCat] = useState(null);
@@ -93,9 +93,19 @@ export const CategoryManagerModal = ({ isOpen, onClose }) => {
 
           {/* Right Column: Categories Grid */}
           <div className="md:col-span-7 space-y-2">
-            <span className="font-bold text-[var(--text-muted)] uppercase tracking-wider text-[11px] block mb-1">
-              Categorias Ativas ({categories.length})
-            </span>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-bold text-[var(--text-muted)] uppercase tracking-wider text-[11px]">
+                Categorias Ativas ({categories.length})
+              </span>
+              <button
+                type="button"
+                onClick={autoTranslateAllCategories}
+                className="text-[10px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-all"
+                title="Traduzir todas as categorias e produtos automaticamente para Português"
+              >
+                <Sparkles size={12} /> ✨ Traduzir Todas p/ Português
+              </button>
+            </div>
             <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto pr-1">
               {categories.map((cat) => (
                 <div

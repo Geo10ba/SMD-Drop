@@ -86,7 +86,7 @@ export const ResellerOrdersModal = ({ isOpen, onClose }) => {
                         {order.items.map((item, idx) => (
                           <div key={idx} className="flex justify-between text-[var(--text-main)] font-medium">
                             <span className="truncate pr-2">• {item.title} {item.pricingType === 'custom_m2' ? `(${item.widthCm}x${item.heightCm}cm)` : ''}</span>
-                            <span className="font-mono font-bold shrink-0">R$ {item.unitWholesalePrice.toFixed(2)}</span>
+                            <span className="font-mono font-bold shrink-0">R$ {(Number(item.unitWholesalePrice) || 0).toFixed(2)}</span>
                           </div>
                         ))}
                       </div>
@@ -95,7 +95,7 @@ export const ResellerOrdersModal = ({ isOpen, onClose }) => {
                     {/* Footer Action */}
                     <div className="flex justify-between items-center pt-2 border-t border-[var(--border-color)] text-xs mt-2">
                       <span className="text-[var(--text-muted)] text-[11px]">
-                        Custo Atacado: <strong className="text-amber-500 font-mono">R$ {order.wholesaleTotal.toFixed(2)}</strong>
+                        Custo Atacado: <strong className="text-amber-500 font-mono">R$ {(Number(order.wholesaleTotal) || 0).toFixed(2)}</strong>
                       </span>
 
                       <button

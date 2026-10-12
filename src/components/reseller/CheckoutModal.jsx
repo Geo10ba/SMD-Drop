@@ -20,7 +20,7 @@ import { calculateMelhorEnvioShipping } from '../../lib/melhorenvio';
 import { createMercadoPagoPixPayment, createMercadoPagoPreference } from '../../lib/mercadopago';
 
 export const CheckoutModal = ({ isOpen, onClose }) => {
-  const { cart, submitOrder, showNotification } = useStore();
+  const { cart, submitOrder, showNotification, currentUser } = useStore();
 
   const [step, setStep] = useState(1); // 1: Dispatch Mode & Details, 2: Payment Method & Finalization
   const [dispatchMode, setDispatchMode] = useState('marketplace_label'); // 'marketplace_label' or 'direct_blind_shipping'
@@ -146,7 +146,8 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
 
   const handleFinalizeOrder = () => {
     submitOrder({
-      resellerName: "Sua Loja / Revendedor Autorizado",
+      resellerName: currentUser?.name || "Sua Loja / Revendedor Autorizado",
+      resellerEmail: currentUser?.email || "revendedor@smddrop.com.br",
       dispatchMode,
       paymentMethod: paymentMethod === 'mercadopago' ? 'Mercado Pago (+5%)' : 'PIX Direto (0%)',
       marketplace: dispatchMode === 'marketplace_label' ? marketplace : null,

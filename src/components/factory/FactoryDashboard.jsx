@@ -50,6 +50,9 @@ import { PricingAuditModal } from './PricingAuditModal';
 import { MagicImportModal } from '../reseller/MagicImportModal';
 import { Wand2, Clock, CheckCircle, XCircle as XCircleIcon } from 'lucide-react';
 import { parseShopeeFiles } from '../../lib/shopeeImporter';
+import { OrderDetailsModal } from './OrderDetailsModal';
+import { getMelhorEnvioConfig, saveMelhorEnvioConfig, testMelhorEnvioToken } from '../../lib/melhorenvio';
+import { getMercadoPagoConfig, saveMercadoPagoConfig } from '../../lib/mercadopago';
 
 export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTab: externalTab, onTabChange }) => {
   const { 
@@ -80,6 +83,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
     updateOrderStatus,
     showNotification,
     resetSystemForProduction,
+    restoreFullBackup,
     syncAllToSupabase,
     getSupabaseCredentials,
     saveSupabaseCredentials,
@@ -99,7 +103,87 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
   const [isPricingAuditOpen, setIsPricingAuditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [evaluatingPendingProduct, setEvaluatingPendingProduct] = useState(null);
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Backup & Restore State
+  const backupInputRef = useRef(null);
+
+  const handleExportFullBackup = () => {
+    const backupData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      products,
+      categories,
+      materials,
+      orders,
+      users,
+      pendingProducts,
+      companySettings
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Backup_SMD_Drop_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showNotification('📦 Backup completo (JSON) exportado com sucesso!', 'success');
+  };
+
+  const handleRestoreBackupFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        if (window.confirm(`Deseja restaurar este backup exportado em ${parsed.exportedAt || 'data anterior'}? Todos os dados atuais serão substituídos pelos do arquivo.`)) {
+          restoreFullBackup(parsed);
+        }
+      } catch (err) {
+        alert('Arquivo JSON inválido ou corrompido: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Melhor Envio & Mercado Pago Integrations State
+  const [meConfig, setMeConfig] = useState(() => getMelhorEnvioConfig());
+  const [meTesting, setMeTesting] = useState(false);
+  const [meTestResult, setMeTestResult] = useState(null);
+  const [mpConfig, setMpConfig] = useState(() => getMercadoPagoConfig());
+
+  const handleSaveMeConfig = () => {
+    saveMelhorEnvioConfig(meConfig);
+    showNotification('Configurações do Mercado Envios / Melhor Envio salvas com sucesso!');
+  };
+
+  const handleTestMeToken = async () => {
+    setMeTesting(true);
+    setMeTestResult(null);
+    try {
+      const res = await testMelhorEnvioToken(meConfig.token, meConfig.sandbox);
+      if (res.success) {
+        setMeTestResult({ success: true, message: `✅ Conectado com sucesso à API Melhor Envio!` });
+      } else {
+        setMeTestResult({ success: false, message: `❌ Falha ao validar Token: ${res.error}` });
+      }
+    } catch (err) {
+      setMeTestResult({ success: false, message: `❌ Erro de conexão: ${err.message}` });
+    } finally {
+      setMeTesting(false);
+    }
+  };
+
+  const handleSaveMpConfig = () => {
+    saveMercadoPagoConfig(mpConfig);
+    showNotification('Credenciais do Mercado Pago salvas com sucesso!');
+  };
 
   // Draft Management State
   const [draftSearchTerm, setDraftSearchTerm] = useState('');
@@ -316,7 +400,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
   };
 
   // Metrics
-  const totalWholesaleRevenue = orders.reduce((acc, order) => acc + order.wholesaleTotal, 0);
+  const totalWholesaleRevenue = orders.reduce((acc, order) => acc + (Number(order.wholesaleTotal) || 0), 0);
   const pendingOrders = orders.filter((o) => o.status === 'aguardando_impressao');
   const inProductionOrders = orders.filter((o) => o.status === 'em_producao');
   const dispatchedOrders = orders.filter((o) => o.status === 'despachado' || o.status === 'entregue');
@@ -451,6 +535,29 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
             >
               <Wand2 size={16} /> ⚡ Botão Mágico
             </button>
+
+            <button
+              onClick={handleExportFullBackup}
+              className="bg-slate-800/90 hover:bg-slate-700/90 text-amber-300 border border-amber-500/30 py-2.5 px-3.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+              title="Baixar backup completo de produtos, pedidos e configurações em arquivo JSON"
+            >
+              <Download size={15} /> 📦 Baixar Backup (JSON)
+            </button>
+
+            <button
+              onClick={() => backupInputRef.current?.click()}
+              className="bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border border-slate-700 py-2.5 px-3.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+              title="Restaurar banco de dados a partir de um arquivo JSON"
+            >
+              <Upload size={15} /> 📥 Restaurar Backup (JSON)
+            </button>
+            <input
+              type="file"
+              ref={backupInputRef}
+              onChange={handleRestoreBackupFile}
+              accept=".json"
+              className="hidden"
+            />
 
             <button
               onClick={async () => {
@@ -1102,55 +1209,73 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-color)] text-[var(--text-main)]">
-                {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-[var(--bg-surface-hover)] transition-colors">
-                    <td className="p-3 font-mono font-extrabold text-amber-600 dark:text-amber-400">{o.id}</td>
-                    <td className="p-3 font-semibold">{o.resellerName}</td>
-                    <td className="p-3">
-                      {o.dispatchMode === 'marketplace_label' ? (
-                        <span className="badge-ml text-[10px] whitespace-nowrap">{o.marketplace}</span>
-                      ) : (
-                        <span className="badge-gold text-[10px] whitespace-nowrap">Envio Direto Cego</span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      {o.dispatchMode === 'marketplace_label' ? (
-                        <button
-                          onClick={() => handleDownloadLabelPdf(o)}
-                          className="btn-gold text-[11px] font-bold py-1.5 px-3 whitespace-nowrap shadow-sm flex items-center gap-1.5"
-                        >
-                          <Download size={13} /> Baixar Etiqueta (PDF)
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-[var(--text-muted)] font-medium">Frete Fábrica</span>
-                      )}
-                    </td>
-                    <td className="p-3 font-bold font-mono">R$ {o.wholesaleTotal.toFixed(2)}</td>
-                    <td className="p-3">
-                      <select
-                        value={o.status}
-                        onChange={(e) => updateOrderStatus(o.id, e.target.value)}
-                        className="input-field py-1 text-[11px] font-bold"
-                      >
-                        <option value="aguardando_impressao">Aguardando Impressão</option>
-                        <option value="em_producao">Em Produção / Corte</option>
-                        <option value="despachado">Despachado</option>
-                        <option value="entregue">Entregue</option>
-                      </select>
-                    </td>
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Excluir pedido ${o.id}?`)) deleteOrder(o.id);
-                        }}
-                        className="p-1.5 text-red-500 hover:bg-red-500/10 rounded"
-                        title="Excluir Pedido"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-[var(--text-muted)] font-medium">
+                      Nenhum pedido registrado no momento.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  orders.map((o) => {
+                    const wholesaleVal = Number(o.wholesaleTotal ?? o.total ?? 0) || 0;
+                    return (
+                      <tr key={o.id} className="hover:bg-[var(--bg-surface-hover)] transition-colors">
+                        <td className="p-3 font-mono font-extrabold text-amber-600 dark:text-amber-400">{o.id}</td>
+                        <td className="p-3 font-semibold">{o.resellerName || 'Revendedor'}</td>
+                        <td className="p-3">
+                          {o.dispatchMode === 'marketplace_label' ? (
+                            <span className="badge-ml text-[10px] whitespace-nowrap">{o.marketplace || 'Marketplace'}</span>
+                          ) : (
+                            <span className="badge-gold text-[10px] whitespace-nowrap">Envio Direto Cego</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {o.dispatchMode === 'marketplace_label' ? (
+                            <button
+                              onClick={() => handleDownloadLabelPdf(o)}
+                              className="btn-gold text-[11px] font-bold py-1.5 px-3 whitespace-nowrap shadow-sm flex items-center gap-1.5"
+                            >
+                              <Download size={13} /> Baixar Etiqueta (PDF)
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-[var(--text-muted)] font-medium">Frete Fábrica</span>
+                          )}
+                        </td>
+                        <td className="p-3 font-bold font-mono">R$ {wholesaleVal.toFixed(2)}</td>
+                        <td className="p-3">
+                          <select
+                            value={o.status || 'aguardando_impressao'}
+                            onChange={(e) => updateOrderStatus(o.id, e.target.value)}
+                            className="input-field py-1 text-[11px] font-bold"
+                          >
+                            <option value="aguardando_impressao">Aguardando Impressão</option>
+                            <option value="em_producao">Em Produção / Corte</option>
+                            <option value="despachado">Despachado</option>
+                            <option value="entregue">Entregue</option>
+                          </select>
+                        </td>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => setSelectedOrderDetails(o)}
+                            className="p-1.5 text-amber-500 hover:bg-amber-500/10 rounded mr-1 inline-flex items-center gap-1 font-bold text-[11px]"
+                            title="Ver Detalhes Completos do Pedido"
+                          >
+                            <Eye size={14} /> Detalhes
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Excluir pedido ${o.id}?`)) deleteOrder(o.id);
+                            }}
+                            className="p-1.5 text-red-500 hover:bg-red-500/10 rounded inline-flex items-center"
+                            title="Excluir Pedido"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -1867,6 +1992,179 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
             </div>
           </div>
 
+          {/* Box 7: Logistics & Freight API (Mercado Envios / Melhor Envio) */}
+          <div className="space-y-4 pt-4 border-t border-[var(--border-color)]">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-amber-500 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                <Truck size={16} /> 7. Logística & Cálculo de Fretes ao Vivo (Mercado Envios / Melhor Envio)
+              </h4>
+              <span className="badge-gold text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                <Truck size={12} /> Cotação PAC, SEDEX & Jadlog
+              </span>
+            </div>
+
+            <div className="bg-[var(--bg-surface-hover)] p-4 rounded-xl border border-[var(--border-color)] space-y-3">
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                Integração direta com a API do Melhor Envio para cotar fretes automaticamente no checkout para envio direto (correios e transportadoras).
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase mb-1">
+                    Token de Acesso (Bearer Token)
+                  </label>
+                  <input
+                    type="password"
+                    value={meConfig.token || ''}
+                    onChange={(e) => setMeConfig({ ...meConfig, token: e.target.value })}
+                    placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs..."
+                    className="input-field text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase mb-1">
+                    CEP de Origem da Fábrica
+                  </label>
+                  <input
+                    type="text"
+                    value={meConfig.originPostalCode || ''}
+                    onChange={(e) => setMeConfig({ ...meConfig, originPostalCode: e.target.value })}
+                    placeholder="01001-000"
+                    className="input-field text-xs font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--text-main)]">
+                  <input
+                    type="checkbox"
+                    checked={meConfig.sandbox || false}
+                    onChange={(e) => setMeConfig({ ...meConfig, sandbox: e.target.checked })}
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                  Modo Sandbox (Ambiente de Testes)
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--text-main)]">
+                  <input
+                    type="checkbox"
+                    checked={meConfig.enabled ?? true}
+                    onChange={(e) => setMeConfig({ ...meConfig, enabled: e.target.checked })}
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                  Habilitar Cotação no Checkout
+                </label>
+              </div>
+
+              {meTestResult && (
+                <div className={`p-3 rounded-lg text-xs font-semibold border ${
+                  meTestResult.success ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'
+                }`}>
+                  {meTestResult.message}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveMeConfig}
+                  className="btn-gold text-xs py-2 px-4 font-bold flex items-center gap-1.5"
+                >
+                  <Save size={14} /> Salvar Configuração de Frete
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTestMeToken}
+                  disabled={meTesting}
+                  className="btn-secondary text-xs py-2 px-4 font-bold flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <CheckCircle size={14} className="text-amber-500" /> {meTesting ? 'Testando Conexão...' : 'Testar Conexão com API Melhor Envio'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Box 8: Payment Gateway (Mercado Pago PIX & Cartão) */}
+          <div className="space-y-4 pt-4 border-t border-[var(--border-color)]">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-amber-500 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                <DollarSign size={16} /> 8. Gateway de Pagamento (Mercado Pago PIX & Cartão de Crédito)
+              </h4>
+              <span className="badge-emerald text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                <CheckCircle size={12} /> Checkout Pro Ativo
+              </span>
+            </div>
+
+            <div className="bg-[var(--bg-surface-hover)] p-4 rounded-xl border border-[var(--border-color)] space-y-3">
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                Configure as credenciais da sua conta Mercado Pago para receber pagamentos de atacado via PIX ou Cartão (com taxa de repasse de 5% configurada).
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase mb-1">
+                    Access Token (Produção ou Teste)
+                  </label>
+                  <input
+                    type="password"
+                    value={mpConfig.accessToken || ''}
+                    onChange={(e) => setMpConfig({ ...mpConfig, accessToken: e.target.value })}
+                    placeholder="APP_USR-80052692..."
+                    className="input-field text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] uppercase mb-1">
+                    Public Key
+                  </label>
+                  <input
+                    type="text"
+                    value={mpConfig.publicKey || ''}
+                    onChange={(e) => setMpConfig({ ...mpConfig, publicKey: e.target.value })}
+                    placeholder="APP_USR-3f850b72..."
+                    className="input-field text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--text-main)]">
+                  <input
+                    type="checkbox"
+                    checked={mpConfig.isSandbox || false}
+                    onChange={(e) => setMpConfig({ ...mpConfig, isSandbox: e.target.checked })}
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                  Modo Sandbox (Mercado Pago)
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--text-main)]">
+                  <input
+                    type="checkbox"
+                    checked={mpConfig.enabled ?? true}
+                    onChange={(e) => setMpConfig({ ...mpConfig, enabled: e.target.checked })}
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                  Exibir Mercado Pago no Checkout (+5%)
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveMpConfig}
+                  className="btn-gold text-xs py-2 px-4 font-bold flex items-center gap-1.5"
+                >
+                  <Save size={14} /> Salvar Credenciais Mercado Pago
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="pt-4 border-t border-[var(--border-color)] flex justify-end">
             <button type="submit" className="btn-gold py-3 px-8 font-bold text-xs shadow-lg flex items-center gap-2">
               <Save size={16} /> Salvar Todas as Configurações da Empresa
@@ -2036,6 +2334,13 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
         isOpen={isPricingAuditOpen}
         onClose={() => setIsPricingAuditOpen(false)}
       />
+      {/* Order Details & Tracking Management Modal */}
+      {selectedOrderDetails && (
+        <OrderDetailsModal
+          order={selectedOrderDetails}
+          onClose={() => setSelectedOrderDetails(null)}
+        />
+      )}
     </div>
   );
 };

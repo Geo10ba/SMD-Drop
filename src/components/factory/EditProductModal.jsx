@@ -11,6 +11,7 @@ import {
   calculateProportionalVariationsPricingWithIA,
   analyzeVariationProgression
 } from '../../lib/smdAssistIa';
+import { normalizeCategoryName } from '../../lib/categoryTranslations';
 
 export const EditProductModal = ({ product, onClose }) => {
   const { updateProduct, deleteProduct, categories, addCategory, showNotification, companySettings, materials } = useStore();
@@ -92,7 +93,7 @@ export const EditProductModal = ({ product, onClose }) => {
   useEffect(() => {
     if (product) {
       setTitle(product.title || '');
-      setCategory(product.category || categories[0] || 'Geral');
+      setCategory(normalizeCategoryName(product.category) || categories[0] || 'Geral');
       setStatus(product.status || 'approved');
       setParentSku(product.parentSku || product.sku || '');
       setShopeeId(product.shopeeId || '');
@@ -485,7 +486,7 @@ export const EditProductModal = ({ product, onClose }) => {
 
     updateProduct(product.id, {
       title,
-      category,
+      category: normalizeCategoryName(category),
       parentSku,
       shopeeId,
       pricingType,
@@ -668,17 +669,17 @@ export const EditProductModal = ({ product, onClose }) => {
                             </button>
                           </div>
                           <select
-                            value={category}
+                            value={normalizeCategoryName(category)}
                             onChange={(e) => {
                               if (e.target.value === '__NEW__') {
                                 setIsCreatingCategory(true);
                               } else {
-                                setCategory(e.target.value);
+                                setCategory(normalizeCategoryName(e.target.value));
                               }
                             }}
                             className="input-field font-medium"
                           >
-                            {categories.map((c) => (
+                            {Array.from(new Set([...categories.map(normalizeCategoryName), normalizeCategoryName(category)].filter(Boolean))).map((c) => (
                               <option key={c} value={c}>{c}</option>
                             ))}
                             <option value="__NEW__">➕ Criar Nova Categoria...</option>

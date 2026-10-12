@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { normalizeCategoryName } from '../../lib/categoryTranslations';
 import heroMoneyImg from '../../assets/hero_male_entrepreneur_money.png';
 import { CustomSizeCalculator } from './CustomSizeCalculator';
 import { MediaKitModal } from './MediaKitModal';
@@ -30,8 +31,154 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
-  UserPlus
+  UserPlus,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
+
+/**
+ * Componente de Mídia do Card de Produto com Reprodução Automática de Vídeo ao passar o Mouse
+ */
+const ProductCardMedia = ({ product, itemsPerRow, isM2, hasVars, productVariations, onOpenMediaKit }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+  const videoRef = useRef(null);
+
+  const videoUrl = product.video || product.mediaKit?.video || product.videoUrl;
+  const hasVideo = Boolean(videoUrl && typeof videoUrl === 'string' && videoUrl.trim() && !videoError);
+  const isYoutube = hasVideo && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'));
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (hasVideo && !isYoutube && videoRef.current) {
+      videoRef.current.currentTime = 0;
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Autoplay silenciado pode exigir interação do usuário em casos raros
+        });
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (hasVideo && !isYoutube && videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  };
+
+  const toggleSound = (e) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+    }
+  };
+
+  return (
+    <div
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={onOpenMediaKit}
+      className={`relative overflow-hidden bg-slate-900 group cursor-pointer select-none ${
+        itemsPerRow === 6 ? 'h-36' : itemsPerRow === 4 ? 'h-40' : 'h-52'
+      }`}
+      title={hasVideo ? "Passe o mouse para ver o vídeo ou clique para abrir o Kit de Mídia" : "Clique para abrir o Kit de Mídia"}
+    >
+      {/* Imagem Base com Transição Suave */}
+      <img
+        src={product.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80"}
+        alt={product.title}
+        loading="lazy"
+        className={`w-full h-full object-cover transition-all duration-500 ${
+          isHovered && hasVideo ? 'opacity-0 scale-105' : 'opacity-100 group-hover:scale-105'
+        }`}
+      />
+
+      {/* Player de Vídeo que roda no lugar da foto ao passar o mouse */}
+      {hasVideo && (
+        isYoutube ? (
+          isHovered ? (
+            <iframe
+              src={videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/') + '?autoplay=1&mute=1&controls=0&loop=1'}
+              title={product.title}
+              className="absolute inset-0 w-full h-full border-0 pointer-events-none z-10"
+              allow="autoplay; encrypted-media"
+            />
+          ) : null
+        ) : (
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            muted={isMuted}
+            loop
+            playsInline
+            preload="metadata"
+            onError={() => setVideoError(true)}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${
+              isHovered ? 'opacity-100 z-10' : 'opacity-0 -z-10'
+            }`}
+          >
+            <source src={videoUrl} type="video/mp4" />
+          </video>
+        )
+      )}
+
+      {/* Sombra / Gradiente sutil quando o vídeo está em reprodução */}
+      {isHovered && hasVideo && (
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 z-10 pointer-events-none transition-opacity duration-300" />
+      )}
+
+      {/* Badge de Precificação (Superior Esquerdo) */}
+      <div className="absolute top-2 left-2 z-20 pointer-events-none">
+        {isM2 ? (
+          <span className="badge-gold font-bold text-[10px] shadow-md">
+            Sob Medida (m²)
+          </span>
+        ) : hasVars ? (
+          <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md uppercase tracking-wider">
+            ✨ {productVariations.length} Variações
+          </span>
+        ) : (
+          <span className="badge-emerald font-bold text-[10px] shadow-md">
+            Preço Fixo
+          </span>
+        )}
+      </div>
+
+      {/* Badge de Vídeo & Indicador de Reprodução em Tempo Real (Superior Direito) */}
+      {hasVideo && (
+        <div className="absolute top-2 right-2 z-20 pointer-events-none transition-all">
+          {isHovered ? (
+            <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1.5 backdrop-blur-md border border-purple-400/40 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              ▶ Reproduzindo Vídeo
+            </span>
+          ) : (
+            <span className="bg-purple-600/90 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-full backdrop-blur-sm shadow flex items-center gap-1">
+              <Video size={10} /> Vídeo
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Controle Opcional de Áudio (Inferior Direito) */}
+      {isHovered && hasVideo && !isYoutube && (
+        <button
+          type="button"
+          onClick={toggleSound}
+          className="absolute bottom-2 right-2 z-20 p-1.5 rounded-full bg-slate-950/80 hover:bg-slate-900 text-white border border-white/20 shadow-md backdrop-blur-sm transition-transform hover:scale-110 cursor-pointer"
+          title={isMuted ? "Ativar som" : "Desativar som"}
+        >
+          {isMuted ? <VolumeX size={12} className="text-slate-300" /> : <Volume2 size={12} className="text-emerald-400" />}
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   const { 
@@ -48,13 +195,10 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   } = useStore();
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com';
-  const displayProducts = products.filter(p => p.status === 'approved' || p.status === 'ativo' || (!p.status && p.inStock)).map(p => {
-    let cleanCat = p.category;
-    if (!cleanCat || cleanCat === 'Others' || cleanCat === 'Outros') cleanCat = 'Quadros & Decoração';
-    if (cleanCat === 'Plates') cleanCat = 'Placas & Sinalização';
-    if (cleanCat === 'Fengshui & Religious Supplies') cleanCat = 'Quadros & Decoração';
-    return { ...p, category: cleanCat };
-  });
+  const displayProducts = products.filter(p => p.status === 'approved' || p.status === 'ativo' || (!p.status && p.inStock)).map(p => ({
+    ...p,
+    category: normalizeCategoryName(p.category)
+  }));
 
   const availableCategories = ['Todos', ...Array.from(new Set(displayProducts.map((p) => p.category).filter(Boolean)))];
 
@@ -425,42 +569,15 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                     key={product.id}
                     className="glass-panel group overflow-hidden flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                   >
-                    {/* Card Image Banner (ALWAYS display image, Video badge if exists) */}
-                    <div className={`relative overflow-hidden bg-slate-900 group ${
-                      itemsPerRow === 6 ? 'h-36' : itemsPerRow === 4 ? 'h-40' : 'h-52'
-                    }`}>
-                      <img
-                        src={product.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80"}
-                        alt={product.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-
-                      {/* Pricing Badge */}
-                      <div className="absolute top-2 left-2 pointer-events-none">
-                        {isM2 ? (
-                          <span className="badge-gold font-bold text-[10px] shadow-md">
-                            Sob Medida (m²)
-                          </span>
-                        ) : hasVars ? (
-                          <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md uppercase tracking-wider">
-                            ✨ {productVariations.length} Variações
-                          </span>
-                        ) : (
-                          <span className="badge-emerald font-bold text-[10px] shadow-md">
-                            Preço Fixo
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Video Available Badge */}
-                      {product.video && (
-                        <div className="absolute top-2 right-2 pointer-events-none">
-                          <span className="bg-purple-600/90 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-full backdrop-blur-sm shadow flex items-center gap-1">
-                            <Video size={10} /> Vídeo
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    {/* Card Image/Video Banner com Reprodução ao Passar o Mouse */}
+                    <ProductCardMedia
+                      product={product}
+                      itemsPerRow={itemsPerRow}
+                      isM2={isM2}
+                      hasVars={hasVars}
+                      productVariations={productVariations}
+                      onOpenMediaKit={() => setMediaKitProduct(product)}
+                    />
 
                     {/* Content Body (Ultra-Clean & Compact Layout) */}
                     <div className="flex flex-col justify-between flex-1 p-3.5 space-y-2.5">

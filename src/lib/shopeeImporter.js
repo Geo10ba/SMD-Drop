@@ -1,7 +1,8 @@
 import * as XLSX from 'xlsx';
+import { normalizeCategoryName } from './categoryTranslations';
 
 /**
- * Clean Shopee category strings
+ * Clean Shopee category strings and translate automatically to Portuguese
  */
 export function cleanCategory(catStr) {
   if (!catStr || typeof catStr !== 'string') return 'Quadros & Decoração';
@@ -10,13 +11,7 @@ export function cleanCategory(catStr) {
     const parts = clean.split('/').map(p => p.trim());
     clean = parts[parts.length - 1] || parts[0];
   }
-  const lower = clean.toLowerCase();
-  if (lower === 'others' || lower === 'outros') return 'Quadros & Decoração';
-  if (lower.includes('plate') || lower.includes('placa')) return 'Placas & Sinalização';
-  if (lower.includes('fengshui') || lower.includes('religious')) return 'Quadros & Decoração';
-  if (lower.includes('photo frames') || lower.includes('wall decoration')) return 'Quadros & Decoração';
-  if (lower.includes('home') || lower.includes('living')) return 'Casa & Decoração';
-  return clean || 'Quadros & Decoração';
+  return normalizeCategoryName(clean);
 }
 
 /**

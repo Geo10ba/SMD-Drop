@@ -28,14 +28,24 @@ export const getSupabaseCredentials = () => {
   return { url, key };
 };
 
-// Initialize Supabase Client dynamically
+// Cached Singleton Supabase Client to avoid multiple GoTrueClient instances
+let cachedClient = null;
+let cachedUrl = null;
+let cachedKey = null;
+
 export const getSupabaseClient = () => {
   const { url, key } = getSupabaseCredentials();
   if (!url || !key) {
     return null;
   }
+  if (cachedClient && cachedUrl === url && cachedKey === key) {
+    return cachedClient;
+  }
   try {
-    return createClient(url, key);
+    cachedClient = createClient(url, key);
+    cachedUrl = url;
+    cachedKey = key;
+    return cachedClient;
   } catch (e) {
     console.warn('[Supabase Init Error]', e);
     return null;
@@ -68,6 +78,9 @@ export const testSupabaseConnection = async (url, key) => {
  * Save custom credentials to localStorage
  */
 export const saveSupabaseCredentials = (url, key) => {
+  cachedClient = null;
+  cachedUrl = null;
+  cachedKey = null;
   if (typeof window !== 'undefined') {
     if (url) localStorage.setItem('smd_supabase_url', url);
     else localStorage.removeItem('smd_supabase_url');

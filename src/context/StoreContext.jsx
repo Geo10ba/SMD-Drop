@@ -7,6 +7,7 @@ import {
   testSupabaseConnection, 
   syncToSupabase 
 } from '../lib/supabase';
+import { normalizeCategoryName, normalizeCategoryList } from '../lib/categoryTranslations';
 
 const StoreContext = createContext();
 
@@ -190,7 +191,7 @@ export function deserializeProductFromSupabase(p) {
   return {
     id: String(p.id),
     title: p.title,
-    category: p.category_name || p.category || 'Geral',
+    category: normalizeCategoryName(p.category_name || p.category || 'Geral'),
     pricingType: p.pricing_type || p.pricingType || 'fixed',
     wholesalePrice: Number(p.wholesale_price ?? p.wholesalePrice ?? 0),
     suggestedRetailPrice: Number(p.suggested_retail_price ?? p.suggestedRetailPrice ?? 0),
@@ -426,14 +427,14 @@ export const StoreProvider = ({ children }) => {
     });
   };
 
-  // Dynamic Categories State (Zerado para Produção)
+  // Dynamic Categories State (Normalizado para Português)
   const [categories, setCategoriesState] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('smd_categories');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed)) return normalizeCategoryList(parsed);
         } catch (e) {}
       }
     }
@@ -442,7 +443,8 @@ export const StoreProvider = ({ children }) => {
 
   const setCategories = (cats) => {
     setCategoriesState((prev) => {
-      const next = typeof cats === 'function' ? cats(prev) : cats;
+      const raw = typeof cats === 'function' ? cats(prev) : cats;
+      const next = normalizeCategoryList(raw);
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_categories', JSON.stringify(next));
         broadcastSync('categories', next);
@@ -633,14 +635,19 @@ export const StoreProvider = ({ children }) => {
     }
   };
 
-  // Products State (Zerado para Produção Real)
+  // Products State (Normalizado automaticamente para Português)
   const [products, setProductsState] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('smd_products');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed)) {
+            return parsed.map((p) => ({
+              ...p,
+              category: normalizeCategoryName(p.category)
+            }));
+          }
         } catch (e) {}
       }
     }
@@ -649,7 +656,10 @@ export const StoreProvider = ({ children }) => {
 
   const setProducts = (prods) => {
     setProductsState((prev) => {
-      const next = typeof prods === 'function' ? prods(prev) : prods;
+      const raw = typeof prods === 'function' ? prods(prev) : prods;
+      const next = Array.isArray(raw)
+        ? raw.map((p) => (p.category ? { ...p, category: normalizeCategoryName(p.category) } : p))
+        : raw;
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_products', JSON.stringify(next));
         broadcastSync('products', next);
@@ -686,14 +696,27 @@ export const StoreProvider = ({ children }) => {
   // Reseller Cart
   const [cart, setCart] = useState([]);
 
-  // Orders State (Zerado para Produção)
+  // Orders State (Normalizado e seguro contra valores nulos)
   const [orders, setOrdersState] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('smd_orders');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed)) {
+            return parsed.map((o) => ({
+              ...o,
+              wholesaleTotal: Number(o.wholesaleTotal ?? o.wholesale_total ?? o.total ?? 0) || 0,
+              total: Number(o.total ?? o.wholesaleTotal ?? o.wholesale_total ?? 0) || 0,
+              resellerName: o.resellerName || o.reseller_name || 'Revendedor',
+              dispatchMode: o.dispatchMode || o.dispatch_mode || 'marketplace_label',
+              marketplace: o.marketplace || 'Mercado Livre',
+              items: Array.isArray(o.items) ? o.items.map((it) => ({
+                ...it,
+                unitWholesalePrice: Number(it.unitWholesalePrice ?? it.price ?? 0) || 0
+              })) : []
+            }));
+          }
         } catch (e) {}
       }
     }
@@ -702,7 +725,21 @@ export const StoreProvider = ({ children }) => {
 
   const setOrders = (ords) => {
     setOrdersState((prev) => {
-      const next = typeof ords === 'function' ? ords(prev) : ords;
+      const raw = typeof ords === 'function' ? ords(prev) : ords;
+      const next = Array.isArray(raw)
+        ? raw.map((o) => ({
+            ...o,
+            wholesaleTotal: Number(o.wholesaleTotal ?? o.wholesale_total ?? o.total ?? 0) || 0,
+            total: Number(o.total ?? o.wholesaleTotal ?? o.wholesale_total ?? 0) || 0,
+            resellerName: o.resellerName || o.reseller_name || 'Revendedor',
+            dispatchMode: o.dispatchMode || o.dispatch_mode || 'marketplace_label',
+            marketplace: o.marketplace || 'Mercado Livre',
+            items: Array.isArray(o.items) ? o.items.map((it) => ({
+              ...it,
+              unitWholesalePrice: Number(it.unitWholesalePrice ?? it.price ?? 0) || 0
+            })) : []
+          }))
+        : raw;
       if (typeof window !== 'undefined') {
         localStorage.setItem('smd_orders', JSON.stringify(next));
         broadcastSync('orders', next);
@@ -741,6 +778,36 @@ export const StoreProvider = ({ children }) => {
     }
 
     showNotification('🧹 Sistema e Banco de Dados Zerados com Sucesso! Prontíssimo para Produção.', 'success');
+  };
+
+  const restoreFullBackup = (backupData) => {
+    if (!backupData || typeof backupData !== 'object') {
+      showNotification('Arquivo de backup inválido.', 'error');
+      return false;
+    }
+    if (Array.isArray(backupData.products)) {
+      setProducts(backupData.products);
+    }
+    if (Array.isArray(backupData.categories)) {
+      setCategories(backupData.categories);
+    }
+    if (Array.isArray(backupData.materials)) {
+      setMaterials(backupData.materials);
+    }
+    if (Array.isArray(backupData.orders)) {
+      setOrders(backupData.orders);
+    }
+    if (Array.isArray(backupData.users)) {
+      setUsers(backupData.users);
+    }
+    if (Array.isArray(backupData.pendingProducts)) {
+      setPendingProducts(backupData.pendingProducts);
+    }
+    if (backupData.companySettings) {
+      updateCompanySettings(backupData.companySettings);
+    }
+    showNotification('🎉 Backup completo restaurado com sucesso no sistema!', 'success');
+    return true;
   };
 
   // Notifications Toast
@@ -1053,9 +1120,9 @@ export const StoreProvider = ({ children }) => {
         // 1. Fetch Categories from Supabase
         const { data: dbCategories, error: catErr } = await client.from('categories').select('*');
         if (!catErr && dbCategories && dbCategories.length > 0) {
-          const catNames = dbCategories.map((c) => c.name);
+          const catNames = dbCategories.map((c) => normalizeCategoryName(c.name));
           setCategoriesState((prev) => {
-            const merged = Array.from(new Set([...prev, ...catNames]));
+            const merged = normalizeCategoryList([...prev, ...catNames]);
             if (typeof window !== 'undefined') {
               localStorage.setItem('smd_categories', JSON.stringify(merged));
             }
@@ -1108,12 +1175,18 @@ export const StoreProvider = ({ children }) => {
             id: o.id,
             resellerName: o.reseller_name || o.resellerName || 'Revendedor',
             resellerEmail: o.reseller_email || o.resellerEmail || '',
-            wholesaleTotal: Number(o.wholesale_total ?? o.wholesaleTotal ?? 0),
-            total: Number(o.total ?? 0),
+            wholesaleTotal: Number(o.wholesale_total ?? o.wholesaleTotal ?? 0) || 0,
+            total: Number(o.total ?? o.wholesale_total ?? o.wholesaleTotal ?? 0) || 0,
             status: o.status || 'aguardando_impressao',
+            dispatchMode: o.dispatch_mode || o.dispatchMode || 'marketplace_label',
+            marketplace: o.marketplace || 'Mercado Livre',
             trackingCode: o.tracking_code || o.trackingCode || null,
+            labelPdf: o.label_pdf || o.labelPdf || null,
             createdAt: o.created_at || o.createdAt,
-            items: o.items || []
+            items: Array.isArray(o.items) ? o.items.map((it) => ({
+              ...it,
+              unitWholesalePrice: Number(it.unitWholesalePrice ?? it.price ?? 0) || 0
+            })) : []
           }));
           setOrdersState(normalizedOrders);
           if (typeof window !== 'undefined') {
@@ -1252,6 +1325,54 @@ export const StoreProvider = ({ children }) => {
     }
   }, []);
 
+  // Migração e Tradução Automática no carregamento (Sem ação manual do usuário)
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const savedCats = localStorage.getItem('smd_categories');
+      const savedProds = localStorage.getItem('smd_products');
+      let changed = false;
+
+      if (savedCats) {
+        const parsed = JSON.parse(savedCats);
+        if (Array.isArray(parsed)) {
+          const translated = normalizeCategoryList(parsed);
+          if (JSON.stringify(parsed) !== JSON.stringify(translated)) {
+            localStorage.setItem('smd_categories', JSON.stringify(translated));
+            setCategoriesState(translated);
+            changed = true;
+          }
+        }
+      }
+
+      if (savedProds) {
+        const parsed = JSON.parse(savedProds);
+        if (Array.isArray(parsed)) {
+          let prodsChanged = false;
+          const translatedProds = parsed.map((p) => {
+            const nextCat = normalizeCategoryName(p.category);
+            if (nextCat !== p.category) {
+              prodsChanged = true;
+              return { ...p, category: nextCat };
+            }
+            return p;
+          });
+          if (prodsChanged) {
+            localStorage.setItem('smd_products', JSON.stringify(translatedProds));
+            setProductsState(translatedProds);
+            changed = true;
+          }
+        }
+      }
+
+      if (changed) {
+        console.log('[SMD Drop] ✨ Categorias traduzidas automaticamente para Português no carregamento.');
+      }
+    } catch (err) {
+      console.warn('[Auto-translate startup error]:', err);
+    }
+  }, []);
+
   // Sync all current state to Supabase
   const syncAllToSupabase = async () => {
     const client = getSupabaseClient();
@@ -1319,7 +1440,7 @@ export const StoreProvider = ({ children }) => {
   // Category Operations
   const addCategory = async (categoryName) => {
     if (!categoryName) return;
-    const cleanName = categoryName.trim();
+    const cleanName = normalizeCategoryName(categoryName.trim());
     setCategories((prev) => {
       if (prev.includes(cleanName)) return prev;
       return [...prev, cleanName];
@@ -1336,7 +1457,7 @@ export const StoreProvider = ({ children }) => {
 
   const editCategory = (oldName, newName) => {
     if (!newName) return;
-    const cleanName = newName.trim();
+    const cleanName = normalizeCategoryName(newName.trim());
     setCategories((prev) => prev.map((c) => (c === oldName ? cleanName : c)));
     setProducts((prev) =>
       prev.map((p) => (p.category === oldName ? { ...p, category: cleanName } : p))
@@ -1347,6 +1468,36 @@ export const StoreProvider = ({ children }) => {
   const deleteCategory = (categoryName) => {
     setCategories((prev) => prev.filter((c) => c !== categoryName));
     showNotification(`Categoria "${categoryName}" removida.`);
+  };
+
+  const autoTranslateAllCategories = () => {
+    // 1. Translate categories list
+    setCategoriesState((prev) => {
+      const next = normalizeCategoryList(prev);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_categories', JSON.stringify(next));
+        broadcastSync('categories', next);
+      }
+      return next;
+    });
+
+    // 2. Translate product categories
+    setProductsState((prev) => {
+      const updated = prev.map((p) => {
+        const translated = normalizeCategoryName(p.category);
+        if (translated !== p.category) {
+          return { ...p, category: translated };
+        }
+        return p;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_products', JSON.stringify(updated));
+        broadcastSync('products', updated);
+      }
+      return updated;
+    });
+
+    showNotification('✨ Todas as categorias foram traduzidas para português!');
   };
 
   // Toggle Theme
@@ -1378,7 +1529,8 @@ export const StoreProvider = ({ children }) => {
   const submitOrder = (orderData) => {
     const newOrder = {
       id: "ORD-" + Math.floor(1000 + Math.random() * 9000),
-      resellerEmail: currentUser.email,
+      resellerName: orderData.resellerName || currentUser?.name || 'Revendedor Convidado',
+      resellerEmail: currentUser?.email || orderData.resellerEmail || 'revendedor@smddrop.com.br',
       createdAt: new Date().toISOString(),
       status: "aguardando_impressao",
       ...orderData
@@ -1390,7 +1542,7 @@ export const StoreProvider = ({ children }) => {
     // Sync to Supabase
     syncToSupabase('orders', {
       id: newOrder.id,
-      reseller_name: currentUser?.name || 'Revendedor',
+      reseller_name: newOrder.resellerName,
       reseller_email: newOrder.resellerEmail,
       wholesale_total: newOrder.wholesaleTotal || 0,
       total: newOrder.wholesaleTotal || 0,
@@ -1598,7 +1750,12 @@ export const StoreProvider = ({ children }) => {
   const importShopeeProducts = (newProductsList) => {
     if (!Array.isArray(newProductsList) || newProductsList.length === 0) return 0;
 
-    const newCats = Array.from(new Set(newProductsList.map(p => p.category).filter(Boolean)));
+    const normalizedList = newProductsList.map((p) => ({
+      ...p,
+      category: normalizeCategoryName(p.category)
+    }));
+
+    const newCats = Array.from(new Set(normalizedList.map(p => p.category).filter(Boolean)));
     setCategories(prev => {
       const merged = Array.from(new Set([...prev, ...newCats]));
       return merged;
@@ -1607,10 +1764,10 @@ export const StoreProvider = ({ children }) => {
     let trulyNewItems = [];
 
     setProducts(prev => {
-      const newItemsMap = new Map(newProductsList.map(p => [p.id, p]));
+      const newItemsMap = new Map(normalizedList.map(p => [p.id, p]));
       
       const updatedPrev = prev.map(p => {
-        const matched = newItemsMap.get(p.id) || newProductsList.find(np => np.shopeeId && p.shopeeId && np.shopeeId === p.shopeeId);
+        const matched = newItemsMap.get(p.id) || normalizedList.find(np => np.shopeeId && p.shopeeId && np.shopeeId === p.shopeeId);
         if (matched) {
           newItemsMap.delete(matched.id);
           return {
@@ -1894,6 +2051,8 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         addCategory,
         editCategory,
         deleteCategory,
+        autoTranslateAllCategories,
+        normalizeCategoryName,
         materials,
         addMaterial,
         updateMaterial,
@@ -1934,6 +2093,7 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         updateCompanySettings,
         setCompanySettings: updateCompanySettings,
         resetSystemForProduction,
+        restoreFullBackup,
         syncAllToSupabase,
         getSupabaseCredentials,
         saveSupabaseCredentials,
