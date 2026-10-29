@@ -55,6 +55,7 @@ export const VariationSelectionModal = ({ product, onClose }) => {
       selectedVariation: selectedVar,
       variationName: selectedVar.name,
       wholesalePrice: varWholesale,
+      unitWholesalePrice: varWholesale,
       suggestedRetailPrice: varRetail,
       customSellingPrice: finalSellingPrice,
       quantity: Number(quantity) || 1

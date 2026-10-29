@@ -195,10 +195,14 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   } = useStore();
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com';
-  const displayProducts = products.filter(p => p.status === 'approved' || p.status === 'ativo' || (!p.status && p.inStock)).map(p => ({
-    ...p,
-    category: normalizeCategoryName(p.category)
-  }));
+  const displayProducts = (products || [])
+    .filter(p => p && (p.status === 'approved' || p.status === 'ativo' || (!p.status && p.inStock)))
+    .map(p => ({
+      ...p,
+      title: p.title || 'Produto sob Medida',
+      description: p.description || '',
+      category: normalizeCategoryName(p.category || 'Geral')
+    }));
 
   const availableCategories = ['Todos', ...Array.from(new Set(displayProducts.map((p) => p.category).filter(Boolean)))];
 
@@ -254,10 +258,13 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
 
   // Filter logic
   const filteredProducts = displayProducts.filter((product) => {
+    if (!product) return false;
     const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory;
     const matchesPricing = selectedPricingType === 'all' || product.pricingType === selectedPricingType;
-    const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          product.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const titleStr = (product.title || '').toLowerCase();
+    const descStr = (product.description || '').toLowerCase();
+    const q = (searchQuery || '').toLowerCase().trim();
+    const matchesSearch = !q || titleStr.includes(q) || descStr.includes(q);
     return matchesCategory && matchesPricing && matchesSearch;
   });
 
@@ -267,7 +274,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
 
-  const categories = ['Todos', ...globalCategories];
+  const categories = ['Todos', ...(Array.isArray(globalCategories) ? globalCategories : [])];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -483,7 +490,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                       : 'text-[var(--text-muted)]'
                   }`}
                 >
-                  Sob Medida (m²)
+                  Sob Medida (Orçamento)
                 </button>
               </div>
             </div>
@@ -595,18 +602,15 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                         {currentUser ? (
                           /* LOGGED IN RESELLER VIEW */
                           isM2 ? (
-                            <div className="space-y-1">
+                            <div className="space-y-1 text-center py-0.5">
                               <div className="flex items-center justify-between text-[11px]">
-                                <span className="text-[var(--text-muted)] font-medium">Valor/m²:</span>
-                                <span className="font-extrabold text-[var(--text-main)] font-['Outfit']">
-                                  R$ {product.pricePerM2?.toFixed(2)}
+                                <span className="text-[var(--text-muted)] font-medium">Orçamento:</span>
+                                <span className="font-extrabold text-amber-500 font-['Outfit'] text-[11px]">
+                                  Sob Medida
                                 </span>
                               </div>
-                              <div className="flex items-center justify-between text-[10px] pt-1 border-t border-[var(--border-color)]">
-                                <span className="text-[var(--text-muted)]">Sugestão:</span>
-                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                  R$ {product.suggestedPricePerM2?.toFixed(2)}/m²
-                                </span>
+                              <div className="text-[10px] text-[var(--text-muted)] pt-1 border-t border-[var(--border-color)] truncate">
+                                Preço avaliado pelo CNC da fábrica
                               </div>
                             </div>
                           ) : (
@@ -617,7 +621,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                                 <span className="font-extrabold text-[var(--text-main)] font-['Outfit'] text-xs">
                                   {hasVars
                                     ? (minW === maxW ? `R$ ${minW.toFixed(2)}` : `R$ ${minW.toFixed(2)} ~ R$ ${maxW.toFixed(2)}`)
-                                    : `R$ ${(product.wholesalePrice || 0).toFixed(2)}`}
+                                    : `R$ ${Number(product.wholesalePrice || 0).toFixed(2)}`}
                                 </span>
                               </div>
 
@@ -631,7 +635,15 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                                 </div>
                               ) : (
                                 <div className="flex items-center justify-between gap-1 pt-1 border-t border-[var(--border-color)]">
-                                  <span className="text-[10px] font-bold text-[var(--text-main)] whitespace-nowrap">Sua Venda:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setProfitModalProduct(product)}
+                                    className="text-[10px] font-bold text-[var(--text-main)] hover:text-amber-500 flex items-center gap-1 transition-colors whitespace-nowrap cursor-pointer group/calc"
+                                    title="Calcular Margem Real por Canal (Mercado Livre, Shopee, Venda Direta)"
+                                  >
+                                    <Calculator size={11} className="text-amber-500 group-hover/calc:scale-110 transition-transform" />
+                                    <span className="underline decoration-dotted underline-offset-2">Sua Venda:</span>
+                                  </button>
                                   <div className="relative w-20 shrink-0">
                                     <span className="absolute left-1.5 top-0.5 text-[9px] font-bold text-[var(--text-muted)]">R$</span>
                                     <input
@@ -651,7 +663,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                           /* UNAUTHENTICATED VISITOR VIEW */
                           <div className="space-y-1 text-center py-0.5">
                             <span className="text-[10px] font-bold text-[var(--text-muted)] block truncate">
-                              Sugestão Varejo: R$ {isM2 ? `${product.suggestedPricePerM2?.toFixed(2)}/m²` : product.suggestedRetailPrice?.toFixed(2)}
+                              {isM2 ? 'Projeto Sob Medida Laser' : `Sugestão Varejo: R$ ${Number(product.suggestedRetailPrice || 0).toFixed(2)}`}
                             </span>
                             <span className="text-[10px] font-extrabold text-amber-500 block">
                               🔒 Atacado Reservado
@@ -671,6 +683,18 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                           <span className="truncate">Kit Mídia</span>
                         </button>
 
+                        {!isM2 && currentUser && (
+                          <button
+                            type="button"
+                            onClick={() => setProfitModalProduct(product)}
+                            className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all"
+                            title="Calcular Margem Real por Canal (Mercado Livre, Shopee, Venda Direta)"
+                          >
+                            <Calculator size={13} className="shrink-0" />
+                            <span className="hidden sm:inline">Lucro</span>
+                          </button>
+                        )}
+
                         {currentUser ? (
                           isM2 ? (
                             <button
@@ -678,7 +702,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                               className="btn-gold py-1.5 px-2 text-[11px] font-extrabold flex-1 flex items-center justify-center gap-1 truncate shadow-md"
                             >
                               <Ruler size={13} className="shrink-0" />
-                              <span className="truncate">Calcular m²</span>
+                              <span className="truncate">Orçar sob Medida</span>
                             </button>
                           ) : (
                             <button
@@ -686,7 +710,14 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                                 if (hasVars) {
                                   setVariationProduct(product);
                                 } else {
-                                  addToCart({ ...product, customSellingPrice: customPrices[product.id] });
+                                  addToCart({ 
+                                    ...product, 
+                                    quantity: 1,
+                                    unitWholesalePrice: Number(product.wholesalePrice || 0),
+                                    wholesalePrice: Number(product.wholesalePrice || 0),
+                                    suggestedRetailPrice: Number(product.suggestedRetailPrice || 0),
+                                    customSellingPrice: customPrices[product.id] || product.suggestedRetailPrice 
+                                  });
                                 }
                               }}
                               className="btn-gold py-1.5 px-2 text-[11px] font-extrabold flex-1 flex items-center justify-center gap-1 truncate shadow-md"
@@ -820,7 +851,9 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
       {profitModalProduct && (
         <ProfitCalculatorModal
           product={profitModalProduct}
+          isOpen={Boolean(profitModalProduct)}
           onClose={() => setProfitModalProduct(null)}
+          onApplyPrice={(prodId, price) => handleCustomPriceChange(prodId, price)}
         />
       )}
 

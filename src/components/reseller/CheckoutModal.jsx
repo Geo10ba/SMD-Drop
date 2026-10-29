@@ -14,22 +14,39 @@ import {
   Sparkles,
   CreditCard,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Wallet,
+  Zap,
+  Plus,
+  FileText,
+  FileCheck
 } from 'lucide-react';
 import { calculateMelhorEnvioShipping } from '../../lib/melhorenvio';
 import { createMercadoPagoPixPayment, createMercadoPagoPreference } from '../../lib/mercadopago';
+import { 
+  generatePixPayload, 
+  getQrCodeImageUrl, 
+  SMD_DROP_CNPJ, 
+  SMD_DROP_CNPJ_FORMATTED, 
+  SMD_DROP_BENEFICIARY 
+} from '../../utils/pixGenerator';
 
-export const CheckoutModal = ({ isOpen, onClose }) => {
-  const { cart, submitOrder, showNotification, currentUser } = useStore();
+export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
+  const { cart, submitOrder, showNotification, currentUser, walletBalance } = useStore();
 
   const [step, setStep] = useState(1); // 1: Dispatch Mode & Details, 2: Payment Method & Finalization
   const [dispatchMode, setDispatchMode] = useState('marketplace_label'); // 'marketplace_label' or 'direct_blind_shipping'
   const [marketplace, setMarketplace] = useState('Mercado Livre');
   const [labelPdfFile, setLabelPdfFile] = useState(null);
+  const [labelFileBase64, setLabelFileBase64] = useState(null);
 
-  // Payment Method State: 'pix_direct' (0% fee) or 'mercadopago' (+5% surcharge)
-  const [paymentMethod, setPaymentMethod] = useState('pix_direct');
-  const [loadingMp, setLoadingMp] = useState(false);
+  // Fiscal Tripartite Configuration (Art. 40 Convênio S/N 1970)
+  const [fiscalRegime, setFiscalRegime] = useState('mei'); // 'mei' | 'simples'
+  const [nfeKey, setNfeKey] = useState('');
+  const [informNfeLater, setInformNfeLater] = useState(false);
+
+  // Payment Method State: 'wallet' (0% fee - instant debit), 'pix_direct' (0% fee) or 'mercadopago' (+5% surcharge)
+  const [paymentMethod, setPaymentMethod] = useState('wallet');
 
   // Mercado Envios shipping state
   const [shippingOptions, setShippingOptions] = useState([]);
@@ -40,6 +57,7 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
   const [customerData, setCustomerData] = useState({
     name: 'Carlos Alberto Santos',
     cpf: '341.982.109-88',
+    phone: '(11) 98765-4321',
     address: 'Rua Bela Cintra, 890, Apto 102',
     city: 'São Paulo',
     state: 'SP',
@@ -85,13 +103,17 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
 
   if (!isOpen || cart.length === 0) return null;
 
-  const wholesaleSubtotal = cart.reduce((acc, item) => acc + (item.unitWholesalePrice * item.quantity), 0);
+  const wholesaleSubtotal = cart.reduce((acc, item) => {
+    const itemPrice = Number(item.unitWholesalePrice ?? item.wholesalePrice ?? item.price ?? 0) || 0;
+    const itemQty = Number(item.quantity) > 0 ? Number(item.quantity) : 1;
+    return acc + (itemPrice * itemQty);
+  }, 0);
   
   // Calculate factory shipping cost based on mode
   let factoryShippingCost = 0;
   if (dispatchMode === 'direct_blind_shipping') {
     if (selectedShippingOption) {
-      factoryShippingCost = selectedShippingOption.price;
+      factoryShippingCost = Number(selectedShippingOption.price) || 0;
     } else {
       if (shippingMethod === 'pac') factoryShippingCost = 22.50;
       if (shippingMethod === 'sedex') factoryShippingCost = 38.90;
@@ -99,60 +121,83 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
     }
   }
 
-  const baseTotal = wholesaleSubtotal + factoryShippingCost;
+  const baseTotal = (Number(wholesaleSubtotal) || 0) + (Number(factoryShippingCost) || 0);
   
   // 5% Mercado Pago Fee Surcharge when Mercado Pago is selected
   const mercadoPagoFee = paymentMethod === 'mercadopago' ? baseTotal * 0.05 : 0;
-  const finalTotal = baseTotal + mercadoPagoFee;
+  const finalTotal = Math.max(0, Number(baseTotal + mercadoPagoFee) || 0);
 
   const handleLabelUpload = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (file) {
       setLabelPdfFile(file.name);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setLabelFileBase64(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleMercadoPagoCheckout = async () => {
-    setLoadingMp(true);
-    try {
-      const res = await createMercadoPagoPreference({
-        items: cart.map(item => ({
-          title: item.title,
-          quantity: item.quantity,
-          unit_price: item.unitWholesalePrice * 1.05 // Includes 5% surcharge
-        })),
-        payer: {
-          name: customerData.name || "Revendedor SMD Drop",
-          email: "revendedor@smddrop.com.br"
-        },
-        external_reference: `ORD-MP-${Date.now()}`
-      });
 
-      if (res.success && res.initPoint) {
-        showNotification("Redirecionando para o Checkout do Mercado Pago (+5% taxa aplicada)...");
-        window.open(res.initPoint, "_blank");
-        handleFinalizeOrder();
-      } else {
-        alert(res.error || "Erro ao conectar com a API do Mercado Pago. Finalizando pelo PIX Direto.");
-        handleFinalizeOrder();
+  const handleProceedToStep2 = () => {
+    if (dispatchMode === 'marketplace_label') {
+      if (!labelPdfFile) {
+        showNotification('Por favor, anexe a etiqueta de envio (PDF ou ZPL) do marketplace antes de avançar.', 'error');
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      handleFinalizeOrder();
-    } finally {
-      setLoadingMp(false);
     }
+
+    if (dispatchMode === 'direct_blind_shipping') {
+      if (!customerData.name || customerData.name.trim().length < 3) {
+        showNotification('Informe o nome completo do cliente final.', 'error');
+        return;
+      }
+      const cleanCpf = (customerData.cpf || '').replace(/\D/g, '');
+      if (cleanCpf.length !== 11) {
+        showNotification('CPF do cliente inválido (deve conter 11 dígitos).', 'error');
+        return;
+      }
+      if (!customerData.address || customerData.address.trim().length < 5) {
+        showNotification('Endereço completo de entrega é obrigatório.', 'error');
+        return;
+      }
+    }
+
+    if (fiscalRegime === 'simples' && !informNfeLater) {
+      const cleanKey = (nfeKey || '').replace(/\D/g, '');
+      if (cleanKey.length !== 44) {
+        showNotification('A Chave da NF-e precisa ter exatamente 44 números, ou marque "Informar chave depois".', 'error');
+        return;
+      }
+    }
+
+    setStep(2);
   };
 
   const handleFinalizeOrder = () => {
     submitOrder({
       resellerName: currentUser?.name || "Sua Loja / Revendedor Autorizado",
       resellerEmail: currentUser?.email || "revendedor@smddrop.com.br",
+      resellerDocument: currentUser?.cnpj || "MEI - Isento",
+      fiscalRegime,
+      documentType: fiscalRegime === 'mei' ? 'declaracao_conteudo' : 'nfe_venda',
+      nfeKey: informNfeLater ? '' : nfeKey.replace(/\D/g, ''),
       dispatchMode,
-      paymentMethod: paymentMethod === 'mercadopago' ? 'Mercado Pago (+5%)' : 'PIX Direto (0%)',
+      paymentMethod: paymentMethod === 'mercadopago' ? 'PIX Mercado Pago (+5%)' : (paymentMethod === 'wallet' ? 'Carteira Pré-Paga (0%)' : 'PIX Fábrica (0%)'),
       marketplace: dispatchMode === 'marketplace_label' ? marketplace : null,
       labelPdf: labelPdfFile || (dispatchMode === 'marketplace_label' ? `Etiqueta_${marketplace.replace(' ', '')}_${Date.now()}.pdf` : null),
-      customerData: dispatchMode === 'direct_blind_shipping' ? customerData : { name: "Cliente " + marketplace, city: "Marketplace Fulfillment" },
+      labelFileBase64,
+      labelFileName: labelPdfFile,
+      customerData: dispatchMode === 'direct_blind_shipping' ? customerData : { 
+        name: customerData.name || ("Cliente " + marketplace), 
+        cpf: customerData.cpf || "",
+        phone: customerData.phone || "",
+        city: customerData.city || "Marketplace Fulfillment",
+        address: customerData.address || "Conforme Etiqueta Marketplace",
+        state: customerData.state || "SP",
+        zip: customerData.zip || "01000-000"
+      },
       items: cart,
       wholesaleTotal: wholesaleSubtotal,
       shippingTotal: factoryShippingCost,
@@ -254,6 +299,97 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
+              {/* Seção de Enquadramento Fiscal de Venda à Ordem (Art. 40 Convênio S/N 1970) */}
+              <div className="bg-slate-900 border-2 border-slate-700 p-4 rounded-2xl space-y-3 shadow-md">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="text-amber-400" size={18} />
+                    <span className="text-xs font-black uppercase text-white tracking-wider">
+                      Perfil Fiscal do Revendedor (Venda à Ordem)
+                    </span>
+                  </div>
+                  <span className="text-[10px] bg-slate-800 text-amber-300 font-bold px-2 py-0.5 rounded border border-slate-600">
+                    Art. 40 Convênio S/N 1970
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  {/* Opção MEI */}
+                  <div
+                    onClick={() => setFiscalRegime('mei')}
+                    className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      fiscalRegime === 'mei'
+                        ? 'border-amber-400 bg-amber-500/20 text-white shadow-sm'
+                        : 'border-slate-700 bg-slate-800/80 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-extrabold text-white text-xs">MEI (Isento NF-e p/ PF)</span>
+                      <span className="text-[10px] font-black bg-emerald-500 text-slate-950 px-1.5 py-0.5 rounded">
+                        DECLARAÇÃO
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-tight">
+                      Acompanha Declaração de Conteúdo emitida em seu nome como remetente. Sem exigência de emissão de NF-e para consumidor PF.
+                    </p>
+                  </div>
+
+                  {/* Opção Simples Nacional / ME */}
+                  <div
+                    onClick={() => setFiscalRegime('simples')}
+                    className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      fiscalRegime === 'simples'
+                        ? 'border-amber-400 bg-amber-500/20 text-white shadow-sm'
+                        : 'border-slate-700 bg-slate-800/80 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-extrabold text-white text-xs">Simples Nacional / ME</span>
+                      <span className="text-[10px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">
+                        NF-e 5.120
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-tight">
+                      Operação com NF-e de Venda à Ordem (CFOP 5.120 / 6.120). A fábrica emite a NF-e de Remessa física (CFOP 5.923).
+                    </p>
+                  </div>
+                </div>
+
+                {fiscalRegime === 'simples' && (
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-700 space-y-2 mt-2">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <label className="text-[11px] font-bold text-amber-300">
+                        Chave de Acesso da NF-e de Venda (44 dígitos numéricos)
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 text-[10px] text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={informNfeLater}
+                          onChange={(e) => setInformNfeLater(e.target.checked)}
+                          className="rounded border-slate-600 text-amber-500 focus:ring-0"
+                        />
+                        <span>Informar chave depois da venda</span>
+                      </label>
+                    </div>
+
+                    {!informNfeLater ? (
+                      <input
+                        type="text"
+                        maxLength={44}
+                        value={nfeKey}
+                        onChange={(e) => setNfeKey(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Ex: 35261045109892000199550010000000011000000010 (44 dígitos)"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-slate-500 font-bold focus:border-amber-400 focus:outline-none"
+                      />
+                    ) : (
+                      <div className="bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/30 text-[11px] text-amber-200">
+                        ⚠️ <strong>Trava de Expedição Ativada:</strong> O pedido entrará na fila de produção, mas o despacho físico ficará bloqueado pela fábrica até a inclusão da Chave da NF-e para transporte seguro.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Mode Specific Inputs */}
               {dispatchMode === 'marketplace_label' ? (
                 <div className="bg-[var(--bg-surface-hover)] p-5 rounded-2xl border border-[var(--border-color)] space-y-4">
@@ -280,21 +416,56 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
-                      Upload da Etiqueta de Envio (PDF ou ZPL)
-                    </label>
-                    <div className="border-2 border-dashed border-[var(--border-hover)] rounded-xl p-4 text-center relative bg-[var(--bg-surface)] hover:border-amber-500 transition-colors">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                        Upload da Etiqueta de Envio (PDF ou ZPL)
+                        <span className="text-rose-500 font-extrabold text-[11px]">* Obrigatório</span>
+                      </label>
+                      {labelPdfFile && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLabelPdfFile(null);
+                            setLabelFileBase64(null);
+                          }}
+                          className="text-[11px] text-rose-400 hover:underline font-bold"
+                        >
+                          Remover / Trocar
+                        </button>
+                      )}
+                    </div>
+                    <div className={`border-2 border-dashed rounded-xl p-4 text-center relative transition-all ${
+                      labelPdfFile 
+                        ? 'border-emerald-500 bg-emerald-500/10 shadow-sm' 
+                        : 'border-amber-500/60 hover:border-amber-500 bg-[var(--bg-surface)]'
+                    }`}>
                       <input
                         type="file"
                         onChange={handleLabelUpload}
                         accept=".pdf,.zpl,.txt"
                         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                       />
-                      <FileUp size={24} className="mx-auto text-amber-500 mb-1" />
-                      <span className="text-xs font-semibold text-[var(--text-main)] block">
-                        {labelPdfFile ? `Etiqueta Anexada: ${labelPdfFile}` : "Clique ou arraste o PDF da etiqueta do marketplace"}
-                      </span>
-                      <span className="text-[10px] text-[var(--text-muted)]">Aceita arquivos de etiqueta da Shopee, Mercado Livre e Amazon</span>
+                      {labelPdfFile ? (
+                        <div className="space-y-1">
+                          <CheckCircle2 size={24} className="mx-auto text-emerald-500" />
+                          <span className="text-xs font-bold text-emerald-400 block truncate px-2">
+                            Etiqueta anexada: {labelPdfFile}
+                          </span>
+                          <span className="text-[10px] text-emerald-300">
+                            ✓ Arquivo pronto para impressão fabril. Você já pode avançar!
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <FileUp size={24} className="mx-auto text-amber-500 mb-0.5 animate-bounce" />
+                          <span className="text-xs font-bold text-[var(--text-main)] block">
+                            Clique ou arraste o PDF da etiqueta do marketplace
+                          </span>
+                          <span className="text-[10px] text-amber-500 font-medium block">
+                            ⚠️ Anexo obrigatório para liberar a próxima etapa
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -419,6 +590,24 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
                   </div>
                 </div>
               )}
+
+              {/* Garantia de Logística Cega & Embalagem Neutra */}
+              <div className="bg-slate-900 border border-slate-700 p-3.5 rounded-2xl flex items-center justify-between gap-3 text-xs text-slate-300 shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <div>
+                    <strong className="text-white block text-xs">Garantia SMD de Logística Cega (Blind Shipping):</strong>
+                    <p className="text-[11px] text-slate-300 leading-tight">
+                      Caixa e fitas 100% neutras. Remetente na etiqueta sempre como <strong className="text-amber-400">{currentUser?.name || "sua loja"}</strong>. Documento fiscal afixado no envelope canguru externo. Zero menções à fábrica.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-1 rounded-lg border border-emerald-500/30 shrink-0 hidden sm:block">
+                  100% CEGO
+                </span>
+              </div>
             </div>
           ) : (
             /* Step 2: Payment Options (PIX 0% vs Mercado Pago +5%) */
@@ -428,66 +617,223 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
               </span>
 
               {/* Payment Method Selector Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Option 1: Direct PIX (0% Fee) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Option 1: Carteira Pré-Paga (0% Fee - Débito Imediato) */}
                 <div
-                  onClick={() => setPaymentMethod('pix_direct')}
-                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                    paymentMethod === 'pix_direct'
-                      ? 'border-emerald-500 bg-emerald-500/10 shadow-md'
-                      : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <QrCode size={16} /> PIX Direto Fábrica
-                    </span>
-                    <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
-                      0% TAXA
-                    </span>
-                  </div>
-                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                    Pagamento instantâneo via QR Code PIX direto sem taxas adicionais.
-                  </p>
-                </div>
-
-                {/* Option 2: Mercado Pago (+5% Surcharge) */}
-                <div
-                  onClick={() => setPaymentMethod('mercadopago')}
-                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                    paymentMethod === 'mercadopago'
-                      ? 'border-amber-500 bg-amber-500/10 shadow-md'
+                  onClick={() => setPaymentMethod('wallet')}
+                  className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                    paymentMethod === 'wallet'
+                      ? 'border-amber-500 bg-amber-500/10 shadow-md ring-2 ring-amber-500/20'
                       : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] opacity-70 hover:opacity-100'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <CreditCard size={16} /> Mercado Pago
+                      <Wallet size={16} /> Carteira Saldo
                     </span>
-                    <span className="bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      IMEDIATO
+                    </span>
+                  </div>
+                  <p className="text-xs font-mono font-bold text-[var(--text-main)] mb-1">
+                    Saldo: R$ {(Number(walletBalance) || 0).toFixed(2)}
+                  </p>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-tight">
+                    Débito automático instantâneo sem taxas e aprovação imediata.
+                  </p>
+                </div>
+
+                {/* Option 2: Direct PIX (0% Fee) */}
+                <div
+                  onClick={() => setPaymentMethod('pix_direct')}
+                  className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                    paymentMethod === 'pix_direct'
+                      ? 'border-emerald-500 bg-emerald-500/10 shadow-md ring-2 ring-emerald-500/20'
+                      : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <QrCode size={16} /> PIX Fábrica
+                    </span>
+                    <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                      0% TAXA
+                    </span>
+                  </div>
+                  <p className="text-xs font-mono font-bold text-[var(--text-main)] mb-1">
+                    Copia e Cola
+                  </p>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-tight">
+                    Gera QR Code PIX para pagamento avulso deste pedido.
+                  </p>
+                </div>
+
+                {/* Option 3: Mercado Pago PIX (+5% Surcharge) */}
+                <div
+                  onClick={() => setPaymentMethod('mercadopago')}
+                  className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                    paymentMethod === 'mercadopago'
+                      ? 'border-sky-500 bg-sky-500/10 shadow-md ring-2 ring-sky-500/20'
+                      : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-extrabold text-sky-500 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <QrCode size={16} /> PIX Mercado Pago
+                    </span>
+                    <span className="bg-amber-500/20 border border-amber-500/40 text-amber-500 text-[10px] font-black px-2 py-0.5 rounded-full">
                       +5% TAXA
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                    Cartão de crédito em até 12x ou Checkout Pro (+ 5% de taxa de processamento do MP).
+                  <p className="text-xs font-mono font-bold text-[var(--text-main)] mb-1">
+                    Copia e Cola & QR Code
+                  </p>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-tight">
+                    Pagamento PIX via Mercado Pago com taxa de processamento (+5%).
                   </p>
                 </div>
               </div>
 
               {/* Payment Details Box */}
-              {paymentMethod === 'mercadopago' ? (
-                <div className="bg-gradient-to-br from-amber-950/40 to-slate-900 text-white rounded-2xl p-6 border border-amber-500/40 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between border-b border-amber-500/30 pb-3">
+              {paymentMethod === 'wallet' && (
+                <div className="bg-gradient-to-br from-amber-950/30 via-slate-900 to-slate-900 text-white rounded-2xl p-6 border border-amber-500/30 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-amber-500/20 pb-3">
                     <div className="flex items-center gap-2">
-                      <CreditCard className="text-amber-400" size={20} />
-                      <span className="font-extrabold text-sm text-amber-300">Mercado Pago Checkout Pro</span>
+                      <Wallet className="text-amber-400" size={20} />
+                      <span className="font-extrabold text-sm text-white">Débito Instantâneo da Carteira</span>
                     </div>
-                    <span className="bg-amber-500/20 text-amber-300 text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-amber-500/40">
-                      +5% Acréscimo Aplicado
+                    <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-emerald-500/30">
+                      0% Taxas Adicionais
                     </span>
                   </div>
 
                   <div className="space-y-2 text-xs">
+                    <div className="flex justify-between text-slate-300">
+                      <span>Total do Pedido Atacado:</span>
+                      <span className="font-mono font-bold">R$ {finalTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span>Seu Saldo Disponível na Carteira:</span>
+                      <span className="font-mono font-bold text-amber-400">R$ {(Number(walletBalance) || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-extrabold text-white pt-2 border-t border-slate-800">
+                      <span>Saldo Restante após o Débito:</span>
+                      <span className={`font-mono ${walletBalance >= finalTotal ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        R$ {Math.max(0, (walletBalance - finalTotal)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {walletBalance >= finalTotal ? (
+                    <div className="bg-emerald-500/15 border border-emerald-500/30 p-3 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                      <span>Saldo suficiente! O pedido será debitado e enviado imediatamente para a esteira fabril.</span>
+                    </div>
+                  ) : (
+                    <div className="bg-rose-500/15 border border-rose-500/30 p-3.5 rounded-xl text-xs text-rose-300 space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-rose-400">
+                        <AlertTriangle size={16} className="shrink-0" />
+                        <span>Saldo insuficiente na carteira (Faltam R$ {(finalTotal - walletBalance).toFixed(2)})</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        Faça uma recarga rápida via PIX para liberar o pedido na hora:
+                      </p>
+                      {onOpenWallet && (
+                        <button
+                          type="button"
+                          onClick={onOpenWallet}
+                          className="btn-gold text-xs font-bold py-2 px-3 flex items-center gap-1.5 shadow"
+                        >
+                          <Plus size={14} /> Fazer Recarga Rápida via PIX na Carteira
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {paymentMethod === 'pix_direct' && (
+                <div className="bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-emerald-500/30 text-white rounded-2xl p-6 text-center space-y-4 shadow-xl">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-black border border-emerald-500/30">
+                    <QrCode size={14} /> PIX INSTANTÂNEO DIRETO PARA A FÁBRICA (0% TAXA)
+                  </div>
+
+                  {(() => {
+                    const orderPixCode = generatePixPayload({
+                      key: SMD_DROP_CNPJ,
+                      beneficiary: SMD_DROP_BENEFICIARY,
+                      amount: finalTotal,
+                      txid: 'PED' + Date.now().toString().slice(-8)
+                    });
+                    const qrUrl = getQrCodeImageUrl(orderPixCode, 240);
+
+                    return (
+                      <div className="space-y-4">
+                        {/* Real Scannable QR Code */}
+                        <div className="w-52 h-52 mx-auto bg-white p-3 rounded-2xl shadow-2xl border-4 border-emerald-500 flex flex-col items-center justify-center">
+                          <img
+                            src={qrUrl}
+                            alt={`QR Code PIX CNPJ ${SMD_DROP_CNPJ_FORMATTED}`}
+                            className="w-44 h-44 object-contain rounded-lg"
+                          />
+                          <span className="text-[9px] font-mono text-slate-950 font-black mt-0.5">
+                            CNPJ: {SMD_DROP_CNPJ_FORMATTED}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-xs text-slate-400 block font-medium">Valor Total da Fatura da Fábrica:</span>
+                          <span className="text-3xl font-black text-emerald-400 font-['Outfit']">
+                            R$ {finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+
+                        {/* CNPJ Key Box */}
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs flex items-center justify-between font-mono max-w-md mx-auto">
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-500 block uppercase font-sans font-bold">Chave PIX (CNPJ)</span>
+                            <span className="text-emerald-400 font-black">{SMD_DROP_CNPJ_FORMATTED}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(SMD_DROP_CNPJ);
+                              showNotification(`Chave CNPJ ${SMD_DROP_CNPJ_FORMATTED} copiada!`);
+                            }}
+                            className="btn-gold text-[10px] font-black py-1 px-2.5 rounded shrink-0 shadow"
+                          >
+                            COPIAR CNPJ
+                          </button>
+                        </div>
+
+                        {/* Full EMVCo Payload Box */}
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center justify-between font-mono max-w-md mx-auto">
+                          <span className="truncate pr-2 text-[11px] text-slate-400">{orderPixCode}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(orderPixCode);
+                              showNotification('Código PIX Copia e Cola copiado com sucesso!');
+                            }}
+                            className="btn-gold text-[10px] font-black py-1 px-2.5 rounded shrink-0 shadow"
+                          >
+                            COPIAR CÓDIGO
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {paymentMethod === 'mercadopago' && (
+                <div className="bg-gradient-to-br from-slate-900 via-sky-950/40 to-slate-900 border border-sky-500/40 text-white rounded-2xl p-6 text-center space-y-4 shadow-xl">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-400 text-xs font-black border border-sky-500/40">
+                    <QrCode size={14} /> PIX MERCADO PAGO (+5% TAXA DO GATEWAY)
+                  </div>
+
+                  {/* Pricing Breakdown Box */}
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 text-xs max-w-md mx-auto space-y-1.5 text-left">
                     <div className="flex justify-between text-slate-300">
                       <span>Subtotal Atacado + Frete:</span>
                       <span className="font-mono font-bold">R$ {baseTotal.toFixed(2)}</span>
@@ -496,49 +842,81 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
                       <span>Taxa Processamento Mercado Pago (+5%):</span>
                       <span className="font-mono font-bold">+ R$ {mercadoPagoFee.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-base font-extrabold text-white pt-2 border-t border-amber-500/30">
-                      <span>Total Fatura Mercado Pago:</span>
-                      <span className="font-mono text-amber-400">R$ {finalTotal.toFixed(2)}</span>
+                    <div className="flex justify-between text-sm font-extrabold text-white pt-2 border-t border-slate-800">
+                      <span>Total Fatura PIX Mercado Pago:</span>
+                      <span className="font-mono text-sky-400 text-base">R$ {finalTotal.toFixed(2)}</span>
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-slate-300 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 leading-relaxed">
-                    ⚡ Ao clicar no botão abaixo, a taxa de 5% (R$ {mercadoPagoFee.toFixed(2)}) será incluída na sua preferência do Mercado Pago para você pagar em até 12x ou utilizar o saldo MP!
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-6 text-center space-y-4 shadow-xl">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold">
-                    <QrCode size={14} /> PIX INSTANTÂNEO COM DESCONTO DE FÁBRICA (0% TAXA)
-                  </div>
+                  {(() => {
+                    const mpPixCode = generatePixPayload({
+                      key: SMD_DROP_CNPJ,
+                      beneficiary: "MERCADO PAGO SMD DROP",
+                      amount: finalTotal,
+                      txid: 'MP' + Date.now().toString().slice(-8)
+                    });
+                    const qrUrl = getQrCodeImageUrl(mpPixCode, 240);
 
-                  <div className="w-44 h-44 mx-auto bg-white p-3 rounded-2xl shadow-inner flex items-center justify-center">
-                    <svg viewBox="0 0 100 100" className="w-full h-full">
-                      <rect width="100" height="100" fill="#ffffff" />
-                      <path d="M10 10h30v30h-30zM60 10h30v30h-30zM10 60h30v30h-30z" fill="#0f172a" />
-                      <path d="M15 15h20v20h-20zM65 15h20v20h-20zM15 65h20v20h-20z" fill="#ffffff" />
-                      <path d="M20 20h10v10h-10zM70 20h10v10h-10zM20 70h10v10h-10z" fill="#0f172a" />
-                      <circle cx="50" cy="50" r="12" fill="#c59b27" />
-                    </svg>
-                  </div>
+                    return (
+                      <div className="space-y-4">
+                        {/* Real Scannable QR Code */}
+                        <div className="w-52 h-52 mx-auto bg-white p-3 rounded-2xl shadow-2xl border-4 border-sky-500 flex flex-col items-center justify-center">
+                          <img
+                            src={qrUrl}
+                            alt="QR Code PIX Mercado Pago"
+                            className="w-44 h-44 object-contain rounded-lg"
+                          />
+                          <span className="text-[9px] font-mono text-sky-950 font-black mt-0.5">
+                            PIX MERCADO PAGO
+                          </span>
+                        </div>
 
-                  <div>
-                    <span className="text-xs text-slate-400 block font-medium">Valor Total da Fatura da Fábrica (Sem Taxa):</span>
-                    <span className="text-3xl font-extrabold text-amber-400 font-['Outfit']">
-                      R$ {finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
+                        <div>
+                          <span className="text-xs text-slate-400 block font-medium">Valor Total PIX com Taxa (+5%):</span>
+                          <span className="text-3xl font-black text-sky-400 font-['Outfit']">
+                            R$ {finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
 
-                  <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 max-w-md mx-auto text-xs text-slate-300 flex items-center justify-between font-mono">
-                    <span className="truncate pr-2">00020126580014br.gov.bcb.pix0136smd-drop-factory-pix</span>
-                    <button
-                      type="button"
-                      onClick={() => alert("Código PIX Copiado!")}
-                      className="bg-amber-500 text-slate-900 px-2.5 py-1 rounded font-bold text-[10px] shrink-0 hover:bg-amber-400"
-                    >
-                      COPIAR
-                    </button>
-                  </div>
+                        {/* CNPJ Key Box */}
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs flex items-center justify-between font-mono max-w-md mx-auto">
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-500 block uppercase font-sans font-bold">Chave PIX (Fábrica / MP)</span>
+                            <span className="text-sky-400 font-black">{SMD_DROP_CNPJ_FORMATTED}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(SMD_DROP_CNPJ);
+                              showNotification(`Chave CNPJ ${SMD_DROP_CNPJ_FORMATTED} copiada!`);
+                            }}
+                            className="btn-gold text-[10px] font-black py-1 px-2.5 rounded shrink-0 shadow bg-gradient-to-r from-sky-500 to-amber-500 text-slate-950"
+                          >
+                            COPIAR CHAVE
+                          </button>
+                        </div>
+
+                        {/* Full EMVCo Payload Box */}
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center justify-between font-mono max-w-md mx-auto">
+                          <span className="truncate pr-2 text-[11px] text-slate-400">{mpPixCode}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(mpPixCode);
+                              showNotification('Código PIX Mercado Pago Copia e Cola copiado com sucesso!');
+                            }}
+                            className="btn-gold text-[10px] font-black py-1 px-2.5 rounded shrink-0 shadow bg-gradient-to-r from-sky-500 to-amber-500 text-slate-950"
+                          >
+                            COPIAR CÓDIGO PIX MP
+                          </button>
+                        </div>
+
+                        <p className="text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed">
+                          ⚡ Escaneie o QR Code ou copie o código acima no app do seu banco ou Mercado Pago. Após realizar a transferência, clique no botão abaixo para confirmar e despachar seu pedido!
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -555,13 +933,26 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
                   R$ {baseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="btn-gold py-3 px-6 text-sm font-bold shadow-lg"
-              >
-                Avançar para Pagamento <ArrowRight size={16} />
-              </button>
+              <div className="flex items-center gap-3">
+                {dispatchMode === 'marketplace_label' && !labelPdfFile && (
+                  <span className="text-[11px] font-bold text-amber-500 hidden sm:inline-flex items-center gap-1 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/30">
+                    <AlertTriangle size={14} className="shrink-0" /> Anexe a etiqueta para avançar
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleProceedToStep2}
+                  disabled={dispatchMode === 'marketplace_label' && !labelPdfFile}
+                  className={`py-3 px-6 text-sm font-bold shadow-lg flex items-center gap-2 rounded-xl transition-all ${
+                    dispatchMode === 'marketplace_label' && !labelPdfFile
+                      ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-75'
+                      : 'btn-gold'
+                  }`}
+                  title={dispatchMode === 'marketplace_label' && !labelPdfFile ? 'Anexe a etiqueta de envio do marketplace para liberar' : ''}
+                >
+                  Avançar para Pagamento <ArrowRight size={16} />
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -573,22 +964,34 @@ export const CheckoutModal = ({ isOpen, onClose }) => {
                 Voltar
               </button>
 
-              {paymentMethod === 'mercadopago' ? (
+              {paymentMethod === 'wallet' ? (
                 <button
                   type="button"
-                  disabled={loadingMp}
-                  onClick={handleMercadoPagoCheckout}
-                  className="btn-gold py-3 px-8 text-sm font-bold shadow-lg flex items-center gap-2 bg-gradient-to-r from-amber-500 to-yellow-500"
+                  disabled={walletBalance < finalTotal}
+                  onClick={handleFinalizeOrder}
+                  className={`py-3 px-8 text-sm font-bold shadow-lg flex items-center gap-2 ${
+                    walletBalance >= finalTotal
+                      ? 'btn-gold bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 hover:brightness-110'
+                      : 'bg-slate-700 text-slate-400 cursor-not-allowed rounded-xl'
+                  }`}
                 >
-                  <CreditCard size={18} /> Pagar R$ {finalTotal.toFixed(2)} via Mercado Pago (+5%)
+                  <Zap size={18} /> Pagar R$ {finalTotal.toFixed(2)} com Saldo e Enviar à Fábrica
+                </button>
+              ) : paymentMethod === 'mercadopago' ? (
+                <button
+                  type="button"
+                  onClick={handleFinalizeOrder}
+                  className="btn-gold py-3 px-8 text-sm font-bold shadow-lg flex items-center gap-2 bg-gradient-to-r from-sky-500 via-amber-500 to-amber-600 text-slate-950 font-black hover:brightness-110"
+                >
+                  <CheckCircle2 size={18} /> Confirmar Pagamento PIX MP (R$ {finalTotal.toFixed(2)}) e Enviar à Fábrica
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleFinalizeOrder}
-                  className="btn-gold py-3 px-8 text-sm font-bold shadow-lg"
+                  className="btn-gold py-3 px-8 text-sm font-bold shadow-lg flex items-center gap-2"
                 >
-                  <CheckCircle2 size={18} /> Confirmar Pagamento PIX e Enviar à Fábrica
+                  <CheckCircle2 size={18} /> Confirmar Pagamento PIX Fábrica e Enviar à Fábrica
                 </button>
               )}
             </>

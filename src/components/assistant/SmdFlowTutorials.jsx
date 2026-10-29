@@ -4,27 +4,27 @@ import { Link2, Trophy, Zap, ArrowRight, ChevronLeft, BookOpen } from "lucide-re
 export const TUTORIAL_GUIDES = [
   {
     id: "orcamento-m2",
-    title: "📐 Como Orçar Acrílico Sob Medida (R$/m²)",
-    subtitle: "Aprenda a calcular preços instantâneos para placas e letreiros em qualquer dimensão",
+    title: "📐 Como Solicitar Orçamento Sob Medida",
+    subtitle: "Envie medidas estimadas e o vetor da logo do cliente para orçamento rápido",
     icon: <Zap className="w-5 h-5" />,
     badge: "Essencial #1",
     colorTheme: "amber",
     steps: [
       {
         number: 1,
-        title: "Abrir a Calculadora sob Medida",
-        description: "No topo do menu, clique em 'Calculadora m²'. Digite a Largura (cm) e Altura (cm) desejadas.",
-        highlight: "Exemplo: 60cm x 40cm (0.24 m²)",
+        title: "Abrir a Tela de Orçamento",
+        description: "No topo do menu, clique em 'Orçar sob Medida'. Digite as dimensões estimadas e o texto/modelo.",
+        highlight: "Exemplo: 60cm x 40cm",
       },
       {
         number: 2,
-        title: "Escolher Espessura e Material",
-        description: "Selecione entre Acrílico Cast 2mm, 3mm, 5mm ou Letreiro Neon LED. O sistema calcula a taxa por m² automaticamente.",
+        title: "Escolher Material e Anexar Arquivo",
+        description: "Selecione o material (ex: Acrílico Espelhado Dourado, MDF) e anexe o arquivo (PDF, SVG, PNG) com observações.",
       },
       {
         number: 3,
-        title: "Preço de Atacado x Preço de Venda",
-        description: "Veja o custo real cobrado pela fábrica SMD e o valor final sugerido para seu cliente final.",
+        title: "Aprovação e Faturamento Fábrica",
+        description: "A fábrica avalia o projeto no Gestor Pro CNC e envia o preço oficial de atacado para você faturar com 1 clique.",
       },
     ],
   },

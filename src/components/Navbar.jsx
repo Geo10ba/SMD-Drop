@@ -18,11 +18,24 @@ import {
   Ruler,
   UserPlus,
   Wand2,
-  Smartphone
+  Smartphone,
+  Wallet,
+  TrendingUp
 } from 'lucide-react';
 
-export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders, onOpenTracking, onOpenFaq, onOpenAdminLogin, onOpenCalculator, onOpenRegister }) => {
-  const { theme, toggleTheme, viewMode, setViewMode, currentUser, logout, cart, orders, notification, openMagicImport } = useStore();
+export const Navbar = ({ 
+  onOpenCart, 
+  onOpenNewProductModal, 
+  onOpenResellerOrders, 
+  onOpenTracking, 
+  onOpenFaq, 
+  onOpenAdminLogin, 
+  onOpenCalculator, 
+  onOpenRegister,
+  onOpenWallet,
+  onOpenFinancialStatement
+}) => {
+  const { theme, toggleTheme, viewMode, setViewMode, currentUser, logout, cart, orders, walletBalance, notification, openMagicImport } = useStore();
 
   const pendingOrdersCount = orders.filter((o) => o.status === 'aguardando_impressao').length;
 
@@ -158,10 +171,10 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
                   <button
                     onClick={onOpenCalculator}
                     className="btn-secondary text-xs py-1.5 px-2 flex items-center gap-1 shrink-0"
-                    title="Calculadora sob Medida R$/m²"
+                    title="Solicitar Orçamento sob Medida"
                   >
                     <Ruler size={15} className="text-amber-500 shrink-0" />
-                    <span className="hidden 2xl:inline">Calculadora m²</span>
+                    <span className="hidden 2xl:inline">Orçar sob Medida</span>
                   </button>
 
                   <button
@@ -171,6 +184,28 @@ export const Navbar = ({ onOpenCart, onOpenNewProductModal, onOpenResellerOrders
                   >
                     <PackageCheck size={15} className="text-amber-500 shrink-0" />
                     <span className="hidden lg:inline">Pedidos</span>
+                  </button>
+
+                  {/* Wallet Prepaid Balance Pill */}
+                  <button
+                    onClick={onOpenWallet}
+                    className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[var(--text-main)] text-xs font-bold py-1.5 px-2.5 rounded-xl flex items-center gap-1.5 shrink-0 transition-all shadow-sm group"
+                    title="Carteira do Revendedor • Recarga e Pagamento Instantâneo"
+                  >
+                    <Wallet size={15} className="text-amber-500 group-hover:scale-110 transition-transform" />
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-extrabold">
+                      R$ {(Number(walletBalance) || 0).toFixed(2)}
+                    </span>
+                  </button>
+
+                  {/* Financial Statement & Net Profit Button */}
+                  <button
+                    onClick={onOpenFinancialStatement}
+                    className="btn-secondary text-xs py-1.5 px-2.5 flex items-center gap-1 shrink-0"
+                    title="Extrato Financeiro & Lucro Líquido Real"
+                  >
+                    <TrendingUp size={15} className="text-emerald-500 shrink-0" />
+                    <span className="hidden xl:inline">Finanças</span>
                   </button>
 
                   <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-xl shrink-0">

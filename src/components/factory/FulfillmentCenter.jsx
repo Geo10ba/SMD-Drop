@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { PostalDeclarationModal } from './PostalDeclarationModal';
+import { ProductionOrderModal } from './ProductionOrderModal';
+import { FiscalResolutionModal } from './FiscalResolutionModal';
+import { LabelPreviewModal } from './LabelPreviewModal';
+import { ProductionTimeline } from '../common/ProductionTimeline';
+import { 
+  PRODUCTION_STAGES, 
+  normalizeProductionStatus, 
+  getNextProductionStage, 
+  getPrevProductionStage, 
+  getStageInfo 
+} from '../../utils/productionCycle';
 import { 
   Printer, 
   Download, 
@@ -10,23 +21,61 @@ import {
   Package, 
   Ruler, 
   Clock, 
-  Search,
-  ExternalLink,
-  ShieldCheck,
-  Tag,
-  FileText
+  Search, 
+  ExternalLink, 
+  ShieldCheck, 
+  Tag, 
+  FileText, 
+  Scissors, 
+  AlertTriangle, 
+  Lock, 
+  Unlock, 
+  Barcode,
+  CheckCheck,
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 
 export const FulfillmentCenter = ({ onClose }) => {
-  const { orders, updateOrderStatus, showNotification } = useStore();
+  const { 
+    orders, 
+    updateOrderStatus, 
+    advanceProductionStage, 
+    rollbackProductionStage, 
+    showNotification 
+  } = useStore();
 
-  const [activeTab, setActiveTab] = useState('all'); // 'all', 'aguardando_impressao', 'em_producao', 'despachado'
+  const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [scannerInput, setScannerInput] = useState('');
   const [printingOrderId, setPrintingOrderId] = useState(null);
   const [declarationOrder, setDeclarationOrder] = useState(null);
+  const [productionOrder, setProductionOrder] = useState(null);
+  const [fiscalOrderToResolve, setFiscalOrderToResolve] = useState(null);
+  const [labelPreviewOrder, setLabelPreviewOrder] = useState(null);
+
+  const handleScanSubmit = (e) => {
+    e.preventDefault();
+    const cleanCode = scannerInput.trim();
+    if (!cleanCode) return;
+
+    const found = orders.find(o => 
+      o.id.toLowerCase() === cleanCode.toLowerCase() ||
+      o.id.replace('ORD-', '').toLowerCase() === cleanCode.replace(/^(ORD-|OP-)/i, '').toLowerCase() ||
+      (o.trackingCode && o.trackingCode.toLowerCase() === cleanCode.toLowerCase())
+    );
+
+    if (found) {
+      advanceProductionStage(found.id, 'Avanço por bipagem de código óptico/QR Code');
+      setScannerInput('');
+    } else {
+      showNotification(`Código ou pedido "${cleanCode}" não localizado na fila.`, 'error');
+    }
+  };
 
   const filteredOrders = orders.filter((order) => {
-    const matchesTab = activeTab === 'all' || order.status === activeTab;
+    const norm = normalizeProductionStatus(order.status);
+    const matchesTab = activeTab === 'all' || norm === activeTab;
     const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           order.resellerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (order.trackingCode && order.trackingCode.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -84,26 +133,78 @@ export const FulfillmentCenter = ({ onClose }) => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-[var(--border-color)] pb-2 overflow-x-auto">
-        {[
-          { id: 'all', label: 'Todos os Pedidos' },
-          { id: 'aguardando_impressao', label: 'Aguardando Impressão' },
-          { id: 'em_producao', label: 'Em Produção / Separação' },
-          { id: 'despachado', label: 'Despachados' }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === tab.id
-                ? 'bg-slate-900 text-white dark:bg-amber-500 dark:text-slate-900 shadow-sm'
-                : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            {tab.label}
+      {/* Terminal de Bipagem Rápida por Código de Barras / QR Code */}
+      <div className="bg-slate-900 border-2 border-slate-700 p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 text-white shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <Barcode size={22} />
+          </div>
+          <div>
+            <span className="text-xs font-black uppercase text-amber-300 block tracking-wider">
+              Terminal de Bipagem Rápida (Chão de Fábrica)
+            </span>
+            <span className="text-[11px] text-slate-300">
+              Aponte o leitor óptico para o QR Code da OP ou digite o ID do pedido para avançar automaticamente o estágio na esteira.
+            </span>
+          </div>
+        </div>
+
+        <form onSubmit={handleScanSubmit} className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative w-full md:w-72">
+            <Barcode size={16} className="absolute left-3 top-3 text-amber-400" />
+            <input
+              type="text"
+              placeholder="Bipar QR Code (Ex: ORD-1234)..."
+              value={scannerInput}
+              onChange={(e) => setScannerInput(e.target.value)}
+              className="input-field pl-9 text-xs font-mono font-bold bg-slate-950 border-amber-500/50 text-white placeholder-slate-500 py-2.5 w-full focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+          <button type="submit" className="btn-gold py-2.5 px-5 text-xs font-black shrink-0 shadow-md">
+            Bipar
           </button>
-        ))}
+        </form>
+      </div>
+
+      {/* Tabs por Estágio Canônico (7 Fases) */}
+      <div className="flex items-center gap-2 border-b border-[var(--border-color)] pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'all'
+              ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+              : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+          }`}
+        >
+          <span>Todos</span>
+          <span className="bg-slate-950/20 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+            {orders.length}
+          </span>
+        </button>
+
+        {PRODUCTION_STAGES.map((st) => {
+          const count = orders.filter(o => normalizeProductionStatus(o.status) === st.id).length;
+          return (
+            <button
+              key={st.id}
+              onClick={() => setActiveTab(st.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === st.id
+                  ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                  : 'bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'
+              }`}
+            >
+              <span>{st.shortLabel}</span>
+              {count > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
+                  activeTab === st.id ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Order Cards List */}
@@ -150,15 +251,56 @@ export const FulfillmentCenter = ({ onClose }) => {
                       </span>
                     )}
 
-                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap ${
-                      order.status === 'aguardando_impressao' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
-                      order.status === 'em_producao' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
-                      'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                    }`}>
-                      {order.status === 'aguardando_impressao' ? 'Aguardando Impressão' :
-                       order.status === 'em_producao' ? 'Em Produção / Embalagem' : 'Despachado / Coletado'}
-                    </span>
+                    {/* Canonical Production Stage Badge */}
+                    {(() => {
+                      const stage = getStageInfo(order.status);
+                      return (
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 ${stage.badgeClass}`}>
+                          <span>{stage.icon}</span>
+                          <span>{stage.shortLabel}</span>
+                        </span>
+                      );
+                    })()}
+
+                    {/* Fiscal Status Badge */}
+                    {order.fiscalData && !order.fiscalData.isFiscalComplete ? (
+                      <button
+                        onClick={() => setFiscalOrderToResolve(order)}
+                        className="px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 flex items-center gap-1 transition-all"
+                        title="Clique para regularizar requisitos fiscais"
+                      >
+                        <Lock size={12} className="text-rose-400" /> BLOQUEIO FISCAL
+                      </button>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <ShieldCheck size={12} className="text-emerald-400" /> FISCAL OK
+                      </span>
+                    )}
                   </div>
+                </div>
+
+                {/* Fiscal Lock Alert Banner */}
+                {order.fiscalData && !order.fiscalData.isFiscalComplete && (
+                  <div className="bg-rose-500/15 border-2 border-rose-500/40 p-3 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-rose-200">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle size={18} className="text-rose-400 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-white block">Expedição Travada: Não Conformidade Fiscal (Venda à Ordem)</strong>
+                        <span className="text-[11px] text-rose-300">{order.fiscalData.missingReasons?.join(' • ') || 'Requisitos fiscais pendentes'}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setFiscalOrderToResolve(order)}
+                      className="btn-gold py-1.5 px-3 text-xs font-black shrink-0 shadow flex items-center gap-1"
+                    >
+                      <Unlock size={13} /> Regularizar Fiscal
+                    </button>
+                  </div>
+                )}
+
+                {/* Production Cycle Timeline Visualizer */}
+                <div className="bg-[var(--bg-surface-hover)]/70 p-3 rounded-xl border border-[var(--border-color)]">
+                  <ProductionTimeline status={order.status} timeline={order.timeline || []} />
                 </div>
 
                 {/* Items in Order */}
@@ -237,13 +379,13 @@ export const FulfillmentCenter = ({ onClose }) => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Direct Download PDF Label Button */}
+                    {/* Laser Cutting Production Order (OP) Button */}
                     <button
-                      onClick={() => handleDownloadLabelPdf(order)}
-                      className="btn-gold text-xs font-bold py-2 px-3 shadow-sm"
-                      title="Baixar PDF da Etiqueta"
+                      onClick={() => setProductionOrder(order)}
+                      className="btn-secondary text-xs font-bold py-2 px-3 border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 flex items-center gap-1.5 shadow-sm"
+                      title="Ficha Técnica de Ordem de Produção (OP) para Operador de Laser"
                     >
-                      <Download size={15} /> Baixar Etiqueta PDF
+                      <Scissors size={14} className="text-amber-500" /> OP Laser
                     </button>
 
                     {/* Postal Declaration Button */}
@@ -255,6 +397,15 @@ export const FulfillmentCenter = ({ onClose }) => {
                       <FileText size={15} /> Declaração
                     </button>
 
+                    {/* Preview Blind Thermal Label & Canguru Button */}
+                    <button
+                      onClick={() => setLabelPreviewOrder(order)}
+                      className="btn-secondary text-xs font-bold py-2 px-3 border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 flex items-center gap-1.5 shadow-sm"
+                      title="Visualizar Etiqueta Térmica 10x15cm, Envelope Canguru e Checklist Cego"
+                    >
+                      <Barcode size={15} /> Etiqueta 10x15 (Cega)
+                    </button>
+
                     {/* Print Label Button */}
                     <button
                       onClick={() => handlePrintThermalLabel(order)}
@@ -262,27 +413,66 @@ export const FulfillmentCenter = ({ onClose }) => {
                       className="btn-secondary text-xs font-bold py-2 px-3 bg-slate-900 text-white dark:bg-slate-800"
                     >
                       <Printer size={15} />
-                      {printingOrderId === order.id ? "Imprimindo 10x15cm..." : "Simular Impressora Thermal"}
+                      {printingOrderId === order.id ? "Imprimindo 10x15cm..." : "Imprimir Etiqueta Térmica"}
                     </button>
 
-                    {/* Change Status Buttons */}
-                    {order.status === 'em_producao' && (
-                      <button
-                        onClick={() => updateOrderStatus(order.id, 'despachado')}
-                        className="btn-primary text-xs font-bold py-2 px-3"
-                      >
-                        <CheckCircle2 size={15} /> Despachar
-                      </button>
-                    )}
+                    {/* Sequential Production Advance Button with QC and Fiscal Lock */}
+                    {(() => {
+                      const normStatus = normalizeProductionStatus(order.status);
+                      const nextStage = getNextProductionStage(normStatus);
 
-                    {order.status === 'despachado' && (
-                      <button
-                        onClick={() => updateOrderStatus(order.id, 'entregue')}
-                        className="btn-emerald text-xs font-bold py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-sm flex items-center gap-1"
-                      >
-                        <CheckCircle2 size={15} /> Concluir Entrega
-                      </button>
-                    )}
+                      return (
+                        <div className="flex items-center gap-2">
+                          {/* Rollback QC Button if in Quality Check */}
+                          {normStatus === 'conferencia_qualidade' && (
+                            <button
+                              onClick={() => rollbackProductionStage(order.id, 'Reprovado no teste de qualidade/esquadro. Retornado para retrabalho.')}
+                              className="px-3 py-2 text-xs font-black rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 flex items-center gap-1 transition-all shadow-sm"
+                              title="Reprovar inspeção e devolver para a produção"
+                            >
+                              <RotateCcw size={14} className="text-rose-400" /> Reprovar QC
+                            </button>
+                          )}
+
+                          {/* Advance Button */}
+                          {nextStage ? (
+                            <button
+                              onClick={() => {
+                                if (nextStage.id === 'enviado' && order.fiscalData && !order.fiscalData.isFiscalComplete) {
+                                  setFiscalOrderToResolve(order);
+                                } else {
+                                  advanceProductionStage(order.id);
+                                }
+                              }}
+                              className={`text-xs font-black py-2 px-3.5 rounded-xl flex items-center gap-1.5 transition-all shadow-md ${
+                                nextStage.id === 'enviado' && order.fiscalData && !order.fiscalData.isFiscalComplete
+                                  ? 'bg-rose-950/80 text-rose-300 border-2 border-rose-500 hover:bg-rose-900/90 cursor-pointer animate-pulse'
+                                  : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black'
+                              }`}
+                              title={
+                                nextStage.id === 'enviado' && order.fiscalData && !order.fiscalData.isFiscalComplete
+                                  ? "Expedição bloqueada por falta de conformidade fiscal. Clique para regularizar!"
+                                  : `Avançar para: ${nextStage.label}`
+                              }
+                            >
+                              {nextStage.id === 'enviado' && order.fiscalData && !order.fiscalData.isFiscalComplete ? (
+                                <>
+                                  <Lock size={14} className="text-rose-400" /> Trava Fiscal: Resolver
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCheck size={15} /> Avançar: {nextStage.shortLabel}
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                              <CheckCircle2 size={14} className="text-emerald-400" /> Ciclo Concluído
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -296,6 +486,30 @@ export const FulfillmentCenter = ({ onClose }) => {
         <PostalDeclarationModal
           order={declarationOrder}
           onClose={() => setDeclarationOrder(null)}
+        />
+      )}
+
+      {/* Production Order Technical Sheet Modal */}
+      {productionOrder && (
+        <ProductionOrderModal
+          order={productionOrder}
+          onClose={() => setProductionOrder(null)}
+        />
+      )}
+
+      {/* Fiscal Resolution & Dispatch Unlock Modal */}
+      {fiscalOrderToResolve && (
+        <FiscalResolutionModal
+          order={fiscalOrderToResolve}
+          onClose={() => setFiscalOrderToResolve(null)}
+        />
+      )}
+
+      {/* Blind Shipping Thermal Label & Canguru Pouch Preview Modal */}
+      {labelPreviewOrder && (
+        <LabelPreviewModal
+          order={labelPreviewOrder}
+          onClose={() => setLabelPreviewOrder(null)}
         />
       )}
     </div>

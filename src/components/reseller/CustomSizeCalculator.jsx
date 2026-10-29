@@ -1,552 +1,622 @@
-import React, { useState } from 'react';
-import { useStore } from '../../context/StoreContext';
+import React, { useState, useEffect } from 'react';
 import { 
-  Ruler, 
-  Upload, 
-  CheckCircle2, 
-  DollarSign, 
-  FileText, 
-  ArrowRight, 
-  ShieldCheck, 
-  Sparkles, 
-  Eye, 
-  Type, 
-  Palette,
-  Copy,
-  Check,
-  MessageSquare,
-  Layers,
-  Wand2,
-  Brain
+  Ruler, Check, X, Shield, Sparkles, Send, Layers, 
+  FileUp, Info, Lock, Unlock, Eye, Type, Clock, 
+  MessageSquare, UploadCloud, CheckCircle2, ChevronRight
 } from 'lucide-react';
-import { suggestMaterialAndPitchForCustomSign } from '../../lib/smdAssistIa';
+import { useStore } from '../../context/StoreContext';
+import { BUILTIN_FONTS, calculateTextDimensions } from '../../utils/textMetrics';
+import { parseSVG, parseDXF } from '../../utils/vectorParser';
 
 export const CustomSizeCalculator = ({ product, onClose }) => {
-  const { addToCart, showNotification, materials } = useStore();
+  const { 
+    showNotification, 
+    materials, 
+    fonts, 
+    companySettings,
+    requestCustomQuote,
+    currentUser
+  } = useStore();
 
-  // Unit State: 'mm' | 'cm' | 'm' (Default 'mm')
-  const [unit, setUnit] = useState('mm');
-  const [widthInput, setWidthInput] = useState(500); // e.g. 500 mm
-  const [heightInput, setHeightInput] = useState(800); // e.g. 800 mm
-  const [customText, setCustomText] = useState('STUDIO BELLA');
+  const fontList = fonts && fonts.length > 0 ? fonts : BUILTIN_FONTS;
+
+  const enabledProjectTypes = companySettings?.enabledProjectTypes || {
+    logo_parede: true,
+    placa_fundo: true,
+    texto_simples: true
+  };
+  const activeMaterials = (materials || []).filter(m => m.isActive !== false);
+  const disabledFontIds = companySettings?.disabledFontIds || [];
+  const activeFonts = fontList.filter(f => !disabledFontIds.includes(f.id));
+
+  // Form State
+  const [unit, setUnit] = useState('cm'); // 'mm' | 'cm' | 'm'
+  const [widthInput, setWidthInput] = useState(80); // 80 cm
+  const [heightInput, setHeightInput] = useState(18); // 18 cm
+  const [customText, setCustomText] = useState('Studio Bella');
+  const [selectedFontId, setSelectedFontId] = useState(() => activeFonts[0]?.id || fontList[0]?.id || 'ArialBold');
+  const [isProportionalLocked, setIsProportionalLocked] = useState(true);
+  const [fontMetrics, setFontMetrics] = useState(null);
+  const [isCalculatingFont, setIsCalculatingFont] = useState(false);
   const [fontFamily, setFontFamily] = useState('Outfit');
-  const [backgroundType, setBackgroundType] = useState('transparente'); // transparente, preto, madeira, recortado
   const [vectorFile, setVectorFile] = useState(null);
-  const [copiedQuote, setCopiedQuote] = useState(false);
-  const [copiedScript, setCopiedScript] = useState(false);
-  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
-  const [iaSuggestion, setIaSuggestion] = useState(null);
+  const [vectorData, setVectorData] = useState(null);
+  const [resellerNotes, setResellerNotes] = useState('');
+  const [resellerWhatsapp, setResellerWhatsapp] = useState(currentUser?.phone || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
-  // Material Selection State (Pulls from Admin-registered materials table)
-  const [selectedMaterialId, setSelectedMaterialId] = useState(() => materials[0]?.id || '');
-  const selectedMaterial = materials.find(m => m.id === selectedMaterialId) || materials[0] || {
-    name: 'Acrílico Premium (Luxo)',
-    wholesalePricePerM2: product?.pricePerM2 || 920,
-    suggestedPricePerM2: product?.suggestedPricePerM2 || 1380,
-    style: 'dourado',
-    leadTimeDays: 3
+  // Tipo de Projeto
+  const [projectType, setProjectType] = useState(() => {
+    if (enabledProjectTypes.logo_parede !== false) return 'logo_parede';
+    if (enabledProjectTypes.placa_fundo !== false) return 'placa_fundo';
+    if (enabledProjectTypes.texto_simples !== false) return 'texto_simples';
+    return 'logo_parede';
+  });
+
+  // Material Selection
+  const [selectedMaterialId, setSelectedMaterialId] = useState(() => activeMaterials[0]?.id || materials[0]?.id || '');
+  const selectedMaterial = activeMaterials.find(m => m.id === selectedMaterialId) || activeMaterials[0] || materials[0] || {
+    name: 'MDF 6mm',
+    style: 'amadeirado'
   };
 
-  // Lumen IA Automatic Material & Niche Recommendation Logic (Always Active)
-  React.useEffect(() => {
-    const rawText = customText || '';
-    const text = rawText.toLowerCase().trim();
-    
-    // Check for outdoor / heavy duty / facade niches
-    const isOutdoor = 
-      text.includes('oficina') || text.includes('auto') || text.includes('loja') || text.includes('deposit') ||
-      text.includes('farmac') || text.includes('mercad') || text.includes('padar') || text.includes('bar') ||
-      text.includes('restaur') || text.includes('post');
+  // Unit conversion helpers
+  const toMm = (val, u = unit) => {
+    const num = Number(val) || 0;
+    if (u === 'cm') return num * 10;
+    if (u === 'm') return num * 1000;
+    return num; // mm
+  };
 
-    if (isOutdoor) {
-      const acmMat = materials.find(m => m.name?.toLowerCase().includes('acm'));
-      setIaSuggestion({
-        targetMatId: acmMat?.id || selectedMaterialId,
-        materialName: 'ACM (Alumínio Composto - Sol & Chuva)',
-        reasoning: 'Resistência máxima a intempéries em fachadas externas, mantendo a estrutura intacta sem desbotar.',
-        icon: '🛡️'
+  const fromMm = (valMm, targetUnit = unit) => {
+    if (targetUnit === 'cm') return Math.round(valMm / 10);
+    if (targetUnit === 'm') return Number((valMm / 1000).toFixed(2));
+    return Math.round(valMm); // mm
+  };
+
+  const widthCm = unit === 'mm' ? widthInput / 10 : unit === 'm' ? widthInput * 100 : Number(widthInput);
+  const heightCm = unit === 'mm' ? heightInput / 10 : unit === 'm' ? heightInput * 100 : Number(heightInput);
+
+  // Typography auto-ratio calculation for live preview
+  useEffect(() => {
+    let isMounted = true;
+    const targetFont = activeFonts.find(f => f.id === selectedFontId) || activeFonts[0] || BUILTIN_FONTS[0];
+    if (!targetFont) return;
+
+    setFontFamily(targetFont.family);
+    setIsCalculatingFont(true);
+
+    calculateTextDimensions(customText || 'Exemplo', selectedFontId)
+      .then((metrics) => {
+        if (!isMounted) return;
+        setFontMetrics(metrics);
+        setIsCalculatingFont(false);
+
+        if (isProportionalLocked && metrics.aspectRatio > 0) {
+          const wMm = toMm(widthInput);
+          const naturalHMm = Math.round(wMm * metrics.aspectRatio);
+          setHeightInput(fromMm(naturalHMm));
+        }
+      })
+      .catch((err) => {
+        if (isMounted) setIsCalculatingFont(false);
       });
-    } else {
-      // Default recommendation for all brands, offices, lawyers (ADVOGADA / ADIVOGADA), clinics, salons, etc.
-      const acrilicoMat = materials.find(m => m.name?.toLowerCase().includes('acrílico') || m.name?.toLowerCase().includes('acrilico'));
-      setIaSuggestion({
-        targetMatId: acrilicoMat?.id || selectedMaterialId,
-        materialName: 'Acrílico Premium (Luxo Espelhado)',
-        reasoning: rawText 
-          ? `Para escritórios e marcas ("${rawText}"), o Acrílico Espelhado transmite acabamento nobre de luxo e permite margem de lucro de até 300%!` 
-          : 'Transmite acabamento nobre de alto padrão e permite margem de lucro de até 300% no cliente final!',
-        icon: '💎'
-      });
+
+    return () => { isMounted = false; };
+  }, [customText, selectedFontId]);
+
+  const handleWidthChange = (val) => {
+    const num = Number(val);
+    setWidthInput(num);
+    if (isProportionalLocked && fontMetrics?.aspectRatio) {
+      const wMm = toMm(num);
+      const naturalHMm = Math.round(wMm * fontMetrics.aspectRatio);
+      setHeightInput(fromMm(naturalHMm));
     }
-  }, [customText, materials]);
-
-  // Convert input values to centimeters (cm) and square meters (m²)
-  const getWidthInCm = () => {
-    const val = Number(widthInput) || 0;
-    if (unit === 'mm') return val / 10;
-    if (unit === 'm') return val * 100;
-    return val; // cm
   };
 
-  const getHeightInCm = () => {
-    const val = Number(heightInput) || 0;
-    if (unit === 'mm') return val / 10;
-    if (unit === 'm') return val * 100;
-    return val; // cm
+  const handleHeightChange = (val) => {
+    const num = Number(val);
+    setHeightInput(num);
+    if (isProportionalLocked && fontMetrics?.aspectRatio && fontMetrics.aspectRatio > 0) {
+      const hMm = toMm(num);
+      const wMm = Math.round(hMm / fontMetrics.aspectRatio);
+      setWidthInput(fromMm(wMm));
+    }
   };
 
-  const widthCm = getWidthInCm();
-  const heightCm = getHeightInCm();
-
-  // Dynamic Calculations based on selected material rates + Minimum 0.25 m² area rule!
-  const rawM2 = (widthCm * heightCm) / 10000;
-  const minM2 = 0.25;
-  const isMinM2Applied = rawM2 > 0 && rawM2 < minM2;
-  const calculatedM2 = Math.max(minM2, rawM2);
-
-  const wholesaleTotal = calculatedM2 * selectedMaterial.wholesalePricePerM2;
-  const suggestedTotal = calculatedM2 * selectedMaterial.suggestedPricePerM2;
-  const resellerProfit = suggestedTotal - wholesaleTotal;
+  const applyPresetWidth = (widthCmVal) => {
+    const converted = unit === 'mm' ? widthCmVal * 10 : unit === 'm' ? widthCmVal / 100 : widthCmVal;
+    setWidthInput(converted);
+    if (isProportionalLocked && fontMetrics?.aspectRatio) {
+      const wMm = widthCmVal * 10;
+      const naturalHMm = Math.round(wMm * fontMetrics.aspectRatio);
+      setHeightInput(fromMm(naturalHMm));
+    }
+  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setVectorFile(file.name);
-    }
-  };
+    if (!file) return;
 
-  const handleCopyWhatsappQuote = () => {
-    const text = `🎨 *ORÇAMENTO PRODUTO SOB MEDIDA*
------------------------------------
-📍 *Produto:* ${product?.title || 'Logomarca 3D'}
-🧩 *Material:* ${selectedMaterial.name}
-📐 *Medidas:* ${widthInput} ${unit} x ${heightInput} ${unit} (${widthCm}x${heightCm}cm - ${calculatedM2.toFixed(3)}m²)
-✨ *Texto/Arte:* ${customText || "Personalizado"}
------------------------------------
-💰 *Valor Total para o Cliente:* R$ ${suggestedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-💳 Em até 12x no cartão de crédito!
-🚀 Produção direta de fábrica com garantia total.`;
+    setVectorFile(file.name);
+    const fileName = file.name.toLowerCase();
 
-    navigator.clipboard.writeText(text);
-    setCopiedQuote(true);
-    setTimeout(() => setCopiedQuote(false), 2500);
-    showNotification('📱 Orçamento com material copiado! Cole no WhatsApp do seu cliente.');
-  };
-
-  const handleSendDirectToWhatsapp = async (useIaPitch = true) => {
-    let messageText = '';
-
-    if (useIaPitch) {
-      setIsGeneratingScript(true);
-      try {
-        const res = await suggestMaterialAndPitchForCustomSign({
-          brandText: customText,
-          widthCm: getWidthInCm(),
-          heightCm: getHeightInCm(),
-          selectedMaterialName: selectedMaterial.name,
-          totalPrice: suggestedTotal
-        });
-        if (res && res.whatsappScript) {
-          messageText = res.whatsappScript;
+    if (fileName.endsWith('.svg') || fileName.endsWith('.dxf')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result;
+        if (!content) return;
+        try {
+          let parsed = fileName.endsWith('.svg') ? parseSVG(content) : parseDXF(content);
+          if (parsed && parsed.width > 0 && parsed.height > 0) {
+            setVectorData(parsed);
+            setWidthInput(fromMm(parsed.width));
+            setHeightInput(fromMm(parsed.height));
+            showNotification(`✨ Arquivo ${parsed.format.toUpperCase()} analisado! Medidas ajustadas: ${parsed.width}x${parsed.height}mm.`);
+          }
+        } catch (err) {
+          showNotification(`Arquivo anexado: ${file.name}`);
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsGeneratingScript(false);
-      }
+      };
+      reader.readAsText(file);
+    } else {
+      setVectorData(null);
+      showNotification(`Arquivo anexado: ${file.name}`);
     }
-
-    if (!messageText) {
-      messageText = `🎨 *ORÇAMENTO PRODUTO SOB MEDIDA*\n-----------------------------------\n📍 *Produto:* ${product?.title || 'Logomarca 3D'}\n🧩 *Material:* ${selectedMaterial.name}\n📐 *Medidas:* ${widthInput} ${unit} x ${heightInput} ${unit} (${widthCm}x${heightCm}cm - ${calculatedM2.toFixed(3)}m²)\n✨ *Texto/Arte:* ${customText || "Personalizado"}\n-----------------------------------\n💰 *Valor Total para o Cliente:* R$ ${suggestedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n💳 Em até 12x no cartão de crédito!\n🚀 Produção direta de fábrica com garantia total.`;
-    }
-
-    const encoded = encodeURIComponent(messageText);
-    const waUrl = `https://api.whatsapp.com/send?text=${encoded}`;
-    window.open(waUrl, '_blank');
-    showNotification('📲 Abrindo WhatsApp com a proposta formatada!');
   };
 
-  const handleCopyIaCommercialPitch = async () => {
-    setIsGeneratingScript(true);
+  const handleSubmitQuoteRequest = () => {
+    if (!customText && !vectorFile) {
+      showNotification('⚠️ Preencha o nome da marca ou anexe um arquivo para a fábrica avaliar!', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      const res = await suggestMaterialAndPitchForCustomSign({
-        brandText: customText,
-        widthCm: getWidthInCm(),
-        heightCm: getHeightInCm(),
-        selectedMaterialName: selectedMaterial.name,
-        totalPrice: suggestedTotal
+      requestCustomQuote({
+        title: customText || vectorFile || 'Projeto Sob Medida',
+        customText: customText,
+        widthCm: widthCm,
+        heightCm: heightCm,
+        materialName: selectedMaterial.name,
+        projectType: projectType,
+        resellerNotes: resellerNotes,
+        resellerPhone: resellerWhatsapp,
+        vectorFileName: vectorFile || '',
+        fontFamily: fontMetrics?.fontName || selectedFontId || 'ArialBold'
       });
 
-      if (res && res.whatsappScript) {
-        await navigator.clipboard.writeText(res.whatsappScript);
-        setCopiedScript(true);
-        setTimeout(() => setCopiedScript(false), 2500);
-        showNotification('✨ Script Comercial IA de Alto Fechamento copiado para o WhatsApp!');
-      }
+      setSubmittedSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 2500);
     } catch (err) {
       console.error(err);
-    } finally {
-      setIsGeneratingScript(false);
+      showNotification('Erro ao enviar solicitação. Tente novamente.', 'error');
+      setIsSubmitting(false);
     }
   };
 
-  const handleAddCustomToCart = () => {
-    addToCart({
-      productId: product?.id || 'custom-m2-prod',
-      title: `${product?.title || 'Logomarca 3D'} (${selectedMaterial.name})`,
-      pricingType: 'custom_m2',
-      customText: customText || product?.title,
-      fontFamily,
-      materialName: selectedMaterial.name,
-      widthCm: Number(widthCm),
-      heightCm: Number(heightCm),
-      calculatedM2: Number(calculatedM2.toFixed(3)),
-      unitWholesalePrice: Number(wholesaleTotal.toFixed(2)),
-      suggestedRetailPrice: Number(suggestedTotal.toFixed(2)),
-      finishOption: `${selectedMaterial.name} | Fundo: ${backgroundType.toUpperCase()}`,
-      vectorFileName: vectorFile || 'logo_cliente_vetor.svg',
-      quantity: 1,
-      image: product?.image || 'https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80'
-    });
-    onClose();
-  };
+  const handleSendViaWhatsapp = () => {
+    const factoryPhone = (companySettings?.phone || '5511987654321').replace(/\D/g, '');
+    const projectTypeName = projectType === 'logo_parede' 
+      ? 'Logomarca Corporativa 3D' 
+      : projectType === 'placa_fundo' 
+      ? 'Placa Painel com Fundo' 
+      : 'Nome Simples / Frase';
 
-  // Visual preview style mapping based on selected material style
-  const getAcrylicStyle = () => {
-    switch (selectedMaterial.style) {
-      case 'dourado':
-        return 'bg-gradient-to-r from-amber-300 via-yellow-500 to-amber-600 text-transparent bg-clip-text drop-shadow-[0_4px_10px_rgba(245,158,11,0.5)]';
-      case 'prata':
-        return 'bg-gradient-to-r from-slate-200 via-slate-400 to-slate-100 text-transparent bg-clip-text drop-shadow-[0_4px_10px_rgba(255,255,255,0.6)]';
-      case 'rose':
-        return 'bg-gradient-to-r from-rose-300 via-pink-400 to-rose-500 text-transparent bg-clip-text drop-shadow-[0_4px_10px_rgba(244,63,94,0.5)]';
-      case 'preto':
-        return 'text-slate-950 font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]';
-      case 'madeira':
-        return 'text-amber-200 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] font-extrabold';
-      case 'neon_yellow':
-        return 'text-yellow-300 drop-shadow-[0_0_15px_rgba(253,224,71,0.9)] animate-pulse';
-      case 'neon_blue':
-        return 'text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.9)] animate-pulse';
-      default:
-        return 'text-amber-400';
-    }
-  };
+    const msg = `Olá! Gostaria de um orçamento fabril sob medida:\n\n` +
+      `🏢 *Projeto:* ${projectTypeName}\n` +
+      `✨ *Texto/Marca:* ${customText || 'Conforme arquivo'}\n` +
+      `📐 *Medidas Desejadas:* ${widthCm} cm × ${heightCm} cm\n` +
+      `🧩 *Material de Preferência:* ${selectedMaterial.name}\n` +
+      (vectorFile ? `📁 *Arquivo Anexado:* ${vectorFile}\n` : '') +
+      (resellerNotes ? `📝 *Observações:* ${resellerNotes}\n` : '') +
+      `\nAguardo a análise técnica e o valor de atacado. Obrigado!`;
 
-  const getBgStyle = () => {
-    switch (backgroundType) {
-      case 'preto':
-        return 'bg-slate-950 border border-slate-800';
-      case 'madeira':
-        return 'bg-amber-950 border border-amber-900/60';
-      case 'recortado':
-        return 'bg-slate-900/40 border border-dashed border-slate-700';
-      default: // transparente
-        return 'bg-slate-900/90 backdrop-blur border border-slate-700/60';
-    }
+    const encoded = encodeURIComponent(msg);
+    const url = `https://api.whatsapp.com/send?phone=${factoryPhone}&text=${encoded}`;
+    window.open(url, '_blank');
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col p-4 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[95vh]">
+        
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-3 shrink-0">
+        <div className="p-4 sm:p-5 border-b border-[var(--border-color)] bg-gradient-to-r from-amber-500/10 via-[var(--bg-surface)] to-[var(--bg-surface)] flex justify-between items-center shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center font-bold border border-amber-500/30 shadow-inner">
               <Ruler size={20} />
             </div>
             <div>
-              <span className="badge-gold uppercase tracking-wider text-[10px] mb-0.5 inline-block">
-                CALCULADORA DINÂMICA DE MATÉRIA-PRIMA DA FÁBRICA (R$/m²)
-              </span>
-              <h3 className="text-lg sm:text-xl font-bold text-[var(--text-main)] font-['Outfit'] leading-tight">
-                {product?.title || 'Cálculo de Logomarca sob Medida'}
-              </h3>
+              <h2 className="text-lg sm:text-xl font-extrabold text-[var(--text-main)] font-['Outfit'] flex items-center gap-2">
+                Solicitação de Orçamento sob Medida
+                <span className="text-[10px] bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                  Análise Fabril
+                </span>
+              </h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                Envie suas especificações. A fábrica analisa a geometria e retorna o orçamento com preço oficial no seu painel.
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)] text-xl font-bold p-1">
-            ✕
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+          >
+            <X size={20} />
           </button>
         </div>
 
-        {/* 2-Column Wide Layout (No Scroll) */}
-        <div className="flex-1 overflow-y-auto pr-1">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            {/* Left Column: Form Controls (7 cols) */}
-            <div className="lg:col-span-7 space-y-3.5 text-xs">
-              {/* Text / Name Input */}
-              <div>
-                <label className="block font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1 flex items-center gap-1">
-                  <Type size={13} className="text-amber-500" /> 1. Nome ou Texto da Logomarca
+        {/* Success Alert */}
+        {submittedSuccess ? (
+          <div className="p-12 text-center space-y-4 my-auto">
+            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto border border-emerald-500/40 animate-bounce">
+              <CheckCircle2 size={36} />
+            </div>
+            <h3 className="text-2xl font-extrabold text-[var(--text-main)] font-['Outfit']">
+              Solicitação Enviada com Sucesso!
+            </h3>
+            <p className="text-sm text-[var(--text-muted)] max-w-md mx-auto">
+              Nossa equipe técnica já recebeu seu projeto. O orçamento com custo de atacado e sugestão de revenda será disponibilizado no seu painel.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 overflow-y-auto divide-y lg:divide-y-0 lg:divide-x divide-[var(--border-color)]">
+            
+            {/* Left Column: Form Inputs */}
+            <div className="lg:col-span-7 p-4 sm:p-6 space-y-5">
+              
+              {/* 1. Project Type Selector */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers size={14} className="text-amber-500" /> 1. Tipo de Aplicação do Projeto
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProjectType('logo_parede')}
+                    className={`p-2.5 rounded-2xl border text-left transition-all ${
+                      projectType === 'logo_parede'
+                        ? 'border-amber-500 bg-amber-500/15 shadow-sm ring-1 ring-amber-500/40 text-amber-500 font-bold'
+                        : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1">
+                      <span>🛡️ Logo 3D</span>
+                    </div>
+                    <span className="text-[9px] block text-[var(--text-muted)] mt-1 leading-tight">
+                      Letras + Símbolo soltos c/ gabarito
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setProjectType('texto_simples')}
+                    className={`p-2.5 rounded-2xl border text-left transition-all ${
+                      projectType === 'texto_simples'
+                        ? 'border-amber-500 bg-amber-500/15 shadow-sm ring-1 ring-amber-500/40 text-amber-500 font-bold'
+                        : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1">
+                      <span>🔤 Frase / Nome</span>
+                    </div>
+                    <span className="text-[9px] block text-[var(--text-muted)] mt-1 leading-tight">
+                      Texto corrido decorativo
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setProjectType('placa_fundo')}
+                    className={`p-2.5 rounded-2xl border text-left transition-all ${
+                      projectType === 'placa_fundo'
+                        ? 'border-amber-500 bg-amber-500/15 shadow-sm ring-1 ring-amber-500/40 text-amber-500 font-bold'
+                        : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1">
+                      <span>🖼️ Placa Fundo</span>
+                    </div>
+                    <span className="text-[9px] block text-[var(--text-muted)] mt-1 leading-tight">
+                      Painel com prolongadores
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Text / Brand Name */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Type size={14} className="text-amber-500" /> 2. Nome da Marca ou Texto
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-normal">
+                    Letras maiúsculas e minúsculas
+                  </span>
                 </label>
                 <input
                   type="text"
                   value={customText}
                   onChange={(e) => setCustomText(e.target.value)}
-                  placeholder="ex: BARBEARIA SILVA"
-                  className="input-field font-extrabold uppercase text-sm py-2"
+                  placeholder="Ex: Studio Bella, Dra. Camila, Barbearia..."
+                  className="w-full bg-[var(--bg-surface-hover)] border border-[var(--border-color)] p-3 rounded-2xl text-sm font-semibold text-[var(--text-main)] focus:outline-none focus:border-amber-500"
                 />
 
-                {/* Lumen IA Material Recommendation Card */}
-                {iaSuggestion && (
-                  <div className="bg-purple-500/10 border border-purple-500/30 p-2.5 rounded-xl flex items-center justify-between gap-2 text-xs mt-2 animate-fade-in">
-                    <div className="space-y-0.5">
-                      <span className="font-extrabold text-purple-600 dark:text-purple-300 text-[10px] uppercase tracking-wider flex items-center gap-1">
-                        <Sparkles size={12} className="text-amber-400 animate-pulse" /> Lumen IA: Recomendação para "{customText}"
-                      </span>
-                      <p className="text-[11px] text-[var(--text-main)] leading-tight">
-                        {iaSuggestion.icon} <strong>{iaSuggestion.materialName}</strong>: {iaSuggestion.reasoning}
-                      </p>
-                    </div>
-                    {selectedMaterialId !== iaSuggestion.targetMatId && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedMaterialId(iaSuggestion.targetMatId);
-                          showNotification(`Material alterado para ${iaSuggestion.materialName}!`);
-                        }}
-                        className="btn-gold py-1.5 px-2.5 text-[10px] font-extrabold shrink-0 shadow-sm flex items-center gap-1"
-                      >
-                        Aplicar IA
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Unit Selector & Dimensions Input */}
-              <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
-                    <Ruler size={13} className="text-amber-500" /> 2. Medidas Exatas (Largura x Altura)
-                  </label>
-
-                  {/* Unit Switcher */}
-                  <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-700 text-[10px] font-bold">
+                {/* Font Selector */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                  {activeFonts.slice(0, 8).map((f) => (
                     <button
+                      key={f.id}
                       type="button"
-                      onClick={() => setUnit('mm')}
-                      className={`px-2 py-0.5 rounded ${unit === 'mm' ? 'bg-amber-500 text-slate-950 font-extrabold' : 'text-slate-400'}`}
-                    >
-                      mm
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUnit('cm')}
-                      className={`px-2 py-0.5 rounded ${unit === 'cm' ? 'bg-amber-500 text-slate-950 font-extrabold' : 'text-slate-400'}`}
-                    >
-                      cm
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUnit('m')}
-                      className={`px-2 py-0.5 rounded ${unit === 'm' ? 'bg-amber-500 text-slate-950 font-extrabold' : 'text-slate-400'}`}
-                    >
-                      m
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-[11px] text-[var(--text-muted)] font-medium">Largura ({unit})</span>
-                    <input
-                      type="number"
-                      value={widthInput}
-                      onChange={(e) => setWidthInput(Number(e.target.value))}
-                      className="input-field font-extrabold mt-0.5 text-amber-500 font-mono py-1.5"
-                    />
-                  </div>
-
-                  <div>
-                    <span className="text-[11px] text-[var(--text-muted)] font-medium">Altura ({unit})</span>
-                    <input
-                      type="number"
-                      value={heightInput}
-                      onChange={(e) => setHeightInput(Number(e.target.value))}
-                      className="input-field font-extrabold mt-0.5 text-amber-500 font-mono py-1.5"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-[var(--text-muted)] font-mono">
-                  * Conversão: <strong>{widthCm} cm x {heightCm} cm</strong> ({rawM2.toFixed(3)} m²)
-                  {isMinM2Applied && (
-                    <span className="text-amber-500 font-bold block mt-0.5">
-                      ⚡ Área mínima de faturamento fabril aplicada: 0,250 m²
-                    </span>
-                  )}
-                </p>
-              </div>
-
-              {/* Dynamic Material Selector */}
-              <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2">
-                <label className="font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
-                  <Layers size={14} className="text-amber-500" /> 3. Escolha a Matéria-Prima / Acabamento
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
-                  {materials.map((mat) => (
-                    <button
-                      key={mat.id}
-                      type="button"
-                      onClick={() => setSelectedMaterialId(mat.id)}
-                      className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all ${
-                        selectedMaterialId === mat.id
-                          ? 'border-amber-500 bg-amber-500/10 shadow-sm ring-1 ring-amber-500/50'
-                          : 'border-[var(--border-color)] hover:bg-[var(--bg-surface)]'
+                      onClick={() => setSelectedFontId(f.id)}
+                      className={`p-2 rounded-xl border text-xs truncate transition-all ${
+                        selectedFontId === f.id
+                          ? 'border-amber-500 bg-amber-500/15 text-amber-500 font-bold'
+                          : 'border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:border-slate-600'
                       }`}
                     >
-                      <div className="font-bold text-xs text-[var(--text-main)] flex items-center gap-1.5">
-                        <span className={`w-2.5 h-2.5 rounded-full inline-block shrink-0 ${
-                          mat.style === 'dourado' ? 'bg-amber-400' :
-                          mat.style === 'prata' ? 'bg-slate-300' :
-                          mat.style === 'rose' ? 'bg-rose-400' :
-                          mat.style === 'preto' ? 'bg-slate-900' :
-                          mat.style === 'madeira' ? 'bg-amber-800' :
-                          'bg-cyan-400'
-                        }`} />
-                        <span className="truncate">{mat.name}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between mt-1 text-[11px] pt-1 border-t border-[var(--border-color)]">
-                        <span className="font-mono font-extrabold text-amber-500">
-                          R$ {mat.wholesalePricePerM2.toFixed(2)}/m²
-                        </span>
-                        <span className="text-[9px] text-[var(--text-muted)]">
-                          Sug: R$ {mat.suggestedPricePerM2.toFixed(2)}/m²
-                        </span>
-                      </div>
+                      {f.name.split(' ')[0]}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Vector File Upload */}
-              <div>
-                <div className="border-2 border-dashed border-[var(--border-hover)] rounded-xl p-2.5 text-center relative bg-[var(--bg-surface-hover)] hover:border-amber-500 transition-colors">
+              {/* 3. Dimensions */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+                    <Ruler size={14} className="text-amber-500" /> 3. Medidas Desejadas (Aproximadas)
+                  </label>
+                  <div className="flex items-center bg-[var(--bg-surface-hover)] border border-[var(--border-color)] rounded-xl p-0.5 text-xs font-bold">
+                    {['mm', 'cm', 'm'].map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => {
+                          const wMm = toMm(widthInput);
+                          const hMm = toMm(heightInput);
+                          setUnit(u);
+                          setWidthInput(fromMm(wMm, u));
+                          setHeightInput(fromMm(hMm, u));
+                        }}
+                        className={`px-2 py-0.5 rounded-lg transition-colors ${
+                          unit === u ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-[var(--text-muted)]'
+                        }`}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5">
+                  {[30, 50, 70, 80, 100, 120].map((dim) => (
+                    <button
+                      key={dim}
+                      type="button"
+                      onClick={() => applyPresetWidth(dim)}
+                      className="px-2.5 py-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[10px] font-bold text-[var(--text-main)] hover:border-amber-500 transition-colors"
+                    >
+                      {dim} cm
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)] mb-1 block">Largura ({unit}):</span>
+                    <input
+                      type="number"
+                      value={widthInput}
+                      onChange={(e) => handleWidthChange(e.target.value)}
+                      className="w-full bg-[var(--bg-surface-hover)] border border-[var(--border-color)] p-2.5 rounded-xl font-mono text-sm font-bold text-[var(--text-main)] focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)] mb-1 block">Altura ({unit}):</span>
+                    <input
+                      type="number"
+                      value={heightInput}
+                      onChange={(e) => handleHeightChange(e.target.value)}
+                      className="w-full bg-[var(--bg-surface-hover)] border border-[var(--border-color)] p-2.5 rounded-xl font-mono text-sm font-bold text-[var(--text-main)] focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Material Selection */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers size={14} className="text-amber-500" /> 4. Matéria-Prima de Preferência
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {activeMaterials.map((mat) => (
+                    <button
+                      key={mat.id}
+                      type="button"
+                      onClick={() => setSelectedMaterialId(mat.id)}
+                      className={`p-2.5 rounded-2xl border text-left transition-all ${
+                        selectedMaterialId === mat.id
+                          ? 'border-amber-500 bg-amber-500/15 text-amber-500 font-bold ring-1 ring-amber-500/40'
+                          : 'border-[var(--border-color)] bg-[var(--bg-surface-hover)] text-[var(--text-main)] hover:border-slate-500'
+                      }`}
+                    >
+                      <p className="text-xs font-bold truncate">{mat.name}</p>
+                      <span className="text-[9px] text-[var(--text-muted)] block truncate mt-0.5">
+                        {mat.description || 'Padrão Fabril'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5. File / Vector Upload */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <FileUp size={14} className="text-amber-500" /> 5. Anexo da Logomarca ou Vetor (Opcional)
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    SVG, DXF, PDF, PNG, JPG, Corel
+                  </span>
+                </label>
+
+                <div className="border-2 border-dashed border-[var(--border-color)] hover:border-amber-500/60 rounded-2xl p-4 text-center bg-[var(--bg-surface-hover)] transition-colors relative cursor-pointer">
                   <input
                     type="file"
+                    accept=".svg,.dxf,.pdf,.png,.jpg,.jpeg"
                     onChange={handleFileUpload}
-                    accept=".pdf,.png,.jpg,.svg,.dxf,.ai"
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
-                  <div className="flex items-center justify-center gap-2 text-xs">
-                    <Upload size={15} className="text-amber-500" />
-                    <span className="font-semibold text-[var(--text-main)] truncate">
-                      {vectorFile ? `Vetor Anexado: ${vectorFile}` : "Anexar Vetor / Logo do Cliente (PDF, SVG, DXF, PNG)"}
+                  <div className="flex flex-col items-center gap-1.5 pointer-events-none">
+                    <UploadCloud size={24} className="text-amber-500" />
+                    <span className="text-xs font-bold text-[var(--text-main)]">
+                      {vectorFile ? `Anexado: ${vectorFile}` : 'Clique para selecionar seu arquivo ou arraste aqui'}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      Se tiver o vetor em curvas, envie para que a fábrica analise os nós de corte
                     </span>
                   </div>
                 </div>
               </div>
+
+              {/* 6. Comments & Details */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+                  <MessageSquare size={14} className="text-amber-500" /> 6. Observações & Detalhes Específicos
+                </label>
+                <textarea
+                  rows={3}
+                  value={resellerNotes}
+                  onChange={(e) => setResellerNotes(e.target.value)}
+                  placeholder="Ex: Fita 3M aplicada no verso de cada letra, gabarito em papel kraft para montagem, cor específica dourada espelhada, cliente tem urgência..."
+                  className="w-full bg-[var(--bg-surface-hover)] border border-[var(--border-color)] p-3 rounded-2xl text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* 7. WhatsApp Contact */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+                  Seu WhatsApp para Retorno do Orçamento
+                </label>
+                <input
+                  type="text"
+                  value={resellerWhatsapp}
+                  onChange={(e) => setResellerWhatsapp(e.target.value)}
+                  placeholder="(DDD) 99999-9999"
+                  className="w-full bg-[var(--bg-surface-hover)] border border-[var(--border-color)] p-2.5 rounded-xl text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
             </div>
 
-            {/* Right Column: Canvas Preview & Summary Box (5 cols) */}
-            <div className="lg:col-span-5 flex flex-col justify-between gap-3">
-              {/* Canvas Preview Box */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                  <span className="flex items-center gap-1.5"><Eye size={14} className="text-amber-500" /> Pré-Visualização</span>
-                  <span className="text-amber-600 dark:text-amber-400 font-mono font-bold">
-                    {calculatedM2.toFixed(3)} m²
+            {/* Right Column: Visual Preview & Submit */}
+            <div className="lg:col-span-5 p-4 sm:p-6 bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-surface-hover)] flex flex-col justify-between space-y-4">
+              
+              <div className="space-y-4">
+                {/* Visual Preview Box */}
+                <div>
+                  <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
+                    Pré-visualização Estética
                   </span>
-                </div>
-
-                <div className={`h-32 sm:h-36 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden transition-all shadow-inner ${getBgStyle()}`}>
-                  <div className="absolute inset-0 bg-[radial-gradient(#ffffff15_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
-                  
-                  <div className="relative z-10 text-center px-3 max-w-full">
-                    <h2
-                      className={`text-base sm:text-2xl font-extrabold uppercase tracking-widest break-words line-clamp-2 ${getAcrylicStyle()}`}
-                      style={{ fontFamily: fontFamily }}
-                    >
-                      {customText || "SUA LOGO AQUI"}
-                    </h2>
-                    <p className="text-[10px] text-slate-400 mt-1 font-mono font-medium truncate max-w-xs mx-auto">
-                      [ {selectedMaterial.name} ]
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Summary Card */}
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-4 flex flex-col justify-between shadow-xl space-y-3">
-                <div className="space-y-2.5">
-                  <div className="flex justify-between items-center bg-slate-800/60 p-2 rounded-lg border border-slate-700/60 text-xs">
-                    <span className="text-slate-300">Material Escolhido:</span>
-                    <span className="font-extrabold text-amber-400 text-right truncate max-w-[170px]">{selectedMaterial.name}</span>
-                  </div>
-
-                  <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
-                    <span className="text-[10px] text-slate-400 block font-medium uppercase">Seu Custo Atacado de Fábrica:</span>
-                    <span className="text-2xl font-extrabold text-white font-['Outfit']">
-                      R$ {wholesaleTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-
-                  <div className="bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/30 space-y-1 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-emerald-400 font-medium">Sugestão Cliente Final:</span>
-                      <span className="font-bold text-emerald-300">
-                        R$ {suggestedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <div className="h-44 sm:h-52 bg-slate-950 rounded-2xl border border-slate-800 p-4 flex flex-col items-center justify-center relative overflow-hidden shadow-inner">
+                    <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
+                    
+                    <div className="relative z-10 text-center px-4 max-w-full">
+                      <span 
+                        className="text-2xl sm:text-3xl font-bold tracking-wide break-words inline-block leading-tight text-amber-400 drop-shadow-md"
+                        style={{ fontFamily: fontFamily || 'Outfit' }}
+                      >
+                        {customText || 'Sua Marca'}
+                      </span>
+                      <span className="block text-[10px] text-slate-400 font-mono mt-2">
+                        {widthCm} cm × {heightCm} cm • {selectedMaterial.name}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center pt-1 border-t border-emerald-500/20">
-                      <span className="text-emerald-400 font-semibold">Seu Lucro Estimado:</span>
-                      <span className="font-extrabold text-emerald-400">+ R$ {resellerProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    {/* Direct WhatsApp Open Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleSendDirectToWhatsapp(true)}
-                      disabled={isGeneratingScript}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer border border-emerald-400/30 active:scale-[0.98] disabled:opacity-50"
-                    >
-                      {isGeneratingScript ? (
-                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <MessageSquare size={16} className="text-emerald-200 animate-pulse" />
-                      )}
-                      <span>📲 Enviar Proposta IA Direto para o WhatsApp</span>
-                    </button>
-
-                    {/* Copy Actions */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCopyWhatsappQuote}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-1.5 px-2 rounded-lg text-[10px] flex items-center justify-center gap-1 transition-all border border-slate-700 shadow-sm"
-                      >
-                        {copiedQuote ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                        {copiedQuote ? "Copiado!" : "Copiar Texto Simples"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleCopyIaCommercialPitch}
-                        disabled={isGeneratingScript}
-                        className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 font-bold py-1.5 px-2 rounded-lg text-[10px] flex items-center justify-center gap-1 transition-all border border-purple-500/30 shadow-sm disabled:opacity-50"
-                      >
-                        {copiedScript ? <Check size={13} className="text-emerald-300" /> : <Sparkles size={13} className="text-amber-300" />}
-                        {copiedScript ? "Script Copiado!" : "Copiar Script IA"}
-                      </button>
+                    <div className="absolute bottom-2 left-2 right-2 flex justify-between text-[9px] text-slate-500 font-mono">
+                      <span>Proporção real do texto</span>
+                      <span>{projectType === 'logo_parede' ? '🛡️ Logo 3D' : projectType === 'placa_fundo' ? '🖼️ Placa' : '🔤 Frase'}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-700">
-                  <button
-                    onClick={handleAddCustomToCart}
-                    className="w-full btn-gold justify-center py-2.5 text-xs font-extrabold shadow-lg flex items-center gap-1.5"
-                  >
-                    Adicionar Pedido Sob Medida <ArrowRight size={15} />
-                  </button>
+                {/* Summary Card */}
+                <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] p-4 rounded-2xl space-y-2.5 shadow-sm text-xs">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)] block border-b border-[var(--border-color)] pb-1.5">
+                    Resumo do Pedido para Análise
+                  </span>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--text-muted)]">Projeto:</span>
+                    <span className="font-bold text-[var(--text-main)]">
+                      {projectType === 'logo_parede' ? 'Logomarca 3D Parede' : projectType === 'placa_fundo' ? 'Placa com Fundo' : 'Frase / Nome Simples'}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--text-muted)]">Medidas:</span>
+                    <span className="font-mono font-bold text-[var(--text-main)]">{widthCm} × {heightCm} cm</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--text-muted)]">Material:</span>
+                    <span className="font-bold text-amber-500">{selectedMaterial.name}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--text-muted)]">Arquivo Vetor:</span>
+                    <span className="font-medium text-[var(--text-main)] truncate max-w-[160px]">{vectorFile || 'Texto digitado'}</span>
+                  </div>
+                </div>
+
+                {/* Factory Quality Shield Banner */}
+                <div className="bg-amber-500/10 border border-amber-500/25 p-3.5 rounded-2xl flex items-start gap-2.5">
+                  <Shield size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div className="text-[11px] leading-relaxed text-[var(--text-main)]">
+                    <strong className="block font-bold text-amber-500 mb-0.5">
+                      Precificação Manual Exclusiva no Gestor Pro CNC
+                    </strong>
+                    Sem contas automáticas ou distorções. O setor técnico da fábrica analisa a geometria e a chapa para garantir o menor custo de atacado e o maior lucro para a sua revenda.
+                  </div>
                 </div>
               </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleSubmitQuoteRequest}
+                  className="btn-gold w-full py-3.5 px-4 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                >
+                  <Send size={16} />
+                  <span>{isSubmitting ? 'Enviando Projeto...' : 'Solicitar Orçamento à Fábrica'}</span>
+                  <ChevronRight size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSendViaWhatsapp}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-2xl text-xs flex items-center justify-center gap-2 transition-colors shadow-sm"
+                >
+                  <MessageSquare size={14} />
+                  <span>Enviar Projeto Direto no WhatsApp da Fábrica</span>
+                </button>
+              </div>
+
             </div>
+
           </div>
-        </div>
+        )}
+
       </div>
     </div>
   );

@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 const DEFAULT_SUPABASE_URL = 'https://aghbrlihahygczzvxvim.supabase.co';
-// Active Service Key bypassing RLS restriction to guarantee 100% online sync
-const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnaGJybGloYWh5Z2N6enZ4dmltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODA0NDI0MiwiZXhwIjoyMTAzNjIwMjQyfQ.hTGOtHK2a6ZZwR-iIVf263Wve1TyGlPpowoTAfX74LQ';
+// Chave Pública Anon (Segura para Frontend com RLS habilitado)
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnaGJybGloYWh5Z2N6enZ4dmltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwNDQyNDIsImV4cCI6MjEwMzYyMDI0Mn0.cYqQZVGdkcQYo4Hx_cwvFZafZ0Qf5UDqNEZH6T9roVc';
 
 // Dynamic Credentials Retrieval (From localStorage, env vars, or default active service key)
 export const getSupabaseCredentials = () => {

@@ -150,6 +150,31 @@ async function try9Router(messagesPayload, model) {
   return content.trim();
 }
 
+/** Chamada Segura ao Proxy Serverless de IA (/api/ai/chat) - Chaves protegidas no servidor */
+async function tryServerlessProxy(messagesPayload, model) {
+  try {
+    const res = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: messagesPayload,
+        model: model || "qwen/qwen3.8-27b",
+        temperature: 0.7,
+        max_tokens: 1000,
+      }),
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const content = json?.choices?.[0]?.message?.content;
+      if (content) return content.trim();
+    }
+  } catch (err) {
+    // Falha silenciosa em dev local se a rota /api não estiver ativa
+  }
+  return null;
+}
+
 export async function askLumenAssistant({ tool = "suporte-sistema", input = "", history = [], systemContext = "" }) {
   let baseSystemPrompt = SYSTEM_PROMPTS[tool] || SYSTEM_PROMPTS["suporte-sistema"];
   
@@ -173,9 +198,15 @@ export async function askLumenAssistant({ tool = "suporte-sistema", input = "", 
     messagesPayload.push({ role: "user", content: userPrompt });
   }
 
+  // 1ª Tentativa: Servidor Seguro / Serverless Proxy (Sem chaves no navegador)
+  const serverlessContent = await tryServerlessProxy(messagesPayload, "qwen/qwen3.8-27b");
+  if (serverlessContent) {
+    return { success: true, content: cleanSocialText(serverlessContent), provider: "lumen-secure-api" };
+  }
+
   const errors = [];
 
-  // 1ª Tentativa: Groq (Modelos ativos e ordenados por capacidade)
+  // 2ª Tentativa: Groq direto (Fallback local com tolerância a falhas)
   for (const model of GROQ_MODELS) {
     try {
       const content = await tryGroq(messagesPayload, model);

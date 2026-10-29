@@ -4,7 +4,7 @@ import { useStore } from '../context/StoreContext';
 
 export const TrackingModal = ({ isOpen, onClose, initialTrackingCode = '' }) => {
   const { orders } = useStore();
-  const [searchCode, setSearchCode] = useState(initialTrackingCode || 'ML-BR9821039');
+  const [searchCode, setSearchCode] = useState(initialTrackingCode || '');
 
   useEffect(() => {
     if (initialTrackingCode) {

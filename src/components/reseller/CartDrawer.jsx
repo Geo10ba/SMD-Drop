@@ -7,9 +7,19 @@ export const CartDrawer = ({ isOpen, onClose, onProceedToCheckout }) => {
 
   if (!isOpen) return null;
 
-  const totalWholesaleCost = cart.reduce((acc, item) => acc + (item.unitWholesalePrice * item.quantity), 0);
-  const totalSuggestedRetail = cart.reduce((acc, item) => acc + (item.suggestedRetailPrice * item.quantity), 0);
-  const totalEstimatedProfit = totalSuggestedRetail - totalWholesaleCost;
+  const totalWholesaleCost = cart.reduce((acc, item) => {
+    const price = Number(item.unitWholesalePrice ?? item.wholesalePrice ?? item.price ?? 0) || 0;
+    const qty = Number(item.quantity) > 0 ? Number(item.quantity) : 1;
+    return acc + (price * qty);
+  }, 0);
+
+  const totalSuggestedRetail = cart.reduce((acc, item) => {
+    const price = Number(item.suggestedRetailPrice ?? item.customSellingPrice ?? (Number(item.unitWholesalePrice ?? item.wholesalePrice ?? 0) * 2.2)) || 0;
+    const qty = Number(item.quantity) > 0 ? Number(item.quantity) : 1;
+    return acc + (price * qty);
+  }, 0);
+
+  const totalEstimatedProfit = Math.max(0, totalSuggestedRetail - totalWholesaleCost);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -108,7 +118,7 @@ export const CartDrawer = ({ isOpen, onClose, onProceedToCheckout }) => {
                     <div className="flex items-center justify-between pt-2 border-t border-[var(--border-color)] text-xs">
                       <span className="text-[var(--text-muted)]">Custo Atacado Fábrica:</span>
                       <span className="font-extrabold text-[var(--text-main)] font-['Outfit']">
-                        R$ {(item.unitWholesalePrice * item.quantity).toFixed(2)}
+                        R$ {(((Number(item.unitWholesalePrice ?? item.wholesalePrice ?? item.price ?? 0) || 0) * (Number(item.quantity) > 0 ? Number(item.quantity) : 1))).toFixed(2)}
                       </span>
                     </div>
                   </div>

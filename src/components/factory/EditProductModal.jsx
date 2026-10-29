@@ -745,7 +745,7 @@ export const EditProductModal = ({ product, onClose }) => {
                         className="input-field font-semibold"
                       >
                         <option value="fixed">Preço Fixo (Unidade)</option>
-                        <option value="custom_m2">Sob Medida (R$/m²)</option>
+                        <option value="custom_m2">Sob Medida (Orçamento Personalizado)</option>
                       </select>
                     </div>
 
@@ -778,32 +778,13 @@ export const EditProductModal = ({ product, onClose }) => {
 
                 <div className="space-y-3">
                   {pricingType === 'custom_m2' ? (
-                    <div className="bg-amber-500/10 p-4 rounded-xl border border-amber-500/30 space-y-3">
+                    <div className="bg-amber-500/10 p-4 rounded-xl border border-amber-500/30 space-y-2">
                       <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block flex items-center gap-1">
-                        <Sparkles size={13} /> Precificação por Metro Quadrado (R$/m²)
+                        <Sparkles size={13} /> Orçamento Sob Medida CNC & Laser
                       </span>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-bold text-[var(--text-muted)]">Custo Fábrica R$ / m²</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={pricePerM2}
-                            onChange={(e) => setPricePerM2(e.target.value)}
-                            className="input-field font-extrabold text-amber-500 text-sm mt-1"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-[var(--text-muted)]">Sugestão Revenda R$ / m²</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={suggestedPricePerM2}
-                            onChange={(e) => setSuggestedPricePerM2(e.target.value)}
-                            className="input-field font-extrabold text-emerald-500 text-sm mt-1"
-                          />
-                        </div>
-                      </div>
+                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                        Este produto funciona através de solicitações de orçamento personalizadas. O revendedor preenche as dimensões, material e anexa o vetor, e a fábrica precifica individualmente na aprovação do pedido.
+                      </p>
                     </div>
                   ) : (
                     <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/30 space-y-3">

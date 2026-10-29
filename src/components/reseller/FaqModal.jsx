@@ -12,8 +12,8 @@ export const FaqModal = ({ isOpen, onClose }) => {
       answer: "Quando você realiza uma venda no Mercado Livre ou Shopee, a própria plataforma gera o PDF/ZPL da etiqueta de envio. No momento de fazer o pedido em nosso portal, selecione a opção 'Venda em Marketplace' e anexe a etiqueta. Nossa fábrica cuidará de imprimir, colar na caixa neutra e entregar no ponto de coleta dos Correios/Marketplace sem cobrar frete de você!"
     },
     {
-      question: "Como funciona o cálculo de produtos Sob Medida por Metro Quadrado (R$/m²)?",
-      answer: "Para produtos como Logomarcas 3D em Acrílico, Letreiros Neon e Placas, você seleciona o produto e digita a Largura (cm) x Altura (cm) desejadas pelo seu cliente. Nossa plataforma calcula instantaneamente a área em m² e aplica nosso valor por m². Você também pode anexar o arquivo da logo (PDF, SVG, DXF, PNG) do seu cliente para nossa equipe cortar a laser."
+      question: "Como funciona o Orçamento de Produtos Sob Medida (Logomarcas e Letreiros CNC Laser)?",
+      answer: "Para produtos sob medida (como Logomarcas 3D em Acrílico Espelhado, Letreiros e Placas), você informa o texto ou modelo desejado, dimensões estimadas, material preferido e anexa o arquivo/vetor com suas observações. Nossa fábrica analisa a complexidade do projeto e envia o orçamento oficial com preço de atacado para você aprovar e faturar diretamente pelo painel!"
     },
     {
       question: "O que é Envio Cego (Blind Shipping)?",

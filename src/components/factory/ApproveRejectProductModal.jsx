@@ -83,9 +83,29 @@ export const ApproveRejectProductModal = ({ pendingProduct, onClose }) => {
             <div className="flex-1 min-w-0">
               <p className="font-bold text-[var(--text-main)] truncate">{pendingProduct.title}</p>
               <p className="text-[11px] text-[var(--text-muted)] line-clamp-1">{pendingProduct.description}</p>
-              <span className="badge-emerald text-[10px] mt-1 inline-block">
-                Preço Desejado Revendedor: R$ {pendingProduct.suggestedRetailPrice?.toFixed(2)}
-              </span>
+              
+              {pendingProduct.widthCm > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5 text-[10px]">
+                  <span className="bg-amber-500/15 text-amber-500 font-mono font-bold px-1.5 py-0.5 rounded border border-amber-500/30">
+                    📐 {pendingProduct.widthCm}×{pendingProduct.heightCm} cm
+                  </span>
+                  {pendingProduct.materialName && (
+                    <span className="bg-slate-800 text-slate-300 font-bold px-1.5 py-0.5 rounded border border-slate-700">
+                      🧩 {pendingProduct.materialName}
+                    </span>
+                  )}
+                  {pendingProduct.projectType && (
+                    <span className="bg-emerald-500/15 text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">
+                      {pendingProduct.projectType === 'logo_parede' ? '🛡️ Logo 3D' : pendingProduct.projectType === 'placa_fundo' ? '🖼️ Placa' : '🔤 Frase'}
+                    </span>
+                  )}
+                  {pendingProduct.vectorFileName && (
+                    <span className="bg-blue-500/15 text-blue-400 font-mono font-bold px-1.5 py-0.5 rounded border border-blue-500/30 truncate max-w-[150px]">
+                      📁 {pendingProduct.vectorFileName}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

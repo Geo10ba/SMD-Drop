@@ -28,8 +28,8 @@ const BASE_QUESTS = [
   },
   {
     id: "view_calculator",
-    label: "Usar Calculadora m²",
-    description: "Simule um orçamento em acrílico sob medida",
+    label: "Orçar sob Medida",
+    description: "Envie um projeto sob medida para orçamento",
     icon: Calendar,
     points: 5,
   },

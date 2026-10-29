@@ -235,7 +235,7 @@ export const Footer = ({ onOpenTracking, onOpenFaq, onOpenAdminLogin }) => {
           </p>
           <div className="flex items-center gap-4">
             <p className="text-[10px] text-[var(--text-muted)] hidden md:block">
-              Logística Cega (Blind Shipping) • Anexo de Etiquetas Mercado Livre, Shopee & Amazon • Calculadora sob Medida R$/m²
+              Logística Cega (Blind Shipping) • Anexo de Etiquetas Mercado Livre, Shopee & Amazon • Orçamento sob Medida CNC & Laser
             </p>
             {onOpenAdminLogin && (
               <button

@@ -46,7 +46,7 @@ export const Breadcrumb = ({
       'pedidos': { label: 'Meus Pedidos de Revenda', icon: Package },
       'carrinho': { label: 'Carrinho de Compras', icon: ShoppingBag },
       'checkout': { label: 'Finalizar Pedido', icon: CheckCircle2 },
-      'calculadora-m2': { label: 'Calculadora sob Medida R$/m²', icon: Calculator },
+      'calculadora-m2': { label: 'Orçamento sob Medida CNC', icon: Calculator },
       'ajuda': { label: 'Central de Ajuda & FAQ', icon: HelpCircle },
       'rastreio': { label: 'Rastreamento de Envio', icon: Truck },
       'cadastro': { label: 'Cadastro de Revendedor', icon: ShieldCheck },

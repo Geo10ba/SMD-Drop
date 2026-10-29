@@ -19,16 +19,22 @@ import { LegalModal } from './components/LegalModal';
 import { SmdAssistantChat } from './components/assistant/SmdAssistantChat';
 import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import { Breadcrumb } from './components/common/Breadcrumb';
+import { ResellerWalletModal } from './components/reseller/ResellerWalletModal';
+import { FinancialStatementModal } from './components/reseller/FinancialStatementModal';
 
 function MainApp() {
   const { 
     products,
     viewMode, 
     setViewMode,
+    currentUser,
+    showNotification,
     isMagicImportOpen, 
     magicImportInitialData, 
     closeMagicImport 
   } = useStore();
+
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com';
 
   const [m2CalculatorProduct, setM2CalculatorProduct] = useState(null);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -42,9 +48,19 @@ function MainApp() {
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
   const [isFulfillmentOpen, setIsFulfillmentOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
+  const [isWalletOpen, setIsWalletOpen] = useState(false);
+  const [isFinancialOpen, setIsFinancialOpen] = useState(false);
 
   const [factoryTab, setFactoryTab] = useState('analytics');
   const [currentPath, setCurrentPath] = useState('catalogo');
+
+  // Proteção contra visualização fabril indevida
+  useEffect(() => {
+    if (viewMode === 'factory' && !isAdmin) {
+      setViewMode('reseller');
+      showNotification('Acesso Restrito: Painel fabril exclusivo para a administração da SMD Drop.', 'error');
+    }
+  }, [viewMode, isAdmin]);
 
   const handleOpenAuth = (mode = 'register') => {
     setAuthMode(mode);
@@ -53,6 +69,13 @@ function MainApp() {
 
   const handleNavigatePath = (path) => {
     if (path.startsWith('fabrica')) {
+      if (!isAdmin) {
+        showNotification('Acesso Restrito: Painel fabril exclusivo para a administração.', 'error');
+        setIsAdminLoginOpen(true);
+        setViewMode('reseller');
+        window.location.hash = '#catalogo';
+        return;
+      }
       setViewMode('factory');
       const sub = path.replace('fabrica/', '').replace('fabrica', '').trim();
       if (sub === 'expedicao') {
@@ -88,7 +111,7 @@ function MainApp() {
       if (path === 'calculadora-m2') {
         setM2CalculatorProduct({
           id: 'calc-sample',
-          title: 'Calculadora sob Medida R$/m²',
+          title: 'Orçamento sob Medida CNC',
           category: 'Logomarcas & Letreiros',
           pricingType: 'custom_m2',
           pricePerM2: 530,
@@ -183,7 +206,7 @@ function MainApp() {
         if (hash === 'calculadora-m2') {
           setM2CalculatorProduct({
             id: 'calc-sample',
-            title: 'Calculadora sob Medida R$/m²',
+            title: 'Orçamento sob Medida CNC',
             category: 'Logomarcas & Letreiros',
             pricingType: 'custom_m2',
             pricePerM2: 530,
@@ -234,6 +257,8 @@ function MainApp() {
         onOpenFaq={() => setIsFaqOpen(true)}
         onOpenRegister={(mode) => handleOpenAuth(mode)}
         onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
+        onOpenWallet={() => setIsWalletOpen(true)}
+        onOpenFinancialStatement={() => setIsFinancialOpen(true)}
       />
 
       {/* Main Container */}
@@ -244,12 +269,7 @@ function MainApp() {
           onNavigate={handleNavigatePath}
         />
 
-        {viewMode === 'reseller' ? (
-          <ResellerCatalog 
-            onOpenCart={() => setIsCartOpen(true)} 
-            onOpenRegister={(mode) => handleOpenAuth(mode)}
-          />
-        ) : (
+        {viewMode === 'factory' && isAdmin ? (
           <>
             {isFulfillmentOpen ? (
               <div className="space-y-4">
@@ -270,6 +290,11 @@ function MainApp() {
               />
             )}
           </>
+        ) : (
+          <ResellerCatalog 
+            onOpenCart={() => setIsCartOpen(true)} 
+            onOpenRegister={(mode) => handleOpenAuth(mode)}
+          />
         )}
       </main>
 
@@ -290,6 +315,7 @@ function MainApp() {
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
+        onOpenWallet={() => setIsWalletOpen(true)}
       />
 
       <ResellerOrdersModal
@@ -342,6 +368,18 @@ function MainApp() {
           onClose={() => setM2CalculatorProduct(null)}
         />
       )}
+
+      {/* Reseller Prepaid Wallet Modal */}
+      <ResellerWalletModal
+        isOpen={isWalletOpen}
+        onClose={() => setIsWalletOpen(false)}
+      />
+
+      {/* Financial Statement & Net Profit Modal */}
+      <FinancialStatementModal
+        isOpen={isFinancialOpen}
+        onClose={() => setIsFinancialOpen(false)}
+      />
 
       {/* PWA Mobile & Desktop Install Prompt */}
       <PwaInstallPrompt />

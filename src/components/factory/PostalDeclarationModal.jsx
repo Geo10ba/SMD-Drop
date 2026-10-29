@@ -36,22 +36,22 @@ export const PostalDeclarationModal = ({ order, onClose }) => {
 
           {/* Sender & Addressee */}
           <div className="grid grid-cols-2 gap-4 border-b border-slate-800 pb-3">
-            {/* Remetente (Fábrica) */}
+            {/* Remetente (Revendedor / Operação Comercial Cega) */}
             <div className="space-y-1">
-              <span className="font-bold block uppercase underline">REMETENTE (FÁBRICA):</span>
-              <p className="font-bold">SMD DROP PRODUTOS PERSONALIZADOS</p>
-              <p>CNPJ: 45.109.892/0001-99</p>
-              <p>Endereço: Av. Industrial, 450 - Distrito Industrial</p>
-              <p>Cidade/UF: São Paulo - SP | CEP: 03100-000</p>
+              <span className="font-bold block uppercase underline">REMETENTE (REVENDEDOR):</span>
+              <p className="font-bold text-slate-950 uppercase">{order.fiscalData?.reseller?.name || order.resellerName || "Operação Revendedora Autorizada"}</p>
+              <p>CNPJ/CPF: {order.fiscalData?.reseller?.document || "MEI - Isento de I.E."}</p>
+              <p>Regime: {order.fiscalData?.reseller?.fiscalRegime === 'simples' ? 'Simples Nacional / ME' : 'MEI (Art. 40 Venda à Ordem)'}</p>
+              <p>Contato: {order.fiscalData?.reseller?.email || order.resellerEmail || "suporte@revenda.com.br"}</p>
             </div>
 
             {/* Destinatário (Cliente Final) */}
             <div className="space-y-1">
-              <span className="font-bold block uppercase underline">DESTINATÁRIO:</span>
-              <p className="font-bold">{order.customerData?.name || "Cliente Final"}</p>
-              <p>CPF/CNPJ: {order.customerData?.cpf || "123.456.789-00"}</p>
-              <p>Endereço: {order.customerData?.address || "Rua de Entrega, 100"}</p>
-              <p>Cidade/UF: {order.customerData?.city || "São Paulo"} - {order.customerData?.state || "SP"} | CEP: {order.customerData?.zip || "01000-000"}</p>
+              <span className="font-bold block uppercase underline">DESTINATÁRIO (CLIENTE FINAL):</span>
+              <p className="font-bold">{order.fiscalData?.customer?.name || order.customerData?.name || "Cliente Final"}</p>
+              <p>CPF/CNPJ: {order.fiscalData?.customer?.cpf || order.customerData?.cpf || "123.456.789-00"}</p>
+              <p>Endereço: {order.fiscalData?.customer?.address || order.customerData?.address || "Rua de Entrega, 100"}</p>
+              <p>Cidade/UF: {order.fiscalData?.customer?.city || order.customerData?.city || "São Paulo"} - {order.fiscalData?.customer?.state || order.customerData?.state || "SP"} | CEP: {order.fiscalData?.customer?.zip || order.customerData?.zip || "01000-000"}</p>
             </div>
           </div>
 

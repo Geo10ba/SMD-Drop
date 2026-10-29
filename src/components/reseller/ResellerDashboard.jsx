@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) => {
-  const { currentUser, orders, pendingProducts, products, updateProfile } = useStore();
+  const { currentUser, orders, pendingProducts, products, updateProfile, addToCart } = useStore();
 
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'orders', 'profile', 'suggested'
   const [managingImagesProduct, setManagingImagesProduct] = useState(null);
@@ -448,23 +448,26 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
                         </td>
                         <td className="p-3 text-right">
                           {item.status === 'approved' ? (
-                            <button
-                              onClick={() => {
-                                const targetProduct = linkedApprovedProd || {
-                                  id: item.approvedProductId || item.id,
-                                  title: item.title,
-                                  wholesalePrice: item.wholesalePrice || 50,
-                                  suggestedRetailPrice: item.suggestedRetailPrice || 120,
-                                  category: item.category || 'Geral',
-                                  image: item.image,
-                                  images: item.images || [item.image].filter(Boolean)
-                                };
-                                setManagingImagesProduct(targetProduct);
-                              }}
-                              className="btn-gold text-[11px] font-bold py-1.5 px-3 shadow-sm inline-flex items-center gap-1 shrink-0"
-                            >
-                              <ImageIcon size={13} /> Adicionar Fotos / Catálogo
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  const targetProduct = linkedApprovedProd || {
+                                    id: item.approvedProductId || item.id,
+                                    title: item.title,
+                                    wholesalePrice: Number(item.wholesalePrice || 50),
+                                    suggestedRetailPrice: Number(item.suggestedRetailPrice || 120),
+                                    category: item.category || 'Sob Medida',
+                                    image: item.image,
+                                    images: item.images || [item.image].filter(Boolean)
+                                  };
+                                  addToCart(targetProduct);
+                                  if (onOpenCart) onOpenCart();
+                                }}
+                                className="btn-emerald text-[11px] font-extrabold py-1.5 px-3 shadow-sm inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl"
+                              >
+                                <ShoppingBag size={13} /> Comprar no Atacado
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-[10px] text-[var(--text-muted)] font-mono italic">
                               Ag. Aprovação

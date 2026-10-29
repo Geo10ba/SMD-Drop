@@ -8,6 +8,24 @@ import {
   syncToSupabase 
 } from '../lib/supabase';
 import { normalizeCategoryName, normalizeCategoryList } from '../lib/categoryTranslations';
+import { 
+  getAllActiveFonts, 
+  registerCustomFont, 
+  removeFontById, 
+  restoreDefaultFonts 
+} from '../utils/textMetrics';
+import { buildFiscalOrderData } from '../utils/fiscalOrderFlow';
+import { 
+  normalizeProductionStatus, 
+  getNextProductionStage, 
+  getPrevProductionStage, 
+  getStageInfo,
+  PRODUCTION_STAGES 
+} from '../utils/productionCycle';
+import { 
+  notifyOrderToTelegram, 
+  notifyWalletRechargeToTelegram 
+} from '../services/telegramNotification';
 
 const StoreContext = createContext();
 
@@ -453,45 +471,44 @@ export const StoreProvider = ({ children }) => {
     });
   };
 
-  // Factory Materials Catalog (Official User Pricing Table Persisted in localStorage)
-  // Factory Materials Catalog (Official User Pricing Table Persisted in localStorage)
+  // Factory Materials Catalog (Calibrated Competitive Industrial Pricing Table)
   const defaultInitialMaterials = [
     {
       id: 'mat-mdf-cru',
-      name: 'MDF Cru',
-      factoryCostPerM2: 35.00, // Custo Real de Produção da Fábrica (R$ 35/m²)
-      wholesalePricePerM2: 180.00,
-      suggestedPricePerM2: 380.00,
+      name: 'MDF 6mm',
+      factoryCostPerM2: 69.44, // Custo Gestor Pro CNC: Chapa 1800x1200mm a R$ 150 (R$ 69,44/m²)
+      wholesalePricePerM2: 115.00,
+      suggestedPricePerM2: 180.00,
       style: 'madeira',
       leadTimeDays: 2,
-      description: 'Econômico / Básico para uso interno com acabamento natural.'
+      description: 'MDF 6mm Industrial (Chapa 1800x1200mm a R$ 150). Padrão Gestor Pro CNC.'
     },
     {
       id: 'mat-pvc-branco',
       name: 'PVC Expandido (Branco)',
       factoryCostPerM2: 55.00,
-      wholesalePricePerM2: 220.00,
-      suggestedPricePerM2: 450.00,
+      wholesalePricePerM2: 140.00,
+      suggestedPricePerM2: 290.00,
       style: 'prata',
       leadTimeDays: 2,
       description: 'Leve e resistente à umidade, ideal para letras e placas decorativas.'
     },
     {
       id: 'mat-mdf-pvc-pintado',
-      name: 'MDF ou PVC Pintado',
-      factoryCostPerM2: 65.00,
-      wholesalePricePerM2: 260.00,
-      suggestedPricePerM2: 520.00,
+      name: 'MDF 6mm ou PVC Pintado',
+      factoryCostPerM2: 94.44, // MDF 6mm (R$ 69,44) + Pintura/Primer (R$ 25/m²)
+      wholesalePricePerM2: 155.00,
+      suggestedPricePerM2: 295.00,
       style: 'preto',
       leadTimeDays: 3,
-      description: 'Personalizado com acabamento fosco ou brilhante e alta durabilidade.'
+      description: 'Personalizado com pintura laca/esmalte e acabamento fosco ou brilhante.'
     },
     {
       id: 'mat-acm',
       name: 'ACM (Alumínio Composto)',
       factoryCostPerM2: 85.00,
-      wholesalePricePerM2: 320.00,
-      suggestedPricePerM2: 680.00,
+      wholesalePricePerM2: 195.00,
+      suggestedPricePerM2: 390.00,
       style: 'prata',
       leadTimeDays: 3,
       description: 'Metálico e moderno, para fachadas, letreiros externos e painéis.'
@@ -499,9 +516,9 @@ export const StoreProvider = ({ children }) => {
     {
       id: 'mat-acrilico-luxo',
       name: 'Acrílico Premium (Luxo)',
-      factoryCostPerM2: 140.00,
-      wholesalePricePerM2: 480.00,
-      suggestedPricePerM2: 960.00,
+      factoryCostPerM2: 130.00,
+      wholesalePricePerM2: 280.00,
+      suggestedPricePerM2: 590.00,
       style: 'dourado',
       leadTimeDays: 3,
       description: 'Corte a laser de alta precisão em acrílico cast nobre espelhado.'
@@ -516,23 +533,55 @@ export const StoreProvider = ({ children }) => {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const repaired = parsed.map((m) => {
+              // Sincronização direta com a tabela do Gestor Pro CNC
+              if (m.id === 'mat-mdf-cru' || (m.name && m.name.toLowerCase().includes('mdf'))) {
+                return {
+                  ...m,
+                  id: 'mat-mdf-cru',
+                  name: 'MDF 6mm',
+                  factoryCostPerM2: 69.44,
+                  wholesalePricePerM2: 115.00,
+                  suggestedPricePerM2: 180.00,
+                  description: 'MDF 6mm Industrial (Chapa 1800x1200mm a R$ 150). Padrão Gestor Pro CNC.',
+                  isCustomEdited: false
+                };
+              }
+              if (m.id === 'mat-mdf-pvc-pintado') {
+                return {
+                  ...m,
+                  id: 'mat-mdf-pvc-pintado',
+                  name: 'MDF 6mm ou PVC Pintado',
+                  factoryCostPerM2: 94.44,
+                  wholesalePricePerM2: 155.00,
+                  suggestedPricePerM2: 295.00,
+                  isCustomEdited: false
+                };
+              }
+
               const match = defaultInitialMaterials.find(
                 (d) => d.id === m.id || d.name?.toLowerCase() === (m.name || '').toLowerCase()
               );
               let cost = Number(m.factoryCostPerM2 ?? 0);
+              let wholesale = Number(m.wholesalePricePerM2 ?? 0);
+              let suggested = Number(m.suggestedPricePerM2 ?? 0);
               const isCustom = Boolean(m.isCustomEdited);
+              
               if (!isCustom && match) {
-                // Auto-migrate legacy inflated costs (>= 180) to realistic raw sheet costs (35, 55, 65, 85, 140)
-                if (cost === 0 || cost >= 180) {
-                  cost = match.factoryCostPerM2;
-                }
+                if (cost === 0 || cost >= 180) cost = match.factoryCostPerM2;
+                if (wholesale >= 400 && match.id === 'mat-acrilico-luxo') wholesale = match.wholesalePricePerM2;
+                if (wholesale >= 200 && match.id === 'mat-pvc-branco') wholesale = match.wholesalePricePerM2;
+                if (wholesale >= 300 && match.id === 'mat-acm') wholesale = match.wholesalePricePerM2;
+                suggested = match.suggestedPricePerM2;
               }
-              if (cost === 0) cost = match?.factoryCostPerM2 || 35;
+              if (cost === 0) cost = match?.factoryCostPerM2 || 69.44;
+              if (wholesale === 0) wholesale = match?.wholesalePricePerM2 || 115.00;
+              if (suggested === 0) suggested = match?.suggestedPricePerM2 || 180.00;
+
               return {
                 ...m,
                 factoryCostPerM2: cost,
-                wholesalePricePerM2: match?.wholesalePricePerM2 || m.wholesalePricePerM2 || 180,
-                suggestedPricePerM2: match?.suggestedPricePerM2 || m.suggestedPricePerM2 || 380,
+                wholesalePricePerM2: wholesale,
+                suggestedPricePerM2: suggested,
                 isCustomEdited: isCustom
               };
             });
@@ -635,6 +684,39 @@ export const StoreProvider = ({ children }) => {
     }
   };
 
+  // Fonts State (Fontes CNC Laser & Tipografias Gerenciadas no Admin)
+  const [fonts, setFontsState] = useState(() => getAllActiveFonts());
+
+  const addCustomFont = async (fontData) => {
+    try {
+      const newMeta = await registerCustomFont(fontData);
+      setFontsState(getAllActiveFonts());
+      showNotification(`✨ Fonte "${newMeta.name}" adicionada com sucesso!`);
+      return newMeta;
+    } catch (err) {
+      showNotification(`❌ ${err.message || 'Erro ao adicionar fonte'}`);
+      throw err;
+    }
+  };
+
+  const removeFont = async (fontId) => {
+    try {
+      await removeFontById(fontId);
+      setFontsState(getAllActiveFonts());
+      showNotification('Fonte removida.');
+      return true;
+    } catch (err) {
+      showNotification(`❌ ${err.message || 'Erro ao remover fonte'}`);
+      throw err;
+    }
+  };
+
+  const restoreFonts = () => {
+    const list = restoreDefaultFonts();
+    setFontsState(list);
+    showNotification('Fontes padrão restauradas!');
+  };
+
   // Products State (Normalizado automaticamente para Português)
   const [products, setProductsState] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -696,6 +778,115 @@ export const StoreProvider = ({ children }) => {
   // Reseller Cart
   const [cart, setCart] = useState([]);
 
+  // Reseller Wallet & Prepaid Balance State
+  const [walletBalance, setWalletBalanceState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smd_wallet_balance');
+      if (saved !== null && !isNaN(Number(saved))) {
+        return Number(saved);
+      }
+    }
+    return 0.00; // Saldo real padrão (R$ 0,00)
+  });
+
+  const [walletTransactions, setWalletTransactionsState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smd_wallet_transactions');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {}
+      }
+    }
+    return []; // Histórico real padrão limpo
+  });
+
+  const resetWalletToZero = () => {
+    setWalletBalanceState(0);
+    setWalletTransactionsState([]);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smd_wallet_balance', '0');
+      localStorage.setItem('smd_wallet_transactions', JSON.stringify([]));
+    }
+    showNotification('Saldo de simulação zerado! A carteira agora opera em modo real com R$ 0,00.', 'success');
+  };
+
+  const addWalletFunds = ({ amount, description = 'Recarga via PIX Instantâneo' }) => {
+    const numAmount = Math.max(0, Number(amount) || 0);
+    if (numAmount <= 0) return false;
+
+    setWalletBalanceState((prev) => {
+      const next = Number((prev + numAmount).toFixed(2));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_wallet_balance', String(next));
+      }
+      return next;
+    });
+
+    const newTx = {
+      id: 'WTX-' + Date.now(),
+      type: 'credit',
+      amount: numAmount,
+      description,
+      date: new Date().toISOString()
+    };
+
+    setWalletTransactionsState((prev) => {
+      const next = [newTx, ...prev];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_wallet_transactions', JSON.stringify(next));
+      }
+      return next;
+    });
+
+    showNotification(`💰 R$ ${numAmount.toFixed(2)} adicionados à sua carteira com sucesso!`, 'success');
+
+    // Notificar no Telegram (@smddropbot)
+    notifyWalletRechargeToTelegram({
+      resellerName: currentUser?.name || 'Revendedor',
+      resellerEmail: currentUser?.email || '',
+      amount: numAmount,
+      method: description
+    });
+
+    return true;
+  };
+
+  const deductWalletFunds = ({ amount, orderId, description }) => {
+    const numAmount = Math.max(0, Number(amount) || 0);
+    if (walletBalance < numAmount) {
+      showNotification(`Saldo insuficiente na carteira (Disponível: R$ ${walletBalance.toFixed(2)}).`, 'error');
+      return false;
+    }
+
+    setWalletBalanceState((prev) => {
+      const next = Math.max(0, Number((prev - numAmount).toFixed(2)));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_wallet_balance', String(next));
+      }
+      return next;
+    });
+
+    const newTx = {
+      id: 'WTX-' + Date.now(),
+      type: 'debit',
+      amount: numAmount,
+      description: description || `Pagamento Pedido ${orderId || ''}`,
+      date: new Date().toISOString()
+    };
+
+    setWalletTransactionsState((prev) => {
+      const next = [newTx, ...prev];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_wallet_transactions', JSON.stringify(next));
+      }
+      return next;
+    });
+
+    return true;
+  };
+
   // Orders State (Normalizado e seguro contra valores nulos)
   const [orders, setOrdersState] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -711,6 +902,7 @@ export const StoreProvider = ({ children }) => {
               resellerName: o.resellerName || o.reseller_name || 'Revendedor',
               dispatchMode: o.dispatchMode || o.dispatch_mode || 'marketplace_label',
               marketplace: o.marketplace || 'Mercado Livre',
+              fiscalData: o.fiscalData || null,
               items: Array.isArray(o.items) ? o.items.map((it) => ({
                 ...it,
                 unitWholesalePrice: Number(it.unitWholesalePrice ?? it.price ?? 0) || 0
@@ -734,6 +926,7 @@ export const StoreProvider = ({ children }) => {
             resellerName: o.resellerName || o.reseller_name || 'Revendedor',
             dispatchMode: o.dispatchMode || o.dispatch_mode || 'marketplace_label',
             marketplace: o.marketplace || 'Mercado Livre',
+            fiscalData: o.fiscalData || null,
             items: Array.isArray(o.items) ? o.items.map((it) => ({
               ...it,
               unitWholesalePrice: Number(it.unitWholesalePrice ?? it.price ?? 0) || 0
@@ -1259,17 +1452,31 @@ export const StoreProvider = ({ children }) => {
         const { data: dbMaterials, error: matErr } = await client.from('materials').select('*');
         if (!matErr && dbMaterials && dbMaterials.length > 0) {
           const normalizedMats = dbMaterials.map((m) => {
+            if (m.id === 'mat-mdf-cru' || (m.name && m.name.toLowerCase().includes('mdf'))) {
+              return {
+                id: 'mat-mdf-cru',
+                name: 'MDF 6mm',
+                factoryCostPerM2: 69.44,
+                wholesalePricePerM2: 115.00,
+                suggestedPricePerM2: 180.00,
+                style: 'madeira',
+                leadTimeDays: 2,
+                description: 'MDF 6mm Industrial (Chapa 1800x1200mm a R$ 150). Padrão Gestor Pro CNC.',
+                isCustomEdited: false
+              };
+            }
+
             const match = defaultInitialMaterials.find(
               (d) => d.id === m.id || d.name?.toLowerCase() === (m.name || '').toLowerCase()
             );
             let cost = m.factory_cost_per_m2 !== null && m.factory_cost_per_m2 !== undefined ? Number(m.factory_cost_per_m2) : 0;
             const isCustom = Boolean(m.is_custom_edited || m.isCustomEdited);
             if (!isCustom && match) {
-              if (cost === 0 || (cost === 180 && match.factoryCostPerM2 !== 180)) {
+              if (cost === 0 || cost === 35 || (cost === 180 && match.factoryCostPerM2 !== 180)) {
                 cost = match.factoryCostPerM2;
               }
             }
-            if (cost === 0) cost = match?.factoryCostPerM2 || 180;
+            if (cost === 0) cost = match?.factoryCostPerM2 || 102.66;
 
             return {
               id: m.id,
@@ -1511,9 +1718,23 @@ export const StoreProvider = ({ children }) => {
     }
   };
 
-  // Add Item to Cart
+  // Add Item to Cart (Blindado com normalização de preço atacado e quantidade)
   const addToCart = (cartItem) => {
-    setCart((prev) => [...prev, { ...cartItem, cartId: 'cart-' + Date.now() + Math.random() }]);
+    const wholesale = Number(cartItem.unitWholesalePrice ?? cartItem.wholesalePrice ?? cartItem.price ?? 0) || 0;
+    const qty = Number(cartItem.quantity) > 0 ? Number(cartItem.quantity) : 1;
+    const retail = Number(cartItem.suggestedRetailPrice ?? cartItem.customSellingPrice ?? (wholesale * 2.2)) || (wholesale * 2.2);
+
+    const normalizedItem = {
+      ...cartItem,
+      unitWholesalePrice: wholesale,
+      wholesalePrice: wholesale,
+      quantity: qty,
+      suggestedRetailPrice: retail,
+      customSellingPrice: Number(cartItem.customSellingPrice) || retail,
+      cartId: 'cart-' + Date.now() + Math.random()
+    };
+
+    setCart((prev) => [...prev, normalizedItem]);
     showNotification(`Item "${cartItem.title}" adicionado ao carrinho!`);
   };
 
@@ -1527,14 +1748,62 @@ export const StoreProvider = ({ children }) => {
 
   // Submit Order
   const submitOrder = (orderData) => {
+    const fiscalData = orderData.fiscalData || buildFiscalOrderData({
+      reseller: {
+        name: orderData.resellerName || currentUser?.name || 'Revendedor Convidado',
+        email: currentUser?.email || orderData.resellerEmail || 'revendedor@smddrop.com.br',
+        document: currentUser?.cnpj || orderData.resellerDocument || 'MEI - Isento',
+        phone: currentUser?.phone || orderData.resellerPhone || '',
+        fiscalRegime: orderData.fiscalRegime || 'mei'
+      },
+      customer: orderData.customerData || {
+        name: orderData.customerName || 'Cliente Final',
+        cpf: orderData.customerCpf || '',
+        address: orderData.customerAddress || '',
+        city: orderData.customerCity || '',
+        state: orderData.customerState || '',
+        zip: orderData.customerZip || ''
+      },
+      dispatchMode: orderData.dispatchMode || 'marketplace_label',
+      marketplace: orderData.marketplace || 'Mercado Livre',
+      fiscalRegime: orderData.fiscalRegime || 'mei',
+      documentType: orderData.documentType || (orderData.fiscalRegime === 'mei' ? 'declaracao_conteudo' : 'nfe_venda'),
+      nfeKey: orderData.nfeKey || '',
+      hasLabelAttached: Boolean(orderData.labelPdf)
+    });
+
+    const initialStatus = 'pagamento_confirmado';
+    const initialTimeline = [
+      {
+        stage: initialStatus,
+        label: '1. Pagamento Confirmado',
+        timestamp: new Date().toISOString(),
+        note: 'Custo fabril liquidado ou debitado. Entrada na esteira fabril autorizada.'
+      }
+    ];
+
     const newOrder = {
       id: "ORD-" + Math.floor(1000 + Math.random() * 9000),
       resellerName: orderData.resellerName || currentUser?.name || 'Revendedor Convidado',
       resellerEmail: currentUser?.email || orderData.resellerEmail || 'revendedor@smddrop.com.br',
       createdAt: new Date().toISOString(),
-      status: "aguardando_impressao",
-      ...orderData
+      status: initialStatus,
+      timeline: initialTimeline,
+      ...orderData,
+      fiscalData
     };
+    const isWalletPay = (orderData.paymentMethod || '').toLowerCase().includes('carteira') || 
+                        (orderData.paymentMethod || '').toLowerCase().includes('wallet');
+
+    if (isWalletPay) {
+      const totalToPay = Number(orderData.total || orderData.wholesaleTotal || 0);
+      deductWalletFunds({
+        amount: totalToPay,
+        orderId: newOrder.id,
+        description: `Débito Pedido ${newOrder.id} (${newOrder.marketplace || 'Envio Direto'})`
+      });
+    }
+
     setOrders((prev) => [newOrder, ...prev]);
     clearCart();
     showNotification(`Pedido ${newOrder.id} enviado para a fábrica!`, 'gold');
@@ -1544,41 +1813,140 @@ export const StoreProvider = ({ children }) => {
       id: newOrder.id,
       reseller_name: newOrder.resellerName,
       reseller_email: newOrder.resellerEmail,
-      wholesale_total: newOrder.wholesaleTotal || 0,
-      total: newOrder.wholesaleTotal || 0,
+      wholesale_total: Number(newOrder.wholesaleTotal) || 0,
+      shipping_total: Number(newOrder.shippingTotal) || 0,
+      total: Number(newOrder.total ?? newOrder.wholesaleTotal) || 0,
       status: newOrder.status,
       dispatch_mode: orderData.dispatchMode || 'marketplace_label',
-      customer_name: orderData.customerName || 'Cliente Final',
-      customer_address: orderData.customerAddress || 'Endereço',
-      customer_city: orderData.customerCity || 'São Paulo',
-      customer_state: orderData.customerState || 'SP',
-      customer_zip: orderData.customerZip || '01000-000'
+      marketplace: orderData.marketplace || null,
+      tracking_code: newOrder.trackingCode || null,
+      label_pdf_url: newOrder.labelPdf || null,
+      payment_method: newOrder.paymentMethod || 'pix',
+      mercado_pago_fee: Number(newOrder.mercadoPagoFee) || 0,
+      items: newOrder.items || [],
+      customer_name: orderData.customerName || (newOrder.customerData && newOrder.customerData.name) || 'Cliente Final',
+      customer_cpf: (newOrder.customerData && newOrder.customerData.cpf) || null,
+      customer_address: orderData.customerAddress || (newOrder.customerData && newOrder.customerData.address) || 'Endereço',
+      customer_city: orderData.customerCity || (newOrder.customerData && newOrder.customerData.city) || 'São Paulo',
+      customer_state: orderData.customerState || (newOrder.customerData && newOrder.customerData.state) || 'SP',
+      customer_zip: orderData.customerZip || (newOrder.customerData && newOrder.customerData.zip) || '01000-000'
+    });
+
+    // Notificar imediatamente o dono no Telegram (@smddropbot)
+    notifyOrderToTelegram({
+      ...newOrder,
+      ...orderData
     });
 
     return newOrder;
   };
 
-  // Update Order Status by Factory
-  const updateOrderStatus = (orderId, newStatus, trackingCode = null) => {
+  // Update Order Status by Factory with Strict Fiscal Dispatch Lock & Production Timeline
+  const updateOrderStatus = (orderId, newStatus, trackingCode = null, note = '') => {
+    const canonicalStatus = normalizeProductionStatus(newStatus);
+    const targetOrder = orders.find((o) => o.id === orderId);
+
+    // TRAVA FISCAL DE EXPEDIÇÃO: SE TENTAR DESPACHAR (estágio 'enviado') SEM REQUISITOS OBRIGATÓRIOS, BLOQUEIA
+    if (canonicalStatus === 'enviado') {
+      if (targetOrder && targetOrder.fiscalData && !targetOrder.fiscalData.isFiscalComplete) {
+        const reasons = targetOrder.fiscalData.missingReasons?.join('; ') || 'Dados fiscais pendentes';
+        showNotification(`⛔ Expedição Bloqueada: Faltam requisitos fiscais obrigatórios (${reasons})!`, 'error');
+        return false;
+      }
+    }
+
+    const stageInfo = getStageInfo(canonicalStatus);
+    const timelineEntry = {
+      stage: canonicalStatus,
+      label: stageInfo.label,
+      timestamp: new Date().toISOString(),
+      note: note || `Status atualizado para ${stageInfo.label}`
+    };
+
     setOrders((prev) =>
       prev.map((order) => {
         if (order.id === orderId) {
+          const currentTimeline = Array.isArray(order.timeline) ? order.timeline : [];
           return {
             ...order,
-            status: newStatus,
-            trackingCode: trackingCode || order.trackingCode
+            status: canonicalStatus,
+            trackingCode: trackingCode || order.trackingCode,
+            timeline: [...currentTimeline, timelineEntry]
           };
         }
         return order;
       })
     );
-    showNotification(`Status do Pedido ${orderId} atualizado!`);
+    showNotification(`Status do Pedido ${orderId}: ${stageInfo.shortLabel}!`);
 
     syncToSupabase('orders', {
       id: orderId,
-      status: newStatus,
+      status: canonicalStatus,
       tracking_code: trackingCode || null
     });
+    return true;
+  };
+
+  // Avançar Próximo Estágio na Esteira de Produção
+  const advanceProductionStage = (orderId, note = '') => {
+    const target = orders.find((o) => o.id === orderId);
+    if (!target) return false;
+    const nextStage = getNextProductionStage(target.status);
+    if (!nextStage) {
+      showNotification(`O pedido ${orderId} já está concluído/entregue!`);
+      return false;
+    }
+    return updateOrderStatus(orderId, nextStage, null, note);
+  };
+
+  // Retornar Estágio Anterior para Reprocesso/Retrabalho de Qualidade
+  const rollbackProductionStage = (orderId, note = 'Retornado para reprocesso na esteira de produção') => {
+    const target = orders.find((o) => o.id === orderId);
+    if (!target) return false;
+    const prevStage = getPrevProductionStage(target.status);
+    if (!prevStage) {
+      showNotification(`O pedido ${orderId} já está no primeiro estágio!`);
+      return false;
+    }
+    return updateOrderStatus(orderId, prevStage, null, note);
+  };
+
+  // Regularização de Dados Fiscais do Pedido (Revendedor ou Fábrica)
+  const updateOrderFiscalData = (orderId, updatedFields) => {
+    setOrders((prev) =>
+      prev.map((order) => {
+        if (order.id === orderId) {
+          const currentFiscal = order.fiscalData || {};
+          const mergedCustomer = {
+            ...(currentFiscal.customer || order.customerData || {}),
+            ...(updatedFields.customer || {})
+          };
+          const mergedReseller = {
+            ...(currentFiscal.reseller || {}),
+            ...(updatedFields.reseller || {})
+          };
+
+          const newFiscalData = buildFiscalOrderData({
+            reseller: mergedReseller,
+            customer: mergedCustomer,
+            dispatchMode: updatedFields.dispatchMode || order.dispatchMode,
+            marketplace: updatedFields.marketplace || order.marketplace,
+            fiscalRegime: updatedFields.fiscalRegime || currentFiscal.reseller?.fiscalRegime || 'mei',
+            documentType: updatedFields.documentType || currentFiscal.documentType || 'declaracao_conteudo',
+            nfeKey: updatedFields.nfeKey !== undefined ? updatedFields.nfeKey : currentFiscal.nfeKey,
+            hasLabelAttached: updatedFields.hasLabelAttached !== undefined ? updatedFields.hasLabelAttached : Boolean(order.labelPdf)
+          });
+
+          return {
+            ...order,
+            customerData: mergedCustomer,
+            fiscalData: newFiscalData
+          };
+        }
+        return order;
+      })
+    );
+    showNotification(`Dados fiscais do pedido ${orderId} atualizados!`, 'success');
   };
 
   const deleteOrder = (orderId) => {
@@ -1648,6 +2016,45 @@ export const StoreProvider = ({ children }) => {
     showNotification(`✨ Produto "${productData.title}" cadastrado e sincronizado com o banco de dados!`, 'gold');
 
     safeSyncProductToSupabase(newProduct);
+  };
+
+  // Solicitação de Orçamento sob Medida pelo Revendedor (Envia para Análise Manual da Fábrica)
+  const requestCustomQuote = (quoteData) => {
+    const title = quoteData.title || quoteData.customText || 'Letreiro Sob Medida';
+    const widthCm = Number(quoteData.widthCm) || 0;
+    const heightCm = Number(quoteData.heightCm) || 0;
+    const materialName = quoteData.materialName || 'MDF 6mm';
+
+    const newQuote = {
+      id: "quote-" + Date.now(),
+      createdAt: new Date().toISOString(),
+      resellerId: currentUser?.id || 'anon',
+      resellerName: currentUser?.name || 'Revendedor Convidado',
+      resellerEmail: currentUser?.email || '',
+      resellerPhone: quoteData.resellerPhone || currentUser?.phone || '',
+      title: `${title} (${widthCm}×${heightCm}cm)`,
+      description: `Projeto sob medida: ${title} (${widthCm}×${heightCm}cm) em ${materialName}. Tipo: ${quoteData.projectType || 'logo_parede'}.`,
+      category: 'Sob Medida',
+      pricingType: 'custom_quote',
+      status: 'pending_approval',
+      widthCm: widthCm,
+      heightCm: heightCm,
+      materialName: materialName,
+      projectType: quoteData.projectType || 'logo_parede',
+      resellerNotes: quoteData.resellerNotes || '',
+      vectorFileName: quoteData.vectorFileName || '',
+      vectorFileUrl: quoteData.vectorFileUrl || '',
+      fontFamily: quoteData.fontFamily || 'ArialBold',
+      image: quoteData.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
+      wholesalePrice: 0,
+      suggestedRetailPrice: 0,
+      factoryNotes: ''
+    };
+
+    setPendingProducts((prev) => [newQuote, ...prev]);
+    showNotification(`🚀 Solicitação enviada com sucesso! A fábrica já recebeu seu projeto para análise.`, 'gold');
+    safeSyncProductToSupabase(newQuote);
+    return newQuote;
   };
 
   // Approve Reseller Suggested Product (Admin action with pricing and factory notes)
@@ -1947,9 +2354,21 @@ export const StoreProvider = ({ children }) => {
         { title: "Catálogo Acrílico & Neon", url: "https://acrilico.smddrop.com.br" }
       ],
       monthlyFixedCost: 15000,
-      taxRatePct: 6,
+      taxRatePct: 5,
+      machineHourlyRate: 46.85, // Custo Máquina Laser R$ 46,85/h (Padrão Gestor Pro CNC)
+      laborHourlyRate: 12.50, // Custo Acabamento Manual R$ 12,50/h (Padrão Gestor Pro CNC)
+      retailMarginPct: 150, // Margem de Lucro 150% do Gestor Pro CNC
+      factoryWholesaleMarginPct: 60, // Margem de Atacado da Fábrica (B2B)
       defaultPackagingCost: 4.5,
-      targetMinFactoryMarginPct: 35,
+      maxWallHeightCm: 25, // Limite de altura máxima decorativa de parede (em cm)
+      isMaxHeightLockedDefault: true, // Trava inteligente anti-desperdício de chapa ativa por padrão
+      minSheetM2: 0.20, // Área mínima fabril de chapa cobrada (em m²)
+      enabledProjectTypes: {
+        logo_parede: true,
+        placa_fundo: true,
+        texto_simples: true
+      },
+      disabledFontIds: [],
       termsContent: `1. ACEITAÇÃO DOS TERMOS E CONDIÇÕES
 Ao utilizar a plataforma SMD Drop, o contratante (Revendedor) declara ter lido, compreendido e aceito integralmente estes Termos de Uso. A SMD Drop atua como parceira fabril e prestadora de serviços de fabricação, processamento e postagem de pedidos em modalidade de logística cega (Blind Shipping).
 
@@ -1989,7 +2408,12 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
     };
   });
 
-  const updateCompanySettings = (newSettings) => {
+  const recalculateMaterialPrices = () => {
+    // No-op: cálculos matemáticos automáticos por m² foram desativados.
+    // Todos os pedidos sob medida são orçados manualmente pela fábrica via Gestor Pro CNC.
+  };
+
+  const updateCompanySettings = (newSettings, shouldRecalculatePricing = true) => {
     setCompanySettingsState((prev) => {
       const updated = { ...prev, ...newSettings };
       if (typeof window !== 'undefined') {
@@ -2026,7 +2450,8 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
 
       return updated;
     });
-    showNotification('Configurações da empresa e jurídicas salvas com sucesso!');
+
+    showNotification('Configurações da empresa salvas com sucesso!');
   };
 
   return (
@@ -2057,6 +2482,12 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         addMaterial,
         updateMaterial,
         deleteMaterial,
+        setMaterials,
+        recalculateMaterialPrices,
+        fonts,
+        addCustomFont,
+        removeFont,
+        restoreFonts,
         products,
         addProduct,
         importShopeeProducts,
@@ -2067,6 +2498,7 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         deleteSelectedDrafts,
         pendingProducts,
         suggestProductByReseller,
+        requestCustomQuote,
         approveProductByAdmin,
         rejectProductByAdmin,
         updateProduct,
@@ -2078,7 +2510,15 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         orders,
         submitOrder,
         updateOrderStatus,
+        advanceProductionStage,
+        rollbackProductionStage,
+        updateOrderFiscalData,
         deleteOrder,
+        walletBalance,
+        walletTransactions,
+        addWalletFunds,
+        deductWalletFunds,
+        resetWalletToZero,
         notification,
         showNotification,
         isMagicImportOpen,

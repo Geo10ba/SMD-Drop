@@ -44,15 +44,14 @@ import {
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { EditProductModal } from './EditProductModal';
 import { ApproveRejectProductModal } from './ApproveRejectProductModal';
-import { MaterialManagerModal } from './MaterialManagerModal';
 import { FactoryCostsModal, FactoryCostsContent } from './FactoryCostsModal';
-import { PricingAuditModal } from './PricingAuditModal';
 import { MagicImportModal } from '../reseller/MagicImportModal';
 import { Wand2, Clock, CheckCircle, XCircle as XCircleIcon } from 'lucide-react';
 import { parseShopeeFiles } from '../../lib/shopeeImporter';
 import { OrderDetailsModal } from './OrderDetailsModal';
+import { BancoInterSettingsModal } from './BancoInterSettingsModal';
 import { getMelhorEnvioConfig, saveMelhorEnvioConfig, testMelhorEnvioToken } from '../../lib/melhorenvio';
-import { getMercadoPagoConfig, saveMercadoPagoConfig } from '../../lib/mercadopago';
+import { getMercadoPagoConfig, saveMercadoPagoConfig, testMercadoPagoToken } from '../../lib/mercadopago';
 
 export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTab: externalTab, onTabChange }) => {
   const { 
@@ -98,9 +97,8 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
     if (onTabChange) onTabChange(tab);
   };
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
-  const [isMaterialManagerOpen, setIsMaterialManagerOpen] = useState(false);
   const [isFactoryCostsOpen, setIsFactoryCostsOpen] = useState(false);
-  const [isPricingAuditOpen, setIsPricingAuditOpen] = useState(false);
+  const [isInterModalOpen, setIsInterModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [evaluatingPendingProduct, setEvaluatingPendingProduct] = useState(null);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
@@ -177,6 +175,28 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
       setMeTestResult({ success: false, message: `❌ Erro de conexão: ${err.message}` });
     } finally {
       setMeTesting(false);
+    }
+  };
+
+  const [mpTesting, setMpTesting] = useState(false);
+  const [mpTestResult, setMpTestResult] = useState(null);
+
+  const handleTestMpToken = async () => {
+    setMpTesting(true);
+    setMpTestResult(null);
+    try {
+      const res = await testMercadoPagoToken(mpConfig.accessToken);
+      setMpTestResult(res);
+      if (res.success) {
+        showNotification(res.message, 'success');
+      } else {
+        showNotification(res.error, 'error');
+      }
+    } catch (err) {
+      setMpTestResult({ success: false, error: err.message });
+      showNotification(`Erro ao testar Mercado Pago: ${err.message}`, 'error');
+    } finally {
+      setMpTesting(false);
     }
   };
 
@@ -478,25 +498,9 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
             <button
               onClick={() => setIsFactoryCostsOpen(true)}
               className="bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 py-2.5 px-4 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all"
-              title="Configurar custos fixos mensais da empresa, imposto NFe e lista de matérias-primas"
+              title="Configurar lista de matérias-primas e fontes para pedidos sob medida"
             >
-              <Building2 size={16} /> ⚙️ Custos da Fábrica & Insumos
-            </button>
-
-            <button
-              onClick={() => setIsPricingAuditOpen(true)}
-              className="bg-purple-600/30 text-purple-200 border border-purple-500/40 hover:bg-purple-600/40 py-2.5 px-4 rounded-xl text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition-all"
-              title="Auditar precificação de todos os produtos ativos contra custos reais e nobreza dos materiais"
-            >
-              <Sparkles size={16} className="text-amber-300" /> 🧠 Auditoria Precificação IA
-            </button>
-
-            <button
-              onClick={() => setIsMaterialManagerOpen(true)}
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 py-2.5 px-4 rounded-xl text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition-all"
-              title="Gerenciar Tabela de Preços por m² e Lucro Líquido da Fábrica"
-            >
-              <Layers size={16} /> 🎨 Preços & Lucro m²
+              <Building2 size={16} /> 🧩 Materiais & Fontes para Orçamento
             </button>
 
             <button
@@ -504,6 +508,27 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
               className="bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-700 py-2.5 px-3.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
             >
               <FolderTree size={15} className="text-amber-400" /> Categorias ({categories.length})
+            </button>
+
+            <button
+              onClick={() => setIsInterModalOpen(true)}
+              className="bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 py-2.5 px-3.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+              title="Configurar credenciais da API Pix Banco Inter PJ para baixa automática"
+            >
+              <Building2 size={16} className="text-orange-400" /> 🏦 API Banco Inter (PIX Automático)
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('settings');
+                setTimeout(() => {
+                  document.getElementById('section-melhor-envio')?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }}
+              className="bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 py-2.5 px-3.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all"
+              title="Configurar Token e CEP da API Mercado Envios / Melhor Envio"
+            >
+              <Truck size={16} className="text-sky-400" /> 📦 Frete Mercado Envios
             </button>
 
             <button
@@ -1361,19 +1386,19 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
                       <td className="p-3 text-[var(--text-muted)] font-medium">{p.category}</td>
                       <td className="p-3">
                         {p.pricingType === 'custom_m2' ? (
-                          <span className="badge-gold text-[10px]">Sob Medida (m²)</span>
+                          <span className="badge-gold text-[10px]">Sob Medida (Orçamento)</span>
                         ) : (
                           <span className="badge-emerald text-[10px]">Preço Fixo</span>
                         )}
                       </td>
                       <td className="p-3 font-bold font-mono">
-                        {p.pricingType === 'custom_m2' ? `R$ ${p.pricePerM2.toFixed(2)}/m²` : `R$ ${p.wholesalePrice.toFixed(2)}`}
+                        {p.pricingType === 'custom_m2' ? <span className="text-amber-500 font-sans text-xs">Orçamento Manual</span> : `R$ ${p.wholesalePrice.toFixed(2)}`}
                       </td>
                       <td className="p-3 text-emerald-600 dark:text-emerald-400 font-bold font-mono">
-                        {p.pricingType === 'custom_m2' ? `R$ ${p.suggestedPricePerM2.toFixed(2)}/m²` : `R$ ${p.suggestedRetailPrice.toFixed(2)}`}
+                        {p.pricingType === 'custom_m2' ? <span className="text-slate-400 font-sans text-xs">Sob Demanda</span> : `R$ ${p.suggestedRetailPrice.toFixed(2)}`}
                       </td>
                       <td className="p-3 font-bold">
-                        {p.pricingType === 'custom_m2' ? "Corte a Laser" : `${p.factoryStock} un`}
+                        {p.pricingType === 'custom_m2' ? "Corte a Laser CNC" : `${p.factoryStock} un`}
                       </td>
                       <td className="p-3">
                         <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-extrabold whitespace-nowrap">
@@ -1515,32 +1540,24 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <span className="badge-gold uppercase tracking-wider text-[10px] inline-block">
-                  RECURSO EXCLUSIVO DA FÁBRICA
+                  CONFIGURAÇÕES DE ORÇAMENTO
                 </span>
                 <h4 className="text-base font-bold text-[var(--text-main)] font-['Outfit']">
-                  Custos Fixos, Tabela de Insumos & Precificação Inteligente IA
+                  Catálogo de Insumos & Opções Sob Medida
                 </h4>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Cadastre os custos operacionais da empresa e matérias-primas (Acrílico Espelhado vs MDF) para a Lumen IA sugerir margens reais e evitar prejuízos.
+                  Gerencie as matérias-primas e fontes que os revendedores podem selecionar ao solicitar orçamentos de corte a laser.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="pt-1">
               <button
                 type="button"
                 onClick={() => setIsFactoryCostsOpen(true)}
-                className="btn-gold py-3 px-4 text-xs font-extrabold flex items-center justify-center gap-2 shadow-md"
+                className="btn-gold py-2.5 px-4 text-xs font-extrabold flex items-center justify-center gap-2 shadow-md w-full sm:w-auto"
               >
-                <Building2 size={16} /> ⚙️ Gerenciar Custos Fixos & Insumos da Fábrica
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsPricingAuditOpen(true)}
-                className="btn-purple py-3 px-4 text-xs font-extrabold flex items-center justify-center gap-2 shadow-md text-white"
-              >
-                <Sparkles size={16} className="text-amber-300" /> 🧠 Auditar Precificação de Todos os Produtos com IA
+                <Building2 size={16} /> 🧩 Gerenciar Insumos & Tipografias
               </button>
             </div>
           </div>
@@ -1993,7 +2010,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
           </div>
 
           {/* Box 7: Logistics & Freight API (Mercado Envios / Melhor Envio) */}
-          <div className="space-y-4 pt-4 border-t border-[var(--border-color)]">
+          <div id="section-melhor-envio" className="space-y-4 pt-4 border-t border-[var(--border-color)] scroll-mt-20">
             <div className="flex items-center justify-between">
               <h4 className="font-bold text-amber-500 uppercase tracking-wider text-xs flex items-center gap-1.5">
                 <Truck size={16} /> 7. Logística & Cálculo de Fretes ao Vivo (Mercado Envios / Melhor Envio)
@@ -2157,11 +2174,30 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
                 <button
                   type="button"
                   onClick={handleSaveMpConfig}
-                  className="btn-gold text-xs py-2 px-4 font-bold flex items-center gap-1.5"
+                  className="btn-gold text-xs py-2 px-4 font-bold flex items-center gap-1.5 shadow"
                 >
                   <Save size={14} /> Salvar Credenciais Mercado Pago
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleTestMpToken}
+                  disabled={mpTesting}
+                  className="btn-secondary text-xs py-2 px-4 font-bold flex items-center gap-1.5 shadow"
+                >
+                  {mpTesting ? <RefreshCw size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                  <span>Testar Conexão com Mercado Pago</span>
+                </button>
               </div>
+
+              {mpTestResult && (
+                <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                  mpTestResult.success ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                }`}>
+                  {mpTestResult.success ? <CheckCircle2 size={16} className="text-emerald-400 shrink-0" /> : <AlertCircle size={16} className="text-rose-400 shrink-0" />}
+                  <span>{mpTestResult.message || mpTestResult.error}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2317,28 +2353,24 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
         onClose={() => setIsCategoryManagerOpen(false)}
       />
 
-      {/* Material Manager Modal */}
-      <MaterialManagerModal
-        isOpen={isMaterialManagerOpen}
-        onClose={() => setIsMaterialManagerOpen(false)}
-      />
-
-      {/* Factory Costs & Company Overhead Management Modal */}
+      {/* Factory Materials & Custom Options Management Modal */}
       <FactoryCostsModal
         isOpen={isFactoryCostsOpen}
         onClose={() => setIsFactoryCostsOpen(false)}
-      />
-
-      {/* AI Pricing & Profit Audit Modal */}
-      <PricingAuditModal
-        isOpen={isPricingAuditOpen}
-        onClose={() => setIsPricingAuditOpen(false)}
       />
       {/* Order Details & Tracking Management Modal */}
       {selectedOrderDetails && (
         <OrderDetailsModal
           order={selectedOrderDetails}
           onClose={() => setSelectedOrderDetails(null)}
+        />
+      )}
+
+      {/* Banco Inter PJ API Configuration Modal */}
+      {isInterModalOpen && (
+        <BancoInterSettingsModal
+          isOpen={isInterModalOpen}
+          onClose={() => setIsInterModalOpen(false)}
         />
       )}
     </div>
