@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
-import { ShoppingBag, Layers, Tag, Check, AlertCircle, X, ChevronRight } from 'lucide-react';
+import { ShoppingBag, Layers, Tag, Check, AlertCircle, X, ChevronRight, Maximize2 } from 'lucide-react';
+import { ImageLightboxModal } from '../common/ImageLightboxModal';
 
 export const VariationSelectionModal = ({ product, onClose }) => {
   const { addToCart } = useStore();
@@ -22,6 +23,7 @@ export const VariationSelectionModal = ({ product, onClose }) => {
   
   const [selectedVarIndex, setSelectedVarIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   
   const selectedVar = variations[selectedVarIndex] || {
     id: 'default',
@@ -89,11 +91,20 @@ export const VariationSelectionModal = ({ product, onClose }) => {
 
         {/* Product Preview Card */}
         <div className="flex items-center gap-3 p-3 bg-[var(--bg-surface-hover)] rounded-xl border border-[var(--border-color)] mb-4">
-          <img
-            src={product.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80"}
-            alt={product.title}
-            className="w-14 h-14 rounded-lg object-cover border border-[var(--border-color)] shrink-0"
-          />
+          <div
+            onClick={() => setLightboxOpen(true)}
+            className="group relative w-14 h-14 rounded-lg overflow-hidden border border-[var(--border-color)] shrink-0 cursor-pointer"
+            title="Clique para ver a foto em tamanho grande"
+          >
+            <img
+              src={product.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80"}
+              alt={product.title}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+            />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+              <Maximize2 size={16} />
+            </div>
+          </div>
           <div className="flex-1 min-w-0">
             <span className="text-[10px] font-bold text-amber-500 uppercase">{product.category}</span>
             <p className="font-bold text-[var(--text-main)] truncate">{product.title}</p>
@@ -184,6 +195,14 @@ export const VariationSelectionModal = ({ product, onClose }) => {
           </button>
         </div>
 
+        {/* Visualizador de Imagem em Tela Cheia */}
+        <ImageLightboxModal
+          isOpen={lightboxOpen}
+          images={product?.images?.length ? product.images : [product?.image]}
+          initialIndex={0}
+          title={product?.title}
+          onClose={() => setLightboxOpen(false)}
+        />
       </div>
     </div>,
     document.body

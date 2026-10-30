@@ -1,12 +1,23 @@
-import React, { useState } from 'react';
-import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2, FileSpreadsheet, ShoppingBag, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2, FileSpreadsheet, ShoppingBag, Upload, Maximize2 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { ResellerProductImagesModal } from './ResellerProductImagesModal';
+import { ImageLightboxModal } from '../common/ImageLightboxModal';
 import { generateMarketingContent } from '../../lib/smdAssistIa';
 import { downloadShopeeMassCreationCSV, saveCustomShopeeTemplate, getCustomShopeeTemplateMeta, clearCustomShopeeTemplate } from '../../lib/shopeeExporter';
 
 export const MediaKitModal = ({ product, onClose }) => {
   const { showNotification } = useStore();
+
+  // Trava a rolagem de fundo enquanto o modal estiver aberto
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'variations' | 'dimensions' | 'fiscal' | 'photos' | 'marketing'
   const [customTemplateMeta, setCustomTemplateMeta] = useState(() => getCustomShopeeTemplateMeta());
   const [copiedTitle, setCopiedTitle] = useState(false);
@@ -15,6 +26,8 @@ export const MediaKitModal = ({ product, onClose }) => {
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
   const [marketingData, setMarketingData] = useState(null);
   const [loadingMarketing, setLoadingMarketing] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   if (!product) return null;
 
@@ -62,9 +75,9 @@ export const MediaKitModal = ({ product, onClose }) => {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col p-4 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col p-4 sm:p-6 shadow-2xl relative my-auto">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-3 shrink-0">
           <div className="flex items-center gap-3">
@@ -181,12 +194,34 @@ export const MediaKitModal = ({ product, onClose }) => {
                   <ImageIcon size={14} className="text-indigo-500" /> Foto Principal
                 </h4>
                 
-                <div className="rounded-xl overflow-hidden border border-[var(--border-color)] shadow-sm bg-slate-100 dark:bg-slate-800">
+                <div 
+                  onClick={() => {
+                    setLightboxIndex(0);
+                    setLightboxOpen(true);
+                  }}
+                  className="group relative rounded-xl overflow-hidden border border-[var(--border-color)] shadow-sm bg-slate-100 dark:bg-slate-800 cursor-pointer select-none"
+                  title="Clique para ver a foto em tela cheia com alta resolução"
+                >
                   <img
                     src={product.image || images[0]}
                     alt={product.title}
-                    className="w-full h-44 object-cover"
+                    className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-300"
                   />
+                  
+                  {/* Hover Overlay com Ícone de Expansão */}
+                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-white gap-1 backdrop-blur-[2px]">
+                    <div className="w-10 h-10 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                      <Maximize2 size={20} />
+                    </div>
+                    <span className="text-[11px] font-extrabold tracking-wide uppercase bg-black/60 px-2.5 py-0.5 rounded-md text-amber-300">
+                      Ver em Tela Cheia
+                    </span>
+                  </div>
+
+                  {/* Badge sutil no canto da foto */}
+                  <div className="absolute bottom-2 right-2 bg-slate-900/85 backdrop-blur-md text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-md pointer-events-none">
+                    <Maximize2 size={11} /> Clique p/ ampliar
+                  </div>
                 </div>
 
                 <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2 text-xs">
@@ -680,20 +715,26 @@ export const MediaKitModal = ({ product, onClose }) => {
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {images.map((imgUrl, idx) => (
-                  <div key={idx} className="group relative bg-[var(--bg-surface-hover)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-sm">
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setLightboxIndex(idx);
+                      setLightboxOpen(true);
+                    }}
+                    className="group relative bg-[var(--bg-surface-hover)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-sm cursor-pointer select-none"
+                    title={`Clique para ver a Foto ${idx + 1} em tela cheia`}
+                  >
                     <img
                       src={imgUrl}
                       alt={`Foto ${idx + 1}`}
                       className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <a
-                      href={imgUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold text-xs transition-opacity gap-1"
-                    >
-                      <ExternalLink size={16} /> Abrir HD
-                    </a>
+                    <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white font-bold text-xs transition-opacity gap-1.5 backdrop-blur-[1px]">
+                      <div className="w-8 h-8 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-md">
+                        <Maximize2 size={16} />
+                      </div>
+                      <span className="text-[11px] font-bold text-amber-300">Ver em Tela Cheia</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -709,8 +750,18 @@ export const MediaKitModal = ({ product, onClose }) => {
             onClose={() => setIsImagesModalOpen(false)}
           />
         )}
+
+        {/* Visualizador de Imagens em Tela Cheia (Lightbox HD) */}
+        <ImageLightboxModal
+          isOpen={lightboxOpen}
+          images={images}
+          initialIndex={lightboxIndex}
+          title={product.title}
+          onClose={() => setLightboxOpen(false)}
+        />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import * as XLSX from 'xlsx';
 import { 
@@ -20,6 +21,16 @@ import {
 
 export const FinancialStatementModal = ({ isOpen, onClose }) => {
   const { orders, showNotification } = useStore();
+
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isOpen]);
 
   const [periodFilter, setPeriodFilter] = useState('all'); // 'all' | '7days' | '30days'
   const [channelFilter, setChannelFilter] = useState('all'); // 'all' | 'Mercado Livre' | 'Shopee' | 'Amazon' | 'direct'
@@ -165,8 +176,8 @@ export const FinancialStatementModal = ({ isOpen, onClose }) => {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
         {/* Top Header Card */}
         <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 border-b border-[var(--border-color)] text-white relative">
@@ -386,6 +397,7 @@ export const FinancialStatementModal = ({ isOpen, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { HelpCircle, ChevronDown, ChevronUp, FileText, Truck, ShieldCheck, Factory, Sparkles } from 'lucide-react';
 
 export const FaqModal = ({ isOpen, onClose }) => {
@@ -29,9 +30,9 @@ export const FaqModal = ({ isOpen, onClose }) => {
     }
   ];
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col p-5 sm:p-6 shadow-2xl relative animate-fade-in my-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col p-5 sm:p-6 shadow-2xl relative my-auto">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-3 mb-4 shrink-0">
           <div className="flex items-center gap-3">
@@ -80,6 +81,7 @@ export const FaqModal = ({ isOpen, onClose }) => {
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

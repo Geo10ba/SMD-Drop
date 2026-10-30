@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Truck, CheckCircle2, Clock, PackageCheck, MapPin, Search, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
@@ -50,9 +51,9 @@ export const TrackingModal = ({ isOpen, onClose, initialTrackingCode = '' }) => 
     }
   ];
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-xl w-full p-6 shadow-2xl relative animate-fade-in my-8">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-xl w-full p-6 shadow-2xl relative my-auto">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-4 mb-6">
           <div className="flex items-center gap-3">
@@ -124,6 +125,7 @@ export const TrackingModal = ({ isOpen, onClose, initialTrackingCode = '' }) => 
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

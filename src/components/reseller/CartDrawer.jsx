@@ -1,9 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { ShoppingBag, Trash2, ArrowRight, Ruler, FileText, CheckCircle2 } from 'lucide-react';
 
 export const CartDrawer = ({ isOpen, onClose, onProceedToCheckout }) => {
   const { cart, removeFromCart } = useStore();
+
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -21,8 +32,8 @@ export const CartDrawer = ({ isOpen, onClose, onProceedToCheckout }) => {
 
   const totalEstimatedProfit = Math.max(0, totalSuggestedRetail - totalWholesaleCost);
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] overflow-hidden">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
@@ -157,6 +168,7 @@ export const CartDrawer = ({ isOpen, onClose, onProceedToCheckout }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

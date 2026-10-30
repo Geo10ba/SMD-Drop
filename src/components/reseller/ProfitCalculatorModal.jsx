@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Calculator, 
   DollarSign, 
@@ -93,8 +94,8 @@ export const ProfitCalculatorModal = ({ product, isOpen, onClose, onApplyPrice }
 
   const channel = SALES_CHANNELS[channelId] || SALES_CHANNELS.ml_classic;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-4xl w-full max-h-[94vh] flex flex-col p-5 sm:p-6 shadow-2xl relative my-auto">
         
         {/* Header */}
@@ -538,6 +539,7 @@ export const ProfitCalculatorModal = ({ product, isOpen, onClose, onApplyPrice }
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

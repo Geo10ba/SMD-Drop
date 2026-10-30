@@ -1,9 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../context/StoreContext';
 import { ShieldCheck, Lock, FileText, CheckCircle2, Building2, ExternalLink } from 'lucide-react';
 
 export const LegalModal = ({ isOpen, onClose, mode = 'terms' }) => {
   const { companySettings } = useStore();
+
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -14,8 +25,8 @@ export const LegalModal = ({ isOpen, onClose, mode = 'terms' }) => {
 
   const content = isTerms ? companySettings.termsContent : companySettings.privacyContent;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col p-5 sm:p-7 shadow-2xl relative animate-fade-in my-auto">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[var(--border-color)] pb-4 mb-4 shrink-0">
@@ -76,6 +87,7 @@ export const LegalModal = ({ isOpen, onClose, mode = 'terms' }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { 
   PackageCheck, 
@@ -56,9 +57,9 @@ export const ResellerOrdersModal = ({ isOpen, onClose, onOpenCatalog }) => {
     );
   });
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col p-5 sm:p-7 shadow-2xl relative animate-fade-in my-auto text-white">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col p-5 sm:p-7 shadow-2xl relative my-auto text-white">
         
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-800 pb-4 mb-3 shrink-0">
@@ -263,7 +264,8 @@ export const ResellerOrdersModal = ({ isOpen, onClose, onOpenCatalog }) => {
           />
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

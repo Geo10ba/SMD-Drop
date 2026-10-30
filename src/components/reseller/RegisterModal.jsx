@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { 
   UserPlus, 
@@ -148,9 +149,9 @@ export const RegisterModal = ({ isOpen, initialMode = 'register', onClose, onOpe
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-2xl w-full max-h-[95vh] flex flex-col p-6 sm:p-7 shadow-2xl relative animate-fade-in my-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl max-w-2xl w-full max-h-[95vh] flex flex-col p-6 sm:p-7 shadow-2xl relative my-auto">
         {/* Header Tabs */}
         <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-3 mb-5 shrink-0">
           <div className="flex items-center gap-2">
@@ -412,6 +413,7 @@ export const RegisterModal = ({ isOpen, initialMode = 'register', onClose, onOpe
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

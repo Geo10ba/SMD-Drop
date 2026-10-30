@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Ruler, Check, X, Shield, Sparkles, Send, Layers, 
   FileUp, Info, Lock, Unlock, Eye, Type, Clock, 
@@ -222,8 +223,8 @@ export const CustomSizeCalculator = ({ product, onClose }) => {
     window.open(url, '_blank');
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
+  return createPortal(
+    <div className="fixed inset-0 z-[9990] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[95vh]">
         
         {/* Header */}
@@ -618,6 +619,7 @@ export const CustomSizeCalculator = ({ product, onClose }) => {
         )}
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

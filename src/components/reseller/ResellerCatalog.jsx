@@ -33,13 +33,15 @@ import {
   Lock,
   UserPlus,
   Volume2,
-  VolumeX
+  VolumeX,
+  Maximize2
 } from 'lucide-react';
+import { ImageLightboxModal } from '../common/ImageLightboxModal';
 
 /**
  * Componente de Mídia do Card de Produto com Reprodução Automática de Vídeo ao passar o Mouse
  */
-const ProductCardMedia = ({ product, itemsPerRow, isM2, hasVars, productVariations, onOpenMediaKit }) => {
+const ProductCardMedia = ({ product, itemsPerRow, isM2, hasVars, productVariations, onOpenMediaKit, onZoomImage }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [videoError, setVideoError] = useState(false);
@@ -176,6 +178,20 @@ const ProductCardMedia = ({ product, itemsPerRow, isM2, hasVars, productVariatio
           {isMuted ? <VolumeX size={12} className="text-slate-300" /> : <Volume2 size={12} className="text-emerald-400" />}
         </button>
       )}
+
+      {/* Botão de Zoom / Tela Cheia Rápido */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onZoomImage?.(product);
+        }}
+        className="absolute bottom-2 left-2 z-20 p-1.5 rounded-lg bg-slate-950/85 hover:bg-amber-500 text-white hover:text-slate-950 border border-white/20 shadow-lg backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 cursor-pointer flex items-center gap-1 text-[10px] font-bold"
+        title="Ver foto em tela cheia (Zoom)"
+      >
+        <Maximize2 size={12} />
+        <span className="hidden sm:inline">Zoom</span>
+      </button>
     </div>
   );
 };
@@ -216,6 +232,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   const [mediaKitProduct, setMediaKitProduct] = useState(null);
   const [profitModalProduct, setProfitModalProduct] = useState(null);
   const [variationProduct, setVariationProduct] = useState(null);
+  const [previewProduct, setPreviewProduct] = useState(null);
   const [customPrices, setCustomPrices] = useState({});
 
   const handleCustomPriceChange = (productId, val) => {
@@ -584,6 +601,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                       hasVars={hasVars}
                       productVariations={productVariations}
                       onOpenMediaKit={() => setMediaKitProduct(product)}
+                      onZoomImage={(prod) => setPreviewProduct(prod)}
                     />
 
                     {/* Content Body (Ultra-Clean & Compact Layout) */}
@@ -861,6 +879,17 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
         <ExportCatalogModal
           isOpen={isExportOpen}
           onClose={() => setIsExportOpen(false)}
+        />
+      )}
+
+      {/* Visualizador de Imagem em Tela Cheia no Catálogo */}
+      {previewProduct && (
+        <ImageLightboxModal
+          isOpen={Boolean(previewProduct)}
+          images={previewProduct.images?.length ? previewProduct.images : [previewProduct.image]}
+          initialIndex={0}
+          title={previewProduct.title}
+          onClose={() => setPreviewProduct(null)}
         />
       )}
     </div>
