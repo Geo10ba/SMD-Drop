@@ -57,30 +57,10 @@ const getInitialBookmarkletData = () => {
         imagesList = [img];
       }
 
-      // Automatically clean AVIF, WEBP or heavy query params from external marketplaces
-      imagesList = imagesList.map((u) => {
-        if (!u || typeof u !== 'string') return '';
-        let clean = u.trim();
-        if (clean.includes('kwcdn.com') || clean.includes('temu.com')) {
-          clean = clean.replace(/\?imageView2.*$/i, '');
-        }
-        if (/format[=/](avif|webp)/i.test(clean)) {
-          const qIdx = clean.indexOf('?');
-          if (qIdx !== -1 && /\.(png|jpe?g)$/i.test(clean.substring(0, qIdx))) {
-            clean = clean.substring(0, qIdx);
-          } else {
-            clean = clean.replace(/format[=/]avif/gi, 'format=jpeg').replace(/format[=/]webp/gi, 'format=jpeg');
-          }
-        }
-        return clean;
-      }).filter(Boolean);
-
-      const mainImg = imagesList[0] || (img ? img.replace(/\?imageView2.*$/i, '') : 'https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80');
-
       return {
         title: title || 'Produto Capturado Mágico',
         description: desc || (title ? `Produto ${title} fabricado em material nobre com corte a laser.` : 'Descrição importada do anúncio.'),
-        image: mainImg,
+        image: imagesList[0] || img || 'https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80',
         images: imagesList,
         video: video || '',
         suggestedRetailPrice: price || 120,
