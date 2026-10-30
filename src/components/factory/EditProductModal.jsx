@@ -12,6 +12,7 @@ import {
   analyzeVariationProgression
 } from '../../lib/smdAssistIa';
 import { normalizeCategoryName } from '../../lib/categoryTranslations';
+import { convertMarketplaceImageToHdShopee } from '../../utils/imageUrlCleaner';
 
 export const EditProductModal = ({ product, onClose }) => {
   const { updateProduct, deleteProduct, categories, addCategory, showNotification, companySettings, materials } = useStore();
@@ -343,12 +344,20 @@ export const EditProductModal = ({ product, onClose }) => {
   const handleAddImage = (e) => {
     e.preventDefault();
     if (newImageUrl.trim()) {
-      const cleanUrl = newImageUrl.trim();
+      const cleanUrl = convertMarketplaceImageToHdShopee(newImageUrl.trim());
       const updated = [...images, cleanUrl];
       setImages(updated);
       if (!image) setImage(cleanUrl);
       setNewImageUrl('');
+      showNotification('Foto adicionada e convertida para HD compatível com a Shopee!');
     }
+  };
+
+  const handleOptimizeAllImages = () => {
+    const optimizedImages = images.map(convertMarketplaceImageToHdShopee);
+    setImages(optimizedImages);
+    if (image) setImage(convertMarketplaceImageToHdShopee(image));
+    showNotification('✨ Todas as fotos foram convertidas para JPEG HD compatível com a Shopee!');
   };
 
   const handleRemoveImage = (index) => {
@@ -513,8 +522,8 @@ export const EditProductModal = ({ product, onClose }) => {
       origin,
       status,
       video: video || '',
-      image: image || images[0] || '',
-      images: images.length > 0 ? images : [image]
+      image: convertMarketplaceImageToHdShopee(image || images[0] || ''),
+      images: (images.length > 0 ? images : [image]).map(convertMarketplaceImageToHdShopee).filter(Boolean)
     });
 
     onClose();
@@ -1663,6 +1672,16 @@ export const EditProductModal = ({ product, onClose }) => {
                     Clique em qualquer foto para defini-la como a Foto Capa oficial do catálogo.
                   </p>
                 </div>
+                {images.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleOptimizeAllImages}
+                    className="btn-secondary text-[11px] py-1.5 px-3 font-bold text-amber-500 border border-amber-500/40 hover:bg-amber-500/10 flex items-center gap-1.5 shrink-0"
+                    title="Converte automaticamente links da Temu, Mercado Livre e outros para JPEG HD compatível com a Shopee"
+                  >
+                    <Sparkles size={14} /> Converter Fotos p/ Shopee (JPEG HD)
+                  </button>
+                )}
               </div>
 
               {/* Add New Image Form */}

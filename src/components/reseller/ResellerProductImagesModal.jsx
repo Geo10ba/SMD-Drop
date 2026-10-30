@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import { Image as ImageIcon, Plus, Trash2, Check, Star, ExternalLink, Save, X, Sparkles } from 'lucide-react';
+import { convertMarketplaceImageToHdShopee } from '../../utils/imageUrlCleaner';
 
 export const ResellerProductImagesModal = ({ product, onClose }) => {
   const { updateProduct, showNotification } = useStore();
@@ -32,12 +33,19 @@ export const ResellerProductImagesModal = ({ product, onClose }) => {
   const handleAddImage = (e) => {
     e.preventDefault();
     if (!newImageUrl.trim()) return;
-    const url = newImageUrl.trim();
+    const url = convertMarketplaceImageToHdShopee(newImageUrl.trim());
     const nextImages = [...images, url];
     setImages(nextImages);
     if (!coverImage) setCoverImage(url);
     setNewImageUrl('');
-    showNotification('Nova imagem adicionada à galeria do seu produto!');
+    showNotification('Nova imagem adicionada e convertida para HD compatível com a Shopee!');
+  };
+
+  const handleOptimizeAllImages = () => {
+    const optimized = images.map(convertMarketplaceImageToHdShopee);
+    setImages(optimized);
+    if (coverImage) setCoverImage(convertMarketplaceImageToHdShopee(coverImage));
+    showNotification('✨ Todas as fotos foram convertidas para JPEG HD compatível com a Shopee!');
   };
 
   const handleRemoveImage = (index) => {
@@ -56,14 +64,15 @@ export const ResellerProductImagesModal = ({ product, onClose }) => {
       return;
     }
 
-    const finalCover = coverImage && images.includes(coverImage) ? coverImage : images[0];
+    const cleanImages = images.map(convertMarketplaceImageToHdShopee).filter(Boolean);
+    const finalCover = convertMarketplaceImageToHdShopee(coverImage && cleanImages.includes(coverImage) ? coverImage : cleanImages[0]);
 
     updateProduct(product.id, {
       image: finalCover,
-      images: images,
+      images: cleanImages,
       mediaKit: {
         ...(product.mediaKit || {}),
-        photos: images
+        photos: cleanImages
       }
     });
 
