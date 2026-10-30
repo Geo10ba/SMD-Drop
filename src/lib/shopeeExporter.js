@@ -78,11 +78,14 @@ const FALLBACK_MODELO_HEADERS = [
 ];
 
 /**
- * Filter out invalid image URLs (e.g. video thumbnails < 500px, unsupported domains)
+ * Filter out invalid image URLs (e.g. video thumbnails < 500px, unsupported domains, AVIF/WEBP formats)
+ * and ensure 100% Shopee compliance (JPG, JPEG, PNG only).
  */
 export const sanitizeImageUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
-  const trimmed = url.trim();
+  let trimmed = url.trim();
+
+  // Unsupported or bad video thumbnails
   if (
     trimmed.includes('v.etsystatic.com') ||
     trimmed.includes('/video/upload/') ||
@@ -93,9 +96,58 @@ export const sanitizeImageUrl = (url) => {
   ) {
     return '';
   }
+
+  // Must be a valid web URL
   if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
     return '';
   }
+
+  // Force HTTPS
+  if (trimmed.startsWith('http://')) {
+    trimmed = 'https://' + trimmed.slice(7);
+  }
+
+  // 1. Temu / Kwcdn: Strip query parameters if the base path already ends with .png, .jpg, or .jpeg
+  // Example: https://img.kwcdn.com/product/..._1000x1000.png?imageView2/2/w/800/q/70/format/avif -> .png
+  if (trimmed.includes('kwcdn.com') || trimmed.includes('temu.com')) {
+    const qIdx = trimmed.indexOf('?');
+    if (qIdx !== -1) {
+      const base = trimmed.substring(0, qIdx);
+      if (/\.(png|jpe?g)$/i.test(base)) {
+        return base;
+      }
+      // If base has no direct extension, convert format/avif or format/webp to format/jpeg
+      trimmed = trimmed.replace(/format\/(avif|webp)/gi, 'format/jpeg');
+    }
+  }
+
+  // 2. AliExpress / Alicdn: Strip trailing _.webp (e.g. .jpg_640x640.jpg_.webp -> .jpg_640x640.jpg)
+  if (trimmed.includes('alicdn.com') || trimmed.includes('aliexpress')) {
+    trimmed = trimmed.replace(/([._])webp(\?.*)?$/i, '$2').replace(/_\.webp$/i, '');
+  }
+
+  // 3. Mercado Livre: Replace .webp with .jpg, and ensure high resolution -O.jpg
+  if (trimmed.includes('mlstatic.com')) {
+    trimmed = trimmed.replace(/\.webp$/i, '.jpg').replace(/-[I|V|E|C|D]\.jpg$/i, '-O.jpg');
+  }
+
+  // 4. Shopee: Replace _tn and ensure jpg
+  if (trimmed.includes('susercontent.com') || trimmed.includes('shopee.')) {
+    trimmed = trimmed.replace(/_tn$/i, '').replace(/\.webp$/i, '.jpg');
+  }
+
+  // 5. General AVIF / WEBP in query params -> strip if base is already jpg/png, or convert to jpeg
+  if (/format[=/](avif|webp)/i.test(trimmed)) {
+    const qIdx = trimmed.indexOf('?');
+    if (qIdx !== -1) {
+      const base = trimmed.substring(0, qIdx);
+      if (/\.(png|jpe?g)$/i.test(base)) {
+        return base;
+      }
+    }
+    trimmed = trimmed.replace(/format[=/]avif/gi, 'format=jpeg').replace(/format[=/]webp/gi, 'format=jpeg');
+  }
+
   return trimmed;
 };
 
