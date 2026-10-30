@@ -1959,12 +1959,12 @@ export const StoreProvider = ({ children }) => {
     }
   };
 
-  // Add Product by Admin (Direct active publication)
+  // Add Product by Admin (Direct active publication or Draft)
   const addProduct = async (productData) => {
     const fiscal = resolveSmartFiscalDetails(productData);
     const newProduct = {
       id: "prod-" + Date.now(),
-      inStock: true,
+      inStock: productData.status !== 'draft',
       mediaKit: {
         photos: [productData.image],
         copyTitle: productData.title,
@@ -1974,8 +1974,13 @@ export const StoreProvider = ({ children }) => {
       ...fiscal,
       ...productData
     };
+    const isDraft = newProduct.status === 'draft' || newProduct.status === 'rascunho';
     setProducts((prev) => [newProduct, ...prev]);
-    showNotification(`Novo produto "${productData.title}" cadastrado no catálogo!`);
+    showNotification(
+      isDraft 
+        ? `📝 Produto "${productData.title}" salvo como rascunho!` 
+        : `Novo produto "${productData.title}" cadastrado no catálogo!`
+    );
 
     safeSyncProductToSupabase(newProduct);
   };
@@ -1986,14 +1991,16 @@ export const StoreProvider = ({ children }) => {
     const retailPrice = Number(productData.suggestedRetailPrice) || 120;
     const wholesalePrice = Number(productData.wholesalePrice) || Math.round(retailPrice * 0.45);
 
+    const isDraft = productData.status === 'draft' || productData.status === 'rascunho';
+
     const newProduct = {
       id: "prod-" + Date.now(),
       createdAt: new Date().toISOString(),
       resellerId: currentUser?.id || 'anon',
       resellerName: currentUser?.name || 'Revendedor Convidado',
       resellerEmail: currentUser?.email || '',
-      status: "approved",
-      inStock: true,
+      status: isDraft ? "draft" : "approved",
+      inStock: !isDraft,
       wholesalePrice: wholesalePrice,
       suggestedRetailPrice: retailPrice,
       pricePerM2: wholesalePrice,
@@ -2012,8 +2019,15 @@ export const StoreProvider = ({ children }) => {
     };
 
     setProducts((prev) => [newProduct, ...prev]);
-    setPendingProducts((prev) => [newProduct, ...prev]);
-    showNotification(`✨ Produto "${productData.title}" cadastrado e sincronizado com o banco de dados!`, 'gold');
+    if (!isDraft) {
+      setPendingProducts((prev) => [newProduct, ...prev]);
+    }
+    showNotification(
+      isDraft
+        ? `📝 Produto "${productData.title}" salvo como rascunho!`
+        : `✨ Produto "${productData.title}" cadastrado e sincronizado com o banco de dados!`,
+      'gold'
+    );
 
     safeSyncProductToSupabase(newProduct);
   };

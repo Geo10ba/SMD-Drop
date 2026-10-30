@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore, resolveSmartFiscalDetails } from '../../context/StoreContext';
-import { Wand2, Copy, Check, Sparkles, FileText, Video, MessageSquare, Loader2 } from 'lucide-react';
+import { Wand2, Copy, Check, Sparkles, FileText, Video, MessageSquare, Loader2, FileEdit } from 'lucide-react';
 import { generateProductDescriptionAndNcm } from '../../lib/smdAssistIa';
+import { convertMarketplaceImageToHdShopee } from '../../utils/imageUrlCleaner';
 
 export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
   const { currentUser, viewMode, addProduct, suggestProductByReseller, categories, addCategory, showNotification } = useStore();
@@ -135,14 +136,15 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
     }
   };
 
-  const handleSaveProduct = (e) => {
-    e.preventDefault();
+  const handleSaveProduct = (e, statusOverride = 'approved') => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!form.title) return;
 
+    const isDraft = statusOverride === 'draft';
     const fiscal = resolveSmartFiscalDetails(form);
-    const finalImgs = Array.isArray(form.images) && form.images.length > 0
+    const finalImgs = (Array.isArray(form.images) && form.images.length > 0
       ? form.images
-      : (form.image ? [form.image] : []);
+      : (form.image ? [form.image] : [])).map(convertMarketplaceImageToHdShopee).filter(Boolean);
 
     const payload = {
       title: form.title,
@@ -154,10 +156,12 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
       pricePerM2: Number(form.wholesalePrice),
       suggestedPricePerM2: Number(form.suggestedRetailPrice),
       description: form.description || `Produto ${form.title} fabricado com qualidade fabril.`,
-      image: finalImgs[0] || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
+      image: convertMarketplaceImageToHdShopee(finalImgs[0] || form.image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80"),
       images: finalImgs,
       video: form.video || "",
       resellerNotes: form.resellerNotes || "",
+      status: isDraft ? 'draft' : (isAdmin ? 'approved' : 'pending'),
+      inStock: !isDraft,
       ...fiscal
     };
 
@@ -527,11 +531,29 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[var(--border-color)] flex justify-end gap-2 shrink-0">
-              <button type="button" onClick={onClose} className="btn-secondary py-2.5 px-4 font-semibold">
+            <div className="pt-3 border-t border-[var(--border-color)] flex flex-wrap items-center justify-end gap-2 shrink-0">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="btn-secondary py-2.5 px-4 font-semibold text-xs"
+              >
                 Cancelar
               </button>
-              <button type="submit" className="btn-gold py-2.5 px-6 font-bold shadow-md">
+
+              <button
+                type="button"
+                onClick={(e) => handleSaveProduct(e, 'draft')}
+                className="py-2.5 px-4 font-bold text-xs rounded-xl border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5 shadow-sm"
+                title="Salva o produto como rascunho sem publicar no catálogo de vendas"
+              >
+                <FileEdit size={14} /> Salvar como Rascunho
+              </button>
+
+              <button 
+                type="submit" 
+                onClick={(e) => handleSaveProduct(e, 'approved')}
+                className="btn-gold py-2.5 px-6 font-bold text-xs shadow-md flex items-center gap-1.5"
+              >
                 {isAdmin ? "🚀 Publicar Produto Direto no Catálogo" : "✨ Enviar Produto para Aprovação do Admin"}
               </button>
             </div>

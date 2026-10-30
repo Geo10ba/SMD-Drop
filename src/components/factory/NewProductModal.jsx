@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
-import { PlusCircle, Ruler, Tag, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { PlusCircle, Ruler, Tag, Image as ImageIcon, Sparkles, FileEdit } from 'lucide-react';
+import { convertMarketplaceImageToHdShopee } from '../../utils/imageUrlCleaner';
 
 export const NewProductModal = ({ isOpen, onClose }) => {
   const { addProduct, categories, addCategory } = useStore();
@@ -38,9 +39,12 @@ export const NewProductModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = (e, statusOverride = 'approved') => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!title) return;
+
+    const isDraft = statusOverride === 'draft';
+    const cleanImg = convertMarketplaceImageToHdShopee(image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80");
 
     addProduct({
       title,
@@ -57,7 +61,10 @@ export const NewProductModal = ({ isOpen, onClose }) => {
       maxHeight: 200,
       leadTimeDays: pricingType === 'custom_m2' ? 3 : 1,
       description: description || "Produto fabricado com acabamento de alta qualidade.",
-      image: image || "https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=800&q=80",
+      image: cleanImg,
+      images: [cleanImg],
+      status: isDraft ? 'draft' : 'approved',
+      inStock: !isDraft,
       ncm: "3926.90.90",
       ean: "789981230" + Math.floor(100 + Math.random() * 900)
     });
@@ -271,12 +278,24 @@ export const NewProductModal = ({ isOpen, onClose }) => {
           </div>
 
           {/* Footer (Fixed Bottom inside Form) */}
-          <div className="pt-4 border-t border-[var(--border-color)] flex justify-end gap-2 shrink-0">
+          <div className="pt-4 border-t border-[var(--border-color)] flex flex-wrap items-center justify-end gap-2 shrink-0">
             <button type="button" onClick={onClose} className="btn-secondary py-2.5 px-4 text-xs font-semibold">
               Cancelar
             </button>
-            <button type="submit" className="btn-gold py-2.5 px-6 text-xs font-bold shadow-md">
-              Salvar Produto no Catálogo
+            <button
+              type="button"
+              onClick={(e) => handleSubmit(e, 'draft')}
+              className="py-2.5 px-4 font-bold text-xs rounded-xl border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5 shadow-sm"
+              title="Salva o produto como rascunho sem publicar no catálogo de vendas"
+            >
+              <FileEdit size={14} /> Salvar como Rascunho
+            </button>
+            <button 
+              type="submit" 
+              onClick={(e) => handleSubmit(e, 'approved')}
+              className="btn-gold py-2.5 px-6 text-xs font-bold shadow-md"
+            >
+              Salvar e Publicar no Catálogo
             </button>
           </div>
         </form>
