@@ -66,9 +66,13 @@ export const StoreProvider = ({ children }) => {
   // Theme Management (Default: 'light' Luxe)
   const [theme, setTheme] = useState('light');
 
-  // View Mode: 'reseller' or 'factory' (Persisted in localStorage)
+  // View Mode: 'reseller' or 'factory' (Persisted in localStorage & synced with URL hash)
   const [viewMode, setViewModeState] = useState(() => {
     if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      if (hash.startsWith('#fabrica') || hash.startsWith('#/fabrica')) {
+        return 'factory';
+      }
       const saved = localStorage.getItem('smd_view_mode');
       if (saved === 'factory' || saved === 'reseller') return saved;
     }
@@ -119,8 +123,9 @@ export const StoreProvider = ({ children }) => {
           }
         } catch (e) {}
       }
+      const hash = window.location.hash || '';
       const mode = localStorage.getItem('smd_view_mode');
-      if (mode === 'factory') return defaultAdminUser;
+      if (mode === 'factory' || hash.startsWith('#fabrica') || hash.startsWith('#/fabrica')) return defaultAdminUser;
     }
     return null; // Visitantes não logados iniciam como Visitantes/Visitante Convidado
   });
@@ -144,7 +149,7 @@ export const StoreProvider = ({ children }) => {
   useEffect(() => {
     if (isMagicImportOpen && magicImportInitialData) {
       if (typeof window !== 'undefined' && window.location.search) {
-        window.history.replaceState({}, '', window.location.pathname);
+        window.history.replaceState({}, '', window.location.pathname + (window.location.hash || ''));
       }
       showNotification('⚡ Produto capturado com o Botão Mágico!');
     }

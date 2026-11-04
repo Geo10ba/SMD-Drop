@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ChevronRight, Store, Factory, Package, ShoppingBag, Settings, Calculator, HelpCircle, Truck, Layers, Users, Clock, PlusCircle, CheckCircle2, ShieldCheck, Share2, Copy, Check } from 'lucide-react';
+import { Home, ChevronRight, Store, Factory, Package, ShoppingBag, Settings, Calculator, HelpCircle, Truck, Layers, Users, Clock, PlusCircle, CheckCircle2, ShieldCheck, Share2, Copy, Check, Wallet, TrendingUp, Building2 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 
 export const Breadcrumb = ({
@@ -46,6 +46,8 @@ export const Breadcrumb = ({
       'pedidos': { label: 'Meus Pedidos de Revenda', icon: Package },
       'carrinho': { label: 'Carrinho de Compras', icon: ShoppingBag },
       'checkout': { label: 'Finalizar Pedido', icon: CheckCircle2 },
+      'carteira': { label: 'Minha Carteira Pré-Paga', icon: Wallet },
+      'extrato': { label: 'Extrato Financeiro & Lucro Líquido', icon: TrendingUp },
       'calculadora-m2': { label: 'Orçamento sob Medida CNC', icon: Calculator },
       'ajuda': { label: 'Central de Ajuda & FAQ', icon: HelpCircle },
       'rastreio': { label: 'Rastreamento de Envio', icon: Truck },
@@ -54,11 +56,20 @@ export const Breadcrumb = ({
       'admin-login': { label: 'Login do Administrador', icon: Factory },
       'fabrica/analytics': { label: 'Visão Geral & Métricas', icon: Layers },
       'fabrica/produtos': { label: 'Catálogo & Produtos Ativos', icon: Package },
+      'fabrica/products': { label: 'Catálogo & Produtos Ativos', icon: Package },
       'fabrica/rascunhos': { label: 'Rascunhos de Importação Shopee', icon: Clock },
+      'fabrica/drafts': { label: 'Rascunhos de Importação Shopee', icon: Clock },
       'fabrica/pedidos': { label: 'Pedidos de Expedição Fábrica', icon: Truck },
+      'fabrica/orders': { label: 'Pedidos de Expedição Fábrica', icon: Truck },
       'fabrica/revendedores': { label: 'Gestão de Revendedores', icon: Users },
+      'fabrica/usuarios': { label: 'Gestão de Revendedores', icon: Users },
+      'fabrica/users': { label: 'Gestão de Revendedores', icon: Users },
       'fabrica/solicitacoes': { label: 'Solicitações Pendentes', icon: Clock },
+      'fabrica/pendentes': { label: 'Solicitações Pendentes', icon: Clock },
+      'fabrica/pending': { label: 'Solicitações Pendentes', icon: Clock },
       'fabrica/configuracoes': { label: 'Configurações Gerais & Rodapé', icon: Settings },
+      'fabrica/settings': { label: 'Configurações Gerais & Rodapé', icon: Settings },
+      'fabrica/custos': { label: 'Custos Fabris & Insumos', icon: Building2 },
       'fabrica/expedicao': { label: 'Central de Expedição & Impressão', icon: Truck },
       'fabrica/novo-produto': { label: 'Cadastro de Novo Produto', icon: PlusCircle }
     };

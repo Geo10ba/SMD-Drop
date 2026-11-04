@@ -21,6 +21,11 @@ import { PwaInstallPrompt } from './components/common/PwaInstallPrompt';
 import { Breadcrumb } from './components/common/Breadcrumb';
 import { ResellerWalletModal } from './components/reseller/ResellerWalletModal';
 import { FinancialStatementModal } from './components/reseller/FinancialStatementModal';
+import { 
+  parseHashRoute, 
+  resolveFactoryTab, 
+  sampleM2CalculatorProduct 
+} from './utils/routeNavigation';
 
 function MainApp() {
   const { 
@@ -36,23 +41,25 @@ function MainApp() {
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com';
 
-  const [m2CalculatorProduct, setM2CalculatorProduct] = useState(null);
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [authMode, setAuthMode] = useState('register');
-  const [legalModalType, setLegalModalType] = useState(null);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [isResellerOrdersOpen, setIsResellerOrdersOpen] = useState(false);
-  const [isFaqOpen, setIsFaqOpen] = useState(false);
-  const [isTrackingOpen, setIsTrackingOpen] = useState(false);
-  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
-  const [isFulfillmentOpen, setIsFulfillmentOpen] = useState(false);
-  const [isNewProductOpen, setIsNewProductOpen] = useState(false);
-  const [isWalletOpen, setIsWalletOpen] = useState(false);
-  const [isFinancialOpen, setIsFinancialOpen] = useState(false);
+  const initialRoute = React.useMemo(() => parseHashRoute(), []);
 
-  const [factoryTab, setFactoryTab] = useState('analytics');
-  const [currentPath, setCurrentPath] = useState('catalogo');
+  const [m2CalculatorProduct, setM2CalculatorProduct] = useState(() => initialRoute.isM2Calc ? sampleM2CalculatorProduct : null);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(() => initialRoute.isRegisterOpen);
+  const [authMode, setAuthMode] = useState(() => initialRoute.authMode);
+  const [legalModalType, setLegalModalType] = useState(null);
+  const [isCartOpen, setIsCartOpen] = useState(() => initialRoute.isCartOpen);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(() => initialRoute.isCheckoutOpen);
+  const [isResellerOrdersOpen, setIsResellerOrdersOpen] = useState(() => initialRoute.isResellerOrdersOpen);
+  const [isFaqOpen, setIsFaqOpen] = useState(() => initialRoute.isFaqOpen);
+  const [isTrackingOpen, setIsTrackingOpen] = useState(() => initialRoute.isTrackingOpen);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(() => initialRoute.isAdminLoginOpen);
+  const [isFulfillmentOpen, setIsFulfillmentOpen] = useState(() => initialRoute.isFulfillmentOpen);
+  const [isNewProductOpen, setIsNewProductOpen] = useState(() => initialRoute.isNewProductOpen);
+  const [isWalletOpen, setIsWalletOpen] = useState(() => initialRoute.isWalletOpen);
+  const [isFinancialOpen, setIsFinancialOpen] = useState(() => initialRoute.isFinancialOpen);
+
+  const [factoryTab, setFactoryTab] = useState(() => initialRoute.factoryTab);
+  const [currentPath, setCurrentPath] = useState(() => initialRoute.currentPath);
 
   // Proteção contra visualização fabril indevida
   useEffect(() => {
@@ -77,7 +84,7 @@ function MainApp() {
         return;
       }
       setViewMode('factory');
-      const sub = path.replace('fabrica/', '').replace('fabrica', '').trim();
+      const sub = path.replace(/^fabrica\/?/, '').trim();
       if (sub === 'expedicao') {
         setIsFulfillmentOpen(true);
       } else if (sub === 'novo-produto') {
@@ -85,9 +92,8 @@ function MainApp() {
       } else {
         setIsFulfillmentOpen(false);
         setIsNewProductOpen(false);
-        if (['analytics', 'products', 'drafts', 'orders', 'users', 'pending', 'settings'].includes(sub)) {
-          setFactoryTab(sub);
-        }
+        const resolved = resolveFactoryTab(sub);
+        setFactoryTab(resolved);
       }
     } else {
       setViewMode('reseller');
@@ -96,6 +102,8 @@ function MainApp() {
       setIsResellerOrdersOpen(path === 'pedidos');
       setIsCartOpen(path === 'carrinho');
       setIsCheckoutOpen(path === 'checkout');
+      setIsWalletOpen(path === 'carteira');
+      setIsFinancialOpen(path === 'extrato');
       setIsFaqOpen(path === 'ajuda');
       setIsTrackingOpen(path === 'rastreio');
       if (path === 'cadastro') {
@@ -109,17 +117,7 @@ function MainApp() {
       }
       setIsAdminLoginOpen(path === 'admin-login');
       if (path === 'calculadora-m2') {
-        setM2CalculatorProduct({
-          id: 'calc-sample',
-          title: 'Orçamento sob Medida CNC',
-          category: 'Logomarcas & Letreiros',
-          pricingType: 'custom_m2',
-          pricePerM2: 530,
-          wholesalePrice: 530,
-          suggestedPricePerM2: 800,
-          suggestedRetailPrice: 800,
-          materials: []
-        });
+        setM2CalculatorProduct(sampleM2CalculatorProduct);
       } else {
         setM2CalculatorProduct(null);
       }
@@ -138,6 +136,8 @@ function MainApp() {
       if (isResellerOrdersOpen) targetPath = 'pedidos';
       else if (isCartOpen) targetPath = 'carrinho';
       else if (isCheckoutOpen) targetPath = 'checkout';
+      else if (isWalletOpen) targetPath = 'carteira';
+      else if (isFinancialOpen) targetPath = 'extrato';
       else if (isFaqOpen) targetPath = 'ajuda';
       else if (isTrackingOpen) targetPath = 'rastreio';
       else if (isRegisterOpen) targetPath = authMode === 'login' ? 'login' : 'cadastro';
@@ -147,7 +147,8 @@ function MainApp() {
     }
 
     setCurrentPath(targetPath);
-    if (window.location.hash !== `#${targetPath}`) {
+    const cleanCurrent = (window.location.hash || '').replace(/^#\/?/, '').trim();
+    if (cleanCurrent !== targetPath) {
       window.history.replaceState(null, '', `#${targetPath}`);
     }
   }, [
@@ -158,6 +159,8 @@ function MainApp() {
     isResellerOrdersOpen,
     isCartOpen,
     isCheckoutOpen,
+    isWalletOpen,
+    isFinancialOpen,
     isFaqOpen,
     isTrackingOpen,
     isRegisterOpen,
@@ -169,60 +172,45 @@ function MainApp() {
   // Initial Load & Hash Change Event Listener
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '').trim();
-      if (!hash) return;
-
-      if (hash.startsWith('fabrica')) {
-        setViewMode('factory');
-        const sub = hash.replace('fabrica/', '').replace('fabrica', '').trim();
-        if (sub === 'expedicao') {
-          setIsFulfillmentOpen(true);
-        } else if (sub === 'novo-produto') {
-          setIsNewProductOpen(true);
-        } else if (['analytics', 'products', 'drafts', 'orders', 'users', 'pending', 'settings'].includes(sub)) {
-          setIsFulfillmentOpen(false);
-          setIsNewProductOpen(false);
-          setFactoryTab(sub);
+      const parsed = parseHashRoute();
+      if (parsed.isFactory) {
+        if (!isAdmin) {
+          showNotification('Acesso Restrito: Painel fabril exclusivo para a administração.', 'error');
+          setIsAdminLoginOpen(true);
+          setViewMode('reseller');
+          window.location.hash = '#catalogo';
+          return;
         }
+        setViewMode('factory');
+        setIsFulfillmentOpen(parsed.isFulfillmentOpen);
+        setIsNewProductOpen(parsed.isNewProductOpen);
+        setFactoryTab(parsed.factoryTab);
       } else {
         setViewMode('reseller');
         setIsFulfillmentOpen(false);
         setIsNewProductOpen(false);
-        setIsResellerOrdersOpen(hash === 'pedidos');
-        setIsCartOpen(hash === 'carrinho');
-        setIsCheckoutOpen(hash === 'checkout');
-        setIsFaqOpen(hash === 'ajuda');
-        setIsTrackingOpen(hash === 'rastreio');
-        if (hash === 'cadastro') {
-          setAuthMode('register');
-          setIsRegisterOpen(true);
-        } else if (hash === 'login') {
-          setAuthMode('login');
-          setIsRegisterOpen(true);
+        setIsResellerOrdersOpen(parsed.isResellerOrdersOpen);
+        setIsCartOpen(parsed.isCartOpen);
+        setIsCheckoutOpen(parsed.isCheckoutOpen);
+        setIsFaqOpen(parsed.isFaqOpen);
+        setIsTrackingOpen(parsed.isTrackingOpen);
+        setIsWalletOpen(parsed.isWalletOpen);
+        setIsFinancialOpen(parsed.isFinancialOpen);
+        setIsAdminLoginOpen(parsed.isAdminLoginOpen);
+        setIsRegisterOpen(parsed.isRegisterOpen);
+        setAuthMode(parsed.authMode);
+        if (parsed.isM2Calc) {
+          setM2CalculatorProduct(sampleM2CalculatorProduct);
         } else {
-          setIsRegisterOpen(false);
-        }
-        setIsAdminLoginOpen(hash === 'admin-login');
-        if (hash === 'calculadora-m2') {
-          setM2CalculatorProduct({
-            id: 'calc-sample',
-            title: 'Orçamento sob Medida CNC',
-            category: 'Logomarcas & Letreiros',
-            pricingType: 'custom_m2',
-            pricePerM2: 530,
-            wholesalePrice: 530,
-            suggestedPricePerM2: 800,
-            suggestedRetailPrice: 800,
-            materials: []
-          });
+          setM2CalculatorProduct(null);
         }
       }
+      setCurrentPath(parsed.currentPath);
     };
 
-    handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     document.title = "SMD Drop | Plataforma Fabril de Dropshipping & Marketplaces";

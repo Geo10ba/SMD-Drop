@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   X, Send, Bot, User, Sparkles, Trophy, Search,
-  Focus, ChevronUp, ChevronDown, Trash2, Copy, BookOpen
+  Focus, ChevronUp, ChevronDown, Trash2, Copy, BookOpen, Check
 } from "lucide-react";
 import { LumenMascot } from "./SmdFlowMascot";
 import { SmdFlowCelebration } from "./SmdFlowCelebration";
@@ -58,9 +58,39 @@ const SUGGESTIONS = [
   "📸 Como usar as fotos HD e vídeos do Kit Mídia?"
 ];
 
+const PERSONA_SUGGESTIONS = {
+  geral: [
+    "🚀 Como fazer minha 1ª venda de R$ 1.000 como revendedor?",
+    "📦 Como funciona o Envio Cego com a minha etiqueta?",
+    "📸 Como usar as fotos HD e vídeos do Kit Mídia?"
+  ],
+  lucro: [
+    "💰 Qual meu lucro se eu vender a R$ 120 na Shopee?",
+    "⚖️ Qual o Break-Even (preço mínimo) no Mercado Livre?",
+    "📊 Quais as taxas atuais de Shopee vs ML Clássico vs ML Premium?"
+  ],
+  objecoes: [
+    "🎯 Script: O cliente disse 'achei caro, tem desconto?'",
+    "🚚 Script: O cliente achou o frete alto",
+    "⏳ Script: O cliente perguntou quantos dias demora a fabricação"
+  ],
+  copy: [
+    "✨ Crie 5 títulos magnéticos de até 60 caracteres para Shopee",
+    "📝 Escreva uma descrição com benefícios e ficha técnica para ML",
+    "🎥 Crie um roteiro de 30 segundos para vídeo do TikTok/Reels"
+  ],
+  tecnico: [
+    "🧩 Qual a diferença entre Acrílico Espelhado e Acrílico Cast?",
+    "⚡ Como instalar a fonte bivolt 12V na luminária Neon LED?",
+    "📏 Quando usar MDF 3mm vs MDF 6mm em letreiros?"
+  ]
+};
+
 export function SmdAssistantChat() {
-  const { viewMode, setViewMode, products, materials, orders, cart, currentUser } = useStore();
+  const { viewMode, setViewMode, products, materials, orders, cart, currentUser, walletBalance } = useStore();
   const [isOpen, setIsOpen] = useState(false);
+  const [activePersona, setActivePersona] = useState("geral");
+  const [copiedMsgIndex, setCopiedMsgIndex] = useState(null);
 
   const getLiveSystemContext = () => {
     const currentPath = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
@@ -75,8 +105,9 @@ export function SmdAssistantChat() {
       }
     }
 
+    const userBalanceNum = Number(currentUser?.walletBalance || walletBalance || 0).toFixed(2);
     const userText = currentUser 
-      ? `${currentUser.name} (${currentUser.role || 'revendedor'}, Nível VIP: ${currentUser.tier || 'Bronze'}, Desconto VIP: ${currentUser.discountPercent || 0}%)`
+      ? `${currentUser.name} (${currentUser.role || 'revendedor'}, Nível VIP: ${currentUser.tier || 'Bronze'}, Desconto VIP: ${currentUser.discountPercent || 0}%, Saldo em Carteira: R$ ${userBalanceNum})`
       : 'Revendedor Visitante (Não Logado)';
 
     const cartSummary = cart && cart.length > 0
@@ -284,8 +315,16 @@ export function SmdAssistantChat() {
     setEmotion("thinking");
 
     try {
+      const toolMap = {
+        geral: "suporte-sistema",
+        lucro: "persona-lucro",
+        objecoes: "persona-objecoes",
+        tecnico: "persona-tecnico",
+        copy: "persona-copy"
+      };
+
       const response = await askLumenAssistant({
-        tool: "suporte-sistema",
+        tool: toolMap[activePersona] || "suporte-sistema",
         input: text,
         history: [...messages, userMessage].slice(-6),
         systemContext: getLiveSystemContext(),
@@ -508,6 +547,31 @@ export function SmdAssistantChat() {
               </div>
             </div>
 
+            {/* Especialidades / Persona Tabs */}
+            <div className="bg-slate-950/90 border-b border-purple-500/20 px-2.5 py-1.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px] shrink-0">
+              {[
+                { id: "geral", label: "Mentor", icon: "🚀" },
+                { id: "lucro", label: "Lucro Real", icon: "💰" },
+                { id: "objecoes", label: "Objeções", icon: "🎯" },
+                { id: "copy", label: "Copy & SEO", icon: "✨" },
+                { id: "tecnico", label: "Técnico Fabril", icon: "🏭" },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setActivePersona(p.id)}
+                  className={`px-2.5 py-1 rounded-lg shrink-0 font-bold transition flex items-center gap-1 ${
+                    activePersona === p.id
+                      ? "bg-purple-600 text-white shadow-sm ring-1 ring-purple-400"
+                      : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white"
+                  }`}
+                >
+                  <span>{p.icon}</span>
+                  <span>{p.label}</span>
+                </button>
+              ))}
+            </div>
+
             {/* Content Body */}
             {showTutorials ? (
               <div className="flex-1 overflow-y-auto p-3.5 bg-slate-950/40">
@@ -541,10 +605,22 @@ export function SmdAssistantChat() {
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(m.content);
+                              setCopiedMsgIndex(idx);
+                              setTimeout(() => setCopiedMsgIndex(null), 2000);
                             }}
-                            className="self-start text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 ml-1 transition"
+                            className="self-start text-[10px] text-slate-400 hover:text-amber-300 flex items-center gap-1 ml-1 transition"
                           >
-                            <Copy className="size-3" /> Copiar
+                            {copiedMsgIndex === idx ? (
+                              <>
+                                <Check className="size-3 text-emerald-400" />
+                                <span className="text-emerald-400 font-bold">Copiado!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="size-3" />
+                                <span>Copiar</span>
+                              </>
+                            )}
                           </button>
                         )}
                       </div>
@@ -567,16 +643,20 @@ export function SmdAssistantChat() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Suggestions on start */}
-                {messages.length <= 2 && (
-                  <div className="p-2.5 bg-slate-950/70 border-t border-slate-800 flex flex-col gap-1">
-                    <p className="text-[10px] text-slate-400 font-bold px-1 uppercase tracking-wider">Perguntas Rápidas:</p>
+                {/* Suggestions on start & by persona */}
+                {messages.length <= 4 && (
+                  <div className="p-2 bg-slate-950/70 border-t border-slate-800 flex flex-col gap-1 shrink-0">
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-[10px] text-purple-300 font-extrabold uppercase tracking-wider">
+                        Perguntas Recomendadas ({activePersona.toUpperCase()}):
+                      </p>
+                    </div>
                     <div className="flex flex-wrap gap-1">
-                      {SUGGESTIONS.map((s, idx) => (
+                      {(PERSONA_SUGGESTIONS[activePersona] || PERSONA_SUGGESTIONS.geral).map((s, idx) => (
                         <button
                           key={idx}
                           onClick={() => handleSend(s)}
-                          className="text-[10px] bg-slate-800 hover:bg-purple-900/40 border border-slate-700 hover:border-purple-500/50 px-2.5 py-1 rounded-full text-slate-300 hover:text-white transition text-left truncate max-w-full"
+                          className="text-[10px] bg-slate-800/90 hover:bg-purple-900/50 border border-slate-700 hover:border-purple-500/50 px-2.5 py-1 rounded-full text-slate-300 hover:text-white transition text-left truncate max-w-full shadow-sm"
                         >
                           {s}
                         </button>
