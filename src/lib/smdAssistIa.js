@@ -4,16 +4,7 @@
  */
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const _p1 = "gsk";
-const _p2 = "kB57tYSBw8dRO6n4";
-const _p3 = "At2EWGdyb3FYi0Oo";
-const _p4 = "GrHv4LVmLAAGXpBLPKqW";
-const GROQ_KEY = import.meta.env?.VITE_GROQ_KEY || `${_p1}_${_p2}${_p3}${_p4}`;
-
 const ROUTER_URL = "https://ninerouter-tmc1.onrender.com/v1/chat/completions";
-const _r1 = "sk-b3c99d6fbb7414b1";
-const _r2 = "p58row-0425b688";
-const ROUTER_KEY = import.meta.env?.VITE_ROUTER_KEY || `${_r1}-${_r2}`;// Modelos ativos e testados no Groq & 9Router (Multi-camadas de Redundância)
 const GROQ_MODELS = [
   "qwen/qwen3.8-27b",
   "openai/gpt-oss-20b",
@@ -86,11 +77,15 @@ const SYSTEM_PROMPTS = {
     "Você é o Lumen, consultor financeiro e especialista em precificação para e-commerce. Responda APENAS o código JSON exato sem texto antes ou depois."
 };
 
-/** Chamada à API Groq */
+/** Chamada à API Groq (Fallback caso VITE_GROQ_KEY esteja definida no cliente) */
 async function tryGroq(messagesPayload, model) {
   const apiKey = (import.meta.env?.VITE_GROQ_KEY && import.meta.env.VITE_GROQ_KEY !== 'undefined')
     ? import.meta.env.VITE_GROQ_KEY
-    : `${_p1}_${_p2}${_p3}${_p4}`;
+    : null;
+
+  if (!apiKey) {
+    throw new Error(`Groq direto não configurado no cliente (requisição delegada ao proxy seguro)`);
+  }
 
   const res = await fetch(GROQ_URL, {
     method: "POST",
@@ -117,11 +112,15 @@ async function tryGroq(messagesPayload, model) {
   return content.trim();
 }
 
-/** Chamada à IA 9Router (Ilimitada) */
+/** Chamada à IA 9Router (Fallback caso VITE_ROUTER_KEY esteja definida no cliente) */
 async function try9Router(messagesPayload, model) {
   const apiKey = (import.meta.env?.VITE_ROUTER_KEY && import.meta.env.VITE_ROUTER_KEY !== 'undefined')
     ? import.meta.env.VITE_ROUTER_KEY
-    : `${_r1}-${_r2}`;
+    : null;
+
+  if (!apiKey) {
+    throw new Error(`Router direto não configurado no cliente (requisição delegada ao proxy seguro)`);
+  }
 
   const res = await fetch(ROUTER_URL, {
     method: "POST",

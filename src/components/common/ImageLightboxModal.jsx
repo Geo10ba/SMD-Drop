@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, Maximize2, ExternalLink } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, Maximize2, ExternalLink, Trash2 } from 'lucide-react';
 
 export const ImageLightboxModal = ({
   isOpen,
   images = [],
   initialIndex = 0,
   title = 'Imagem do Produto',
-  onClose
+  onClose,
+  onDeleteImage
 }) => {
   const imageList = Array.isArray(images) && images.length > 0
     ? images
@@ -146,6 +147,22 @@ export const ImageLightboxModal = ({
           >
             <ExternalLink size={16} />
           </a>
+
+          {/* Delete Button (if deletion is enabled by parent) */}
+          {onDeleteImage && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteImage(currentIndex, currentImage);
+              }}
+              className="p-2 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-rose-500/25 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/40 transition-all cursor-pointer shadow"
+              title="Excluir esta foto da lista"
+            >
+              <Trash2 size={16} />
+              <span className="hidden sm:inline">Excluir Foto</span>
+            </button>
+          )}
 
           {/* Close button */}
           <button

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore, resolveSmartFiscalDetails } from '../../context/StoreContext';
-import { Wand2, Copy, Check, Sparkles, FileText, Video, MessageSquare, Loader2, FileEdit } from 'lucide-react';
+import { Wand2, Copy, Check, Sparkles, FileText, Video, MessageSquare, Loader2, FileEdit, Trash2, Maximize2, Star, Eye } from 'lucide-react';
+import { ImageLightboxModal } from '../common/ImageLightboxModal';
 import { generateProductDescriptionAndNcm } from '../../lib/smdAssistIa';
 import { convertMarketplaceImageToHdShopee } from '../../utils/imageUrlCleaner';
 
@@ -22,6 +23,59 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const handleOpenLightbox = (index = 0) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const handleRemoveImage = (indexToRemove, e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+
+    const currentImages = Array.isArray(form.images) && form.images.length > 0
+      ? form.images
+      : (form.image ? [form.image] : []);
+
+    if (currentImages.length <= 1) {
+      showNotification('O anúncio deve possuir pelo menos 1 foto.', 'error');
+      return;
+    }
+
+    const targetUrl = currentImages[indexToRemove];
+    const updatedImages = currentImages.filter((_, idx) => idx !== indexToRemove);
+
+    setForm((prev) => ({
+      ...prev,
+      images: updatedImages,
+      image: prev.image === targetUrl ? (updatedImages[0] || '') : prev.image
+    }));
+
+    if (lightboxOpen) {
+      if (updatedImages.length === 0) {
+        setLightboxOpen(false);
+      } else if (lightboxIndex >= updatedImages.length) {
+        setLightboxIndex(Math.max(0, updatedImages.length - 1));
+      }
+    }
+
+    showNotification(`Foto #${indexToRemove + 1} removida da galeria.`, 'info');
+  };
+
+  const handleSetAsCover = (index, e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const currentImages = [...(form.images || [])];
+    if (index <= 0 || index >= currentImages.length) return;
+    const [selected] = currentImages.splice(index, 1);
+    const reordered = [selected, ...currentImages];
+    setForm((prev) => ({
+      ...prev,
+      images: reordered,
+      image: selected
+    }));
+    showNotification('Foto definida como a Capa do anúncio (#1)!', 'gold');
+  };
 
   // Extracted Product Form (Initialized from initialData synchronously)
   const [form, setForm] = useState(() => {
@@ -260,7 +314,12 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
 
             {form.image && (
               <div className="flex items-center gap-3 p-3 bg-[var(--bg-surface-hover)] rounded-xl border border-[var(--border-color)]">
-                <img src={form.image} alt={form.title} className="w-16 h-16 object-cover rounded-lg border" />
+                <div className="relative group/main cursor-pointer shrink-0" onClick={() => handleOpenLightbox(0)} title="Clique para expandir a foto da capa">
+                  <img src={form.image} alt={form.title} className="w-16 h-16 object-cover rounded-xl border border-[var(--border-color)] group-hover/main:border-amber-400 transition-all shadow-sm" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/main:opacity-100 rounded-xl flex items-center justify-center transition-opacity">
+                    <Maximize2 size={16} className="text-white" />
+                  </div>
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-[var(--text-main)] line-clamp-1">{form.title || "Sem título"}</p>
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">
@@ -280,28 +339,93 @@ export const MagicImportModal = ({ isOpen, onClose, initialData }) => {
               </div>
             )}
 
-            {form.images && form.images.length > 1 && (
-              <div className="bg-[var(--bg-surface-hover)] p-3 rounded-xl border border-[var(--border-color)] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-amber-500 text-xs flex items-center gap-1.5 uppercase">
-                    📸 Galeria de Fotos HD Capturadas ({form.images.length} fotos)
-                  </span>
-                  <span className="text-[10px] text-[var(--text-muted)] font-mono">
-                    Foto #1 = Capa do Anúncio
+            {form.images && form.images.length > 0 && (
+              <div className="bg-[var(--bg-surface-hover)] p-3.5 rounded-2xl border border-[var(--border-color)] space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-[var(--border-color)] pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-amber-500 text-xs flex items-center gap-1.5 uppercase">
+                      📸 Galeria de Fotos HD ({form.images.length} {form.images.length === 1 ? 'foto' : 'fotos'})
+                    </span>
+                    <span className="text-[10px] bg-amber-500/15 text-amber-500 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                      Foto #1 = Capa Oficial
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] font-medium flex items-center gap-1">
+                    🔍 Clique na foto para expandir | 🗑️ Lixeira para excluir
                   </span>
                 </div>
-                <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-thin">
+
+                <div className="flex items-center gap-2.5 overflow-x-auto py-1.5 scrollbar-thin">
                   {form.images.map((imgUrl, idx) => (
-                    <div key={idx} className="relative shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-[var(--border-color)] group shadow-sm bg-slate-900">
-                      <img src={imgUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
-                      <span className="absolute bottom-0 left-0 right-0 bg-slate-950/80 text-white text-[9px] font-bold text-center py-0.5">
-                        #{idx + 1}
-                      </span>
+                    <div
+                      key={idx}
+                      onClick={() => handleOpenLightbox(idx)}
+                      className={`relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border-2 transition-all cursor-pointer group shadow-sm bg-slate-900 ${
+                        idx === 0
+                          ? 'border-amber-500 ring-2 ring-amber-500/25'
+                          : 'border-[var(--border-color)] hover:border-amber-400/80 hover:shadow-md'
+                      }`}
+                      title="Clique para ver esta foto em tela cheia"
+                    >
+                      <img
+                        src={imgUrl}
+                        alt={`Foto ${idx + 1}`}
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        onError={(e) => {
+                          e.target.style.opacity = '0.2';
+                        }}
+                      />
+
+                      {/* Botão de Excluir Foto com 1 Clique */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleRemoveImage(idx, e)}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-lg bg-rose-600/90 hover:bg-rose-600 text-white flex items-center justify-center shadow-lg transition-all hover:scale-115 active:scale-95 z-20"
+                        title="Excluir esta foto que você não quer"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+
+                      {/* Overlay com Ícone de Lupa / Zoom no centro */}
+                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none z-10">
+                        <span className="bg-slate-900/80 text-white p-1.5 rounded-lg shadow-sm border border-white/20">
+                          <Maximize2 size={14} className="text-amber-400" />
+                        </span>
+                      </div>
+
+                      {/* Barra Inferior com Índice e Ação de Capa */}
+                      {idx === 0 ? (
+                        <span className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-amber-600 to-amber-500 text-slate-950 font-black text-[9px] text-center py-0.5 uppercase tracking-wider flex items-center justify-center gap-1 z-10">
+                          <Star size={9} fill="currentColor" /> Capa
+                        </span>
+                      ) : (
+                        <div className="absolute bottom-0 left-0 right-0 bg-slate-950/85 text-white text-[9px] font-bold text-center py-0.5 flex items-center justify-between px-1.5 z-10">
+                          <span>#${idx + 1}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleSetAsCover(idx, e)}
+                            className="text-[8px] text-amber-400 hover:text-amber-300 hover:underline font-extrabold"
+                            title="Definir esta foto como a capa principal"
+                          >
+                            Tornar Capa
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Modal de Zoom / Lightbox Ampliado */}
+            <ImageLightboxModal
+              isOpen={lightboxOpen}
+              images={form.images && form.images.length > 0 ? form.images : (form.image ? [form.image] : [])}
+              initialIndex={lightboxIndex}
+              title={form.title || 'Foto Ampliada do Produto'}
+              onClose={() => setLightboxOpen(false)}
+              onDeleteImage={(idx) => handleRemoveImage(idx)}
+            />
 
             <div>
               <label className="block font-bold text-[var(--text-muted)] uppercase mb-1">Título do Produto</label>

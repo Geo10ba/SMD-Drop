@@ -7,16 +7,23 @@ function apiDevMiddleware() {
     name: 'api-dev-middleware',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        if (req.url && req.url.startsWith('/api/telegram/notify')) {
+        const urlPath = req.url ? req.url.split('?')[0] : '';
+        if (urlPath.startsWith('/api/')) {
           try {
             const env = loadEnv('development', process.cwd(), '');
-            process.env.TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN;
-            process.env.TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || env.TELEGRAM_CHAT_ID;
+            Object.keys(env).forEach((k) => {
+              if (!process.env[k]) process.env[k] = env[k];
+            });
 
-            const { default: handler } = await import('./api/telegram/notify.js');
+            // Mapeia /api/xyz/abc para ./api/xyz/abc.js
+            const relativePath = urlPath.replace(/^\/api\//, '');
+            const filePath = `./api/${relativePath}.js`;
+
+            const module = await import(/* @vite-ignore */ filePath);
+            const handler = module.default || module;
 
             let body = {};
-            if (req.method === 'POST') {
+            if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
               const buffers = [];
               for await (const chunk of req) {
                 buffers.push(chunk);
