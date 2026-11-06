@@ -1477,7 +1477,7 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-1 font-bold text-amber-500 whitespace-nowrap">
-                        <Award size={14} /> {u.tier} ({u.discountPercent}% OFF)
+                        <Award size={14} /> {u.tier || 'Parceiro'} {u.discountPercent ? `(${u.discountPercent}% OFF)` : ''}
                       </div>
                     </td>
                     <td className="p-3 font-bold font-mono whitespace-nowrap">R$ {u.totalSpent.toFixed(2)}</td>
@@ -1492,11 +1492,11 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
                           </button>
                         )}
                         <button
-                          onClick={() => updateUserStatus(u.id, 'aprovado', 'VIP Gold', 5)}
+                          onClick={() => updateUserStatus(u.id, 'aprovado', 'Parceiro Pro', 5)}
                           className="btn-secondary text-[11px] font-bold py-1.5 px-3 shrink-0"
-                          title="Tornar VIP Gold (+5% Desconto)"
+                          title="Tornar Parceiro Pro (+5% Desconto)"
                         >
-                          Tornar VIP
+                          Tornar Pro
                         </button>
                         <button
                           onClick={() => {

@@ -106,10 +106,12 @@ export const StoreProvider = ({ children }) => {
   const [adminEmail, setAdminEmail] = useState('geovancalado@gmail.com');
 
   const defaultAdminUser = {
-    id: 'admin-1',
+    id: 'admin-geovan',
     email: 'geovancalado@gmail.com',
     name: 'Geovan Calado (Admin Fábrica)',
-    role: 'admin'
+    role: 'admin',
+    tier: 'Administrador',
+    discountPercent: 0
   };
 
   const defaultResellerUser = {
@@ -121,8 +123,8 @@ export const StoreProvider = ({ children }) => {
     pixKey: '45.109.892/0001-99',
     role: 'reseller',
     status: 'aprovado',
-    tier: 'VIP Gold',
-    discountPercent: 5
+    tier: 'Parceiro',
+    discountPercent: 0
   };
 
   const [currentUser, setCurrentUserState] = useState(() => {
@@ -134,6 +136,11 @@ export const StoreProvider = ({ children }) => {
           if (parsed && parsed.email) {
             if (parsed.email.toLowerCase() === adminEmail.toLowerCase()) {
               parsed.role = 'admin';
+              parsed.tier = 'Administrador';
+              parsed.discountPercent = 0;
+            } else if (parsed.tier === 'VIP Gold') {
+              parsed.tier = 'Parceiro';
+              parsed.discountPercent = parsed.discountPercent === 100 ? 0 : (parsed.discountPercent || 0);
             }
             return parsed;
           }
@@ -888,8 +895,8 @@ export const StoreProvider = ({ children }) => {
       pixKey: email,
       role: isAdmin ? 'admin' : 'reseller',
       status: 'aprovado',
-      tier: isAdmin ? 'VIP Gold' : 'Bronze',
-      discountPercent: isAdmin ? 100 : 0
+      tier: isAdmin ? 'Administrador' : 'Parceiro',
+      discountPercent: 0
     };
 
     setCurrentUser(resellerUser);
@@ -929,7 +936,7 @@ export const StoreProvider = ({ children }) => {
             phone: sanitize(userData.phone),
             cnpj: sanitize(userData.cnpj),
             role: isAdmin ? 'admin' : 'reseller',
-            tier: isAdmin ? 'VIP Gold' : 'Bronze'
+            tier: isAdmin ? 'Administrador' : 'Parceiro'
           }
         });
         if (res.success && res.user) {
@@ -948,8 +955,8 @@ export const StoreProvider = ({ children }) => {
       cnpj: sanitize(userData.cnpj) || '45.109.892/0001-99',
       role: isAdmin ? 'admin' : 'reseller',
       status: 'aprovado',
-      tier: isAdmin ? 'VIP Gold' : 'Bronze',
-      discountPercent: isAdmin ? 100 : 0,
+      tier: isAdmin ? 'Administrador' : 'Parceiro',
+      discountPercent: 0,
       totalOrders: 0,
       totalSpent: 0.00,
       createdAt: new Date().toISOString().split('T')[0]

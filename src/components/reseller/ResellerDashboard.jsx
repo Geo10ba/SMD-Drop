@@ -98,7 +98,7 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="badge-gold uppercase tracking-widest text-[10px] inline-flex items-center gap-1">
-                <Award size={12} /> NÍVEL {currentUser.tier || 'BRONZE'} ({currentUser.discountPercent || 0}% DESC. ADICIONAL)
+                <Award size={12} /> {currentUser.role === 'admin' ? 'ADMINISTRADOR DA FÁBRICA' : `PLANO ${currentUser.tier?.toUpperCase() || 'PARCEIRO'}`}
               </span>
               <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
                 CONTA APROVADA
@@ -207,10 +207,10 @@ export const ResellerDashboard = ({ onOpenCart, onOpenOrders, onOpenTracking }) 
                 </div>
               </div>
               <p className="text-2xl font-extrabold text-[var(--text-main)] font-['Outfit']">
-                {currentUser.discountPercent || 5}% OFF
+                {currentUser.discountPercent ? `${currentUser.discountPercent}% OFF` : 'Preço de Fábrica'}
               </p>
               <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
-                Nível {currentUser.tier || 'VIP Gold'}
+                {currentUser.role === 'admin' ? 'Administrador Fábrica' : (currentUser.tier || 'Revendedor Autorizado')}
               </span>
             </div>
           </div>

@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     cnpj VARCHAR(32) NOT NULL,
     role VARCHAR(32) DEFAULT 'reseller', -- 'reseller' ou 'admin'
     status VARCHAR(32) DEFAULT 'aprovado', -- 'aprovado', 'pendente', 'bloqueado'
-    tier VARCHAR(32) DEFAULT 'Bronze', -- 'Bronze', 'Prata', 'VIP Gold'
+    tier VARCHAR(32) DEFAULT 'Bronze', -- 'Bronze', 'Prata', 'Ouro'
     discount_percent NUMERIC(5,2) DEFAULT 0.00,
     wallet_balance NUMERIC(10,2) DEFAULT 0.00,
     total_orders INT DEFAULT 0,
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS company_settings (
 -- =============================================================================
 
 INSERT INTO users (id, name, email, phone, cnpj, role, status, tier)
-VALUES ('admin-geovan', 'Geovan Calado (Admin Fábrica)', 'geovancalado@gmail.com', '(11) 98765-4321', '45.109.892/0001-99', 'admin', 'aprovado', 'VIP Gold')
+VALUES ('admin-geovan', 'Geovan Calado (Admin Fábrica)', 'geovancalado@gmail.com', '(11) 98765-4321', '45.109.892/0001-99', 'admin', 'aprovado', 'Administrador')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO materials (id, name, factory_cost_per_m2, wholesale_price_per_m2, suggested_price_per_m2, style, lead_time_days, description)

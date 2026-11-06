@@ -17,6 +17,10 @@ function loadMemory() {
   try {
     const raw = localStorage.getItem(MEMORY_KEY);
     if (!raw) return null;
+    if (raw.includes("VIP Gold") || raw.includes("100% de desconto")) {
+      localStorage.removeItem(MEMORY_KEY);
+      return null;
+    }
     const mem = JSON.parse(raw);
     if (Date.now() - mem.lastSeenAt > MEMORY_TTL_MS) {
       localStorage.removeItem(MEMORY_KEY);
@@ -105,10 +109,20 @@ export function SmdAssistantChat() {
       }
     }
 
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.email?.toLowerCase() === 'geovancalado@gmail.com';
     const userBalanceNum = Number(currentUser?.walletBalance || walletBalance || 0).toFixed(2);
-    const userText = currentUser 
-      ? `${currentUser.name} (${currentUser.role || 'revendedor'}, Nível VIP: ${currentUser.tier || 'Bronze'}, Desconto VIP: ${currentUser.discountPercent || 0}%, Saldo em Carteira: R$ ${userBalanceNum})`
-      : 'Revendedor Visitante (Não Logado)';
+    
+    let userText = 'Revendedor Visitante (Não Logado)';
+    if (currentUser) {
+      if (isAdmin) {
+        userText = `👑 USUÁRIO CONECTADO: ${currentUser.name} (PROPRIETÁRIO & ADMINISTRADOR DA FÁBRICA SMD DROP).\n` +
+          `⚠️ DIRETRIZ ABSOLUTA PARA O LUMEN: Você está falando diretamente com o DONO DA FÁBRICA / SEU CHEFE (Geovan Calado)! ` +
+          `JAMAIS o trate como revendedor, NUNCA invente níveis como "VIP Gold", e NUNCA fale em "desconto" ou "100% de desconto". ` +
+          `Auxilie-o com foco gerencial na operação fabril, esteira de produção de acrílico/neon/MDF, estoque de insumos, expedição e catálogo. Saldo em carteira no sistema: R$ ${userBalanceNum}.`;
+      } else {
+        userText = `👤 REVENDEDOR CONECTADO: ${currentUser.name} (Revendedor Parceiro Oficial da SMD Drop, Saldo em Carteira: R$ ${userBalanceNum})`;
+      }
+    }
 
     const cartSummary = cart && cart.length > 0
       ? `${cart.length} item(ns) adicionado(s) (Subtotal Atacado: R$ ${cart.reduce((acc, i) => acc + (parseFloat(i.wholesalePrice || i.price || 0) * (i.quantity || 1)), 0).toFixed(2)})`
