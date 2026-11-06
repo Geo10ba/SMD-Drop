@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   X, Send, Bot, User, Sparkles, Trophy, Search,
-  Focus, ChevronUp, ChevronDown, Trash2, Copy, BookOpen, Check
+  Focus, ChevronUp, ChevronDown, Trash2, Copy, BookOpen, Check,
+  Mic, MicOff, Volume2, VolumeX, ShoppingCart, CheckCircle2, ArrowRight,
+  SendHorizontal, Coffee, AlertTriangle
 } from "lucide-react";
+import { parseLumenActions, buildFactoryBriefingMetrics, generateFactoryBriefingText } from "../../utils/lumenActions";
 import { LumenMascot } from "./SmdFlowMascot";
 import { SmdFlowCelebration } from "./SmdFlowCelebration";
 import { SmdFlowQuests } from "./SmdFlowQuests";
@@ -43,6 +46,36 @@ function clearMemory() {
   localStorage.removeItem(MEMORY_KEY);
 }
 
+function playChime(type = 'action') {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === 'action') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } else if (type === 'mic') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    }
+  } catch (e) {}
+}
+
+
 function buildGreeting(mem) {
   const hour = new Date().getHours();
   const period = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
@@ -62,14 +95,20 @@ const SUGGESTIONS = [
   "📸 Como usar as fotos HD e vídeos do Kit Mídia?"
 ];
 
+
 const PERSONA_SUGGESTIONS = {
   geral: [
     "🚀 Como fazer minha 1ª venda de R$ 1.000 como revendedor?",
     "📦 Como funciona o Envio Cego com a minha etiqueta?",
     "📸 Como usar as fotos HD e vídeos do Kit Mídia?"
   ],
+  anuncio: [
+    "✨ Crie um anúncio completo de Luminária Neon para Shopee",
+    "🏷️ 3 Títulos SEO de até 60 caracteres para Letreiro Acrílico",
+    "📋 Ficha Técnica com benefícios para Mercado Livre"
+  ],
   lucro: [
-    "💰 Qual meu lucro se eu vender a R$ 120 na Shopee?",
+    "💰 Quero lucrar R$ 40 limpos na Shopee: qual o preço de venda?",
     "⚖️ Qual o Break-Even (preço mínimo) no Mercado Livre?",
     "📊 Quais as taxas atuais de Shopee vs ML Clássico vs ML Premium?"
   ],
@@ -90,10 +129,161 @@ const PERSONA_SUGGESTIONS = {
   ]
 };
 
+const ADMIN_SUGGESTIONS = [
+  "☕ Briefing Matinal da Fábrica (Produção & Insumos)",
+  "⚠️ Auditor de Gargalos: Pedidos parados há mais de 48h",
+  "📦 Status de Estoque de Acrílico Cast e Fita Neon",
+  "🚚 Pedidos prontos para Expedição e Etiqueta"
+];
+
 export function SmdAssistantChat() {
-  const { viewMode, setViewMode, products, materials, orders, cart, currentUser, walletBalance } = useStore();
+  const {
+    viewMode,
+    setViewMode,
+    products,
+    materials,
+    orders,
+    cart,
+    currentUser,
+    walletBalance,
+    addToCart,
+    updateOrderStatus,
+    showNotification,
+    openTelegramShare
+  } = useStore();
   const [isOpen, setIsOpen] = useState(false);
   const [activePersona, setActivePersona] = useState("geral");
+
+  // Speech & Voice State
+  const [isListening, setIsListening] = useState(false);
+  const [speakingIdx, setSpeakingIdx] = useState(null);
+  const recognitionRef = useRef(null);
+
+  const toggleSpeechRecognition = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      if (showNotification) showNotification('🎙️ Reconhecimento de voz não suportado neste navegador (use Google Chrome ou Edge).');
+      return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        playChime('mic');
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map((r) => r[0].transcript)
+          .join('');
+        setInput(transcript);
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      setIsListening(false);
+    }
+  };
+
+  const toggleSpeak = (idx, text) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      if (showNotification) showNotification('🔊 Síntese de voz não suportada pelo navegador.');
+      return;
+    }
+
+    if (speakingIdx === idx) {
+      window.speechSynthesis.cancel();
+      setSpeakingIdx(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const clean = text
+      .replace(/\[\[ACTION:[^\]]+\]\]/g, '')
+      .replace(/[*_#•]/g, ' ')
+      .trim();
+
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.lang = 'pt-BR';
+    utter.rate = 1.05;
+    utter.onend = () => setSpeakingIdx(null);
+    utter.onerror = () => setSpeakingIdx(null);
+    setSpeakingIdx(idx);
+    window.speechSynthesis.speak(utter);
+  };
+
+  const handleExecuteAction = (action) => {
+    if (!action || !action.type) return;
+
+    if (action.type === 'ADD_TO_CART') {
+      const query = (action.params[0] || '').toLowerCase().trim();
+      const fallbackTitle = (action.params[1] || '').toLowerCase().trim();
+      const target = (products || []).find((p) =>
+        (p.id && String(p.id).toLowerCase() === query) ||
+        (p.title && p.title.toLowerCase().includes(query)) ||
+        (fallbackTitle && p.title && p.title.toLowerCase().includes(fallbackTitle))
+      ) || products?.[0];
+
+      const qty = parseInt(action.params[2]) || 1;
+      if (target && addToCart) {
+        addToCart(target, qty);
+        playChime('action');
+        if (showNotification) showNotification(`🛒 "${target.title}" (x${qty}) adicionado ao carrinho!`);
+      } else {
+        if (showNotification) showNotification('⚠️ Produto não encontrado no catálogo.');
+      }
+    } else if (action.type === 'UPDATE_ORDER_STATUS') {
+      const orderId = action.params[0];
+      const newStatus = action.params[1] || 'in_production';
+      if (orderId && updateOrderStatus) {
+        updateOrderStatus(orderId, newStatus);
+        playChime('action');
+        if (showNotification) showNotification(`🏭 Pedido #${orderId} atualizado para "${newStatus}"!`);
+      }
+    } else if (action.type === 'NAVIGATE') {
+      const targetMode = action.params[0];
+      if ((targetMode === 'factory' || targetMode === 'reseller') && setViewMode) {
+        setViewMode(targetMode);
+        playChime('action');
+        if (showNotification) showNotification(`🧭 Alternado para modo ${targetMode === 'factory' ? 'Fábrica' : 'Revendedor'}.`);
+      }
+    } else if (action.type === 'GENERATE_COPY') {
+      const prodName = action.params[1] || action.params[0] || 'Luminária';
+      setActivePersona('anuncio');
+      handleSend(`Lumen, crie o anúncio completo para Shopee e Mercado Livre para o produto: "${prodName}". Inclua títulos SEO de 60 caracteres, ficha técnica e cálculo de preço.`);
+    } else if (action.type === 'FACTORY_BRIEFING') {
+      const metrics = buildFactoryBriefingMetrics({ orders, materials, products });
+      const briefing = generateFactoryBriefingText(metrics, currentUser?.name || 'Geovan');
+      setMessages((prev) => [...prev, { role: 'assistant', content: briefing }]);
+      playChime('action');
+    } else if (action.type === 'SHARE_TELEGRAM' || action.type === 'TELEGRAM_NOTIFY') {
+      const text = action.params.join(':') || 'Atualização da Fábrica SMD Drop';
+      const shareUrl = `https://t.me/share/url?url=https://drop-seven-rust.vercel.app&text=${encodeURIComponent('⚡ Alerta SMD Drop:\n' + text)}`;
+      window.open(shareUrl, '_blank');
+    }
+  };
+
   const [copiedMsgIndex, setCopiedMsgIndex] = useState(null);
 
   const getLiveSystemContext = () => {
@@ -135,6 +325,7 @@ export function SmdAssistantChat() {
       ? activeProds.map((p) => `- ${p.title} (Categoria: ${p.category || 'Geral'}, Custo Atacado: R$ ${parseFloat(p.wholesalePrice || p.pricePerM2 || 0).toFixed(2)})`).join('\n')
       : 'Nenhum produto ativo no catálogo público.';
 
+    const safeMaterials = materials || [];
     const matList = materials && materials.length > 0
       ? materials.map((m) => `- ${m.name} (Atacado: R$ ${parseFloat(m.wholesalePricePerM2 || 0).toFixed(2)}/m²)`).join('\n')
       : 'Nenhum material de fábrica cadastrado.';
@@ -154,6 +345,17 @@ export function SmdAssistantChat() {
         }).join('\n')
       : 'Nenhum pedido cadastrado no momento.';
 
+    
+    let factoryContext = '';
+    if (isAdmin) {
+      const metrics = buildFactoryBriefingMetrics({ orders, materials, products });
+      factoryContext = `\n🏭 SITUAÇÃO OPERACIONAL DA FÁBRICA HOJE (DADOS AO VIVO):\n` +
+        `- Pedidos Ativos em Andamento: ${metrics.activeCount} (Aguardando: ${metrics.pendingCount}, Em Produção: ${metrics.productionCount}, Despachados: ${metrics.shippedCount})\n` +
+        `- Total Faturamento de Atacado em Esteira: R$ ${metrics.pipelineWholesaleTotal.toFixed(2)}\n` +
+        `- Pedidos Parados há mais de 48h (Gargalos): ${metrics.stalledOrdersCount}\n` +
+        `- Insumos Cadastrados: ${safeMaterials.length}\n`;
+    }
+
     return `📍 LOCALIZAÇÃO E CONTEXTO EM TEMPO REAL NA TELA DO USUÁRIO:\n` +
            `- Modo da Aplicação: ${modeText}\n` +
            `- Rota/URL: ${currentPath}\n` +
@@ -162,7 +364,7 @@ export function SmdAssistantChat() {
            `👤 PERFIL DO REVENDEDOR CONECTADO:\n${userText}\n\n` +
            `📦 PRODUTOS ATIVOS NO CATÁLOGO OFICIAL (${activeProds.length} ativos, ${draftProds.length} rascunhos):\n${prodList}\n\n` +
            `🛠️ MATERIAIS DE FÁBRICA DISPONÍVEIS:\n${matList}\n\n` +
-           `🚚 HISTÓRICO DE PEDIDOS DO USUÁRIO:\n${orderList}`;
+           `🚚 HISTÓRICO DE PEDIDOS DO USUÁRIO:\n${orderList}` + factoryContext;
   };
 
   const [messages, setMessages] = useState(() => {
@@ -331,6 +533,7 @@ export function SmdAssistantChat() {
     try {
       const toolMap = {
         geral: "suporte-sistema",
+        anuncio: "persona-anuncio",
         lucro: "persona-lucro",
         objecoes: "persona-objecoes",
         tecnico: "persona-tecnico",
@@ -679,22 +882,38 @@ export function SmdAssistantChat() {
                   </div>
                 )}
 
-                {/* Input Bar */}
+                                {/* Input Bar com Microfone e Envio */}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleSend(input);
                   }}
-                  className="p-2.5 border-t border-slate-800 bg-slate-900 flex items-center gap-2"
+                  className="p-2.5 border-t border-slate-800 bg-slate-900 flex items-center gap-1.5"
                 >
+                  <button
+                    type="button"
+                    onClick={toggleSpeechRecognition}
+                    className={`size-8 rounded-xl flex items-center justify-center transition shrink-0 ${
+                      isListening
+                        ? 'bg-rose-600 text-white animate-pulse shadow-lg shadow-rose-500/50'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700'
+                    }`}
+                    title={isListening ? 'Parar gravação de voz' : 'Falar por áudio com o Lumen'}
+                  >
+                    {isListening ? <MicOff className="size-3.5" /> : <Mic className="size-3.5" />}
+                  </button>
+
                   <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Pergunte ao Lumen..."
-                    className="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition"
+                    placeholder={isListening ? "Ouvindo você falar..." : "Pergunte ao Lumen..."}
+                    className={`flex-1 bg-slate-950 border rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none transition ${
+                      isListening ? "border-rose-500 ring-1 ring-rose-500" : "border-slate-700/80 focus:border-purple-500"
+                    }`}
                     disabled={loading}
                   />
+
                   <button
                     type="submit"
                     disabled={loading || !input.trim()}
