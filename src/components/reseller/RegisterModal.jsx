@@ -36,8 +36,9 @@ export const RegisterModal = ({ isOpen, initialMode = 'register', onClose, onOpe
   // Mandatory terms checkbox
   const [agreeTerms, setAgreeTerms] = useState(false);
 
-  // Errors state
+  // Errors & Loading state
   const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -235,9 +236,16 @@ export const RegisterModal = ({ isOpen, initialMode = 'register', onClose, onOpe
             <div className="pt-2">
               <button
                 type="submit"
-                className="btn-gold w-full py-3 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg"
+                disabled={isSubmitting}
+                className="btn-gold w-full py-3 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
               >
-                <LogIn size={18} /> Entrar no Portal do Revendedor <ArrowRight size={16} />
+                {isSubmitting ? (
+                  <span>Conectando à Nuvem...</span>
+                ) : (
+                  <>
+                    <LogIn size={18} /> Entrar no Portal do Revendedor <ArrowRight size={16} />
+                  </>
+                )}
               </button>
             </div>
 
@@ -391,12 +399,18 @@ export const RegisterModal = ({ isOpen, initialMode = 'register', onClose, onOpe
             <div className="pt-1">
               <button
                 type="submit"
-                disabled={!agreeTerms}
+                disabled={!agreeTerms || isSubmitting}
                 className={`w-full py-3 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-all ${
-                  agreeTerms ? 'btn-gold' : 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
+                  agreeTerms && !isSubmitting ? 'btn-gold' : 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
                 }`}
               >
-                <ShieldCheck size={18} /> Criar Minha Conta Grátis <ArrowRight size={16} />
+                {isSubmitting ? (
+                  <span>Criando Conta Segura...</span>
+                ) : (
+                  <>
+                    <ShieldCheck size={18} /> Criar Minha Conta Grátis <ArrowRight size={16} />
+                  </>
+                )}
               </button>
             </div>
 

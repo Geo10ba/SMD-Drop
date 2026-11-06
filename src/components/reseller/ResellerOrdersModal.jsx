@@ -13,8 +13,14 @@ import {
   AlertCircle,
   Eye,
   User,
-  ShoppingBag
+  ShoppingBag,
+  MessageSquare
 } from 'lucide-react';
+import { 
+  openWhatsAppNotification, 
+  generateWhatsAppMessage, 
+  NOTIFICATION_EVENTS 
+} from '../../services/whatsappNotification';
 import { TrackingModal } from '../TrackingModal';
 import { Breadcrumb } from '../common/Breadcrumb';
 import { ProductionTimeline } from '../common/ProductionTimeline';
@@ -239,6 +245,24 @@ export const ResellerOrdersModal = ({ isOpen, onClose, onOpenCatalog }) => {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const norm = normalizeProductionStatus(order.status);
+                            let evt = NOTIFICATION_EVENTS.ORDER_CREATED;
+                            if (norm === 'corte_laser' || norm === 'em_producao') evt = NOTIFICATION_EVENTS.PRODUCTION_STARTED;
+                            else if (norm === 'enviado') evt = NOTIFICATION_EVENTS.ORDER_SHIPPED;
+                            else if (norm === 'embalagem_etiquetagem' || norm === 'conferencia_qualidade') evt = NOTIFICATION_EVENTS.ORDER_READY;
+
+                            const phone = currentUser?.phone || order.customerData?.phone;
+                            const msg = generateWhatsAppMessage(order, evt);
+                            openWhatsAppNotification(phone, msg);
+                          }}
+                          className="btn-secondary text-xs font-bold py-2 px-3 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1.5"
+                          title="Abrir detalhes e rastreio deste pedido no WhatsApp"
+                        >
+                          <MessageSquare size={14} className="text-emerald-500" /> WhatsApp
+                        </button>
+
                         <button
                           onClick={() => setSelectedTrackingCode(order.trackingCode || order.id)}
                           className="btn-gold text-xs font-black py-2 px-4 flex items-center gap-1.5 shadow-md"

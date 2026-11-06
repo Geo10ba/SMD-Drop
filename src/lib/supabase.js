@@ -106,3 +106,185 @@ export const syncToSupabase = async (tableName, data) => {
     console.warn(`[Supabase Connection Exception] ${tableName}:`, err.message);
   }
 };
+
+/**
+ * Cadastra novo usuário no Supabase Auth + Tabela users
+ */
+export const signUpWithSupabase = async ({ email, password, metadata = {} }) => {
+  const client = getSupabaseClient();
+  if (!client) return { success: false, error: 'Supabase não inicializado' };
+
+  try {
+    const { data, error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        data: metadata
+      }
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const authUser = data?.user;
+    if (authUser) {
+      // Upsert profile in 'users' table
+      const profileData = {
+        id: authUser.id,
+        email: authUser.email,
+        name: metadata.storeName || metadata.name || authUser.email.split('@')[0],
+        phone: metadata.phone || '',
+        cnpj: metadata.cnpj || '',
+        role: metadata.role || (authUser.email.toLowerCase() === 'geovancalado@gmail.com' ? 'admin' : 'reseller'),
+        status: 'aprovado',
+        tier: metadata.tier || 'Bronze',
+        wallet_balance: metadata.wallet_balance || 0
+      };
+
+      await client.from('users').upsert(profileData, { onConflict: 'id' }).catch(() => {});
+
+      return {
+        success: true,
+        user: {
+          ...profileData,
+          walletBalance: profileData.wallet_balance
+        },
+        session: data.session
+      };
+    }
+
+    return { success: true, user: null };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Autentica usuário com E-mail e Senha no Supabase Auth
+ */
+export const signInWithSupabase = async ({ email, password }) => {
+  const client = getSupabaseClient();
+  if (!client) return { success: false, error: 'Supabase não inicializado' };
+
+  try {
+    const { data, error } = await client.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const authUser = data?.user;
+    if (authUser) {
+      let profile = null;
+      try {
+        const { data: userRow } = await client.from('users').select('*').eq('id', authUser.id).maybeSingle();
+        if (userRow) profile = userRow;
+      } catch (e) {}
+
+      if (!profile) {
+        try {
+          const { data: userRowEmail } = await client.from('users').select('*').eq('email', authUser.email).maybeSingle();
+          if (userRowEmail) profile = userRowEmail;
+        } catch (e) {}
+      }
+
+      const mergedUser = {
+        id: authUser.id,
+        email: authUser.email,
+        name: profile?.name || authUser.user_metadata?.storeName || authUser.user_metadata?.name || authUser.email.split('@')[0],
+        phone: profile?.phone || authUser.user_metadata?.phone || '',
+        cnpj: profile?.cnpj || authUser.user_metadata?.cnpj || '',
+        role: profile?.role || (authUser.email.toLowerCase() === 'geovancalado@gmail.com' ? 'admin' : 'reseller'),
+        status: profile?.status || 'aprovado',
+        tier: profile?.tier || 'Bronze',
+        walletBalance: Number(profile?.wallet_balance ?? 0)
+      };
+
+      return {
+        success: true,
+        user: mergedUser,
+        session: data.session
+      };
+    }
+
+    return { success: false, error: 'Usuário não retornado pelo provedor.' };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Encerra sessão do Supabase Auth
+ */
+export const signOutWithSupabase = async () => {
+  const client = getSupabaseClient();
+  if (!client) return;
+  try {
+    await client.auth.signOut();
+  } catch (e) {}
+};
+
+/**
+ * Obtém sessão e perfil ativo do Supabase
+ */
+export const getCurrentSupabaseUser = async () => {
+  const client = getSupabaseClient();
+  if (!client) return null;
+  try {
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user) return null;
+
+    const authUser = session.user;
+    let profile = null;
+    try {
+      const { data: userRow } = await client.from('users').select('*').eq('id', authUser.id).maybeSingle();
+      if (userRow) profile = userRow;
+    } catch (e) {}
+
+    return {
+      id: authUser.id,
+      email: authUser.email,
+      name: profile?.name || authUser.user_metadata?.storeName || authUser.email.split('@')[0],
+      phone: profile?.phone || '',
+      cnpj: profile?.cnpj || '',
+      role: profile?.role || (authUser.email.toLowerCase() === 'geovancalado@gmail.com' ? 'admin' : 'reseller'),
+      status: profile?.status || 'aprovado',
+      tier: profile?.tier || 'Bronze',
+      walletBalance: Number(profile?.wallet_balance ?? 0)
+    };
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * Inscreve no canal Realtime do Supabase para a tabela de pedidos (orders)
+ */
+export const subscribeToRealtimeOrders = (onOrderChange) => {
+  const client = getSupabaseClient();
+  if (!client || typeof onOrderChange !== 'function') return () => {};
+
+  try {
+    const channel = client
+      .channel('realtime_orders_channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        (payload) => {
+          onOrderChange(payload);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (e) {
+    console.warn('[Realtime Subscription Exception]:', e.message);
+    return () => {};
+  }
+};

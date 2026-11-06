@@ -1,4 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  openWhatsAppNotification, 
+  generateWhatsAppMessage, 
+  NOTIFICATION_EVENTS 
+} from '../../services/whatsappNotification';
 import { useStore } from '../../context/StoreContext';
 import { PostalDeclarationModal } from './PostalDeclarationModal';
 import { ProductionOrderModal } from './ProductionOrderModal';
@@ -33,8 +38,43 @@ import {
   Barcode,
   CheckCheck,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  MessageSquare,
+  Volume2,
+  VolumeX,
+  Zap
 } from 'lucide-react';
+
+function playScanBeep(isSuccess = true) {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (isSuccess) {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1760, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.16);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.16);
+    } else {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      gain.gain.setValueAtTime(0.22, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.28);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.28);
+    }
+  } catch (e) {}
+}
 
 export const FulfillmentCenter = ({ onClose }) => {
   const { 
@@ -54,6 +94,12 @@ export const FulfillmentCenter = ({ onClose }) => {
   const [fiscalOrderToResolve, setFiscalOrderToResolve] = useState(null);
   const [labelPreviewOrder, setLabelPreviewOrder] = useState(null);
 
+  // Scanner Profissional: Modo Rápido, Áudio e Auto-focus
+  const [fastDispatchMode, setFastDispatchMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [sessionScanCount, setSessionScanCount] = useState(0);
+  const scannerInputRef = useRef(null);
+
   const handleScanSubmit = (e) => {
     e.preventDefault();
     const cleanCode = scannerInput.trim();
@@ -66,11 +112,24 @@ export const FulfillmentCenter = ({ onClose }) => {
     );
 
     if (found) {
-      advanceProductionStage(found.id, 'Avanço por bipagem de código óptico/QR Code');
+      if (soundEnabled) playScanBeep(true);
+      setSessionScanCount(prev => prev + 1);
+
+      if (fastDispatchMode) {
+        updateOrderStatus(found.id, 'enviado');
+        showNotification(`⚡ Pedido ${found.id} EXPEDIDO com sucesso via Bipagem Rápida!`, 'success');
+      } else {
+        advanceProductionStage(found.id, 'Avanço por bipagem de leitor de código de barras');
+      }
       setScannerInput('');
     } else {
+      if (soundEnabled) playScanBeep(false);
       showNotification(`Código ou pedido "${cleanCode}" não localizado na fila.`, 'error');
     }
+
+    setTimeout(() => {
+      scannerInputRef.current?.focus();
+    }, 50);
   };
 
   const filteredOrders = orders.filter((order) => {
@@ -133,37 +192,77 @@ export const FulfillmentCenter = ({ onClose }) => {
         </div>
       </div>
 
-      {/* Terminal de Bipagem Rápida por Código de Barras / QR Code */}
-      <div className="bg-slate-900 border-2 border-slate-700 p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 text-white shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-            <Barcode size={22} />
+      {/* Terminal de Bipagem Rápida Profissional com Áudio e Modo Despacho */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border-2 border-amber-500/40 p-4 sm:p-5 rounded-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-white shadow-xl relative overflow-hidden">
+        <div className="flex items-center gap-3.5 z-10">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+            <Barcode size={24} />
           </div>
           <div>
-            <span className="text-xs font-black uppercase text-amber-300 block tracking-wider">
-              Terminal de Bipagem Rápida (Chão de Fábrica)
-            </span>
-            <span className="text-[11px] text-slate-300">
-              Aponte o leitor óptico para o QR Code da OP ou digite o ID do pedido para avançar automaticamente o estágio na esteira.
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase text-amber-400 tracking-wider">
+                Terminal de Bipagem Óptica & Expedição
+              </span>
+              {sessionScanCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  ⚡ {sessionScanCount} caixa{sessionScanCount > 1 ? 's' : ''} bipada{sessionScanCount > 1 ? 's' : ''} nesta sessão
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] text-slate-300 block mt-0.5">
+              Compatível com leitor USB/Bluetooth (Honeywell, Zebra) e código de barras Shopee, Mercado Livre e Correios.
             </span>
           </div>
         </div>
 
-        <form onSubmit={handleScanSubmit} className="flex items-center gap-2 w-full md:w-auto">
-          <div className="relative w-full md:w-72">
-            <Barcode size={16} className="absolute left-3 top-3 text-amber-400" />
-            <input
-              type="text"
-              placeholder="Bipar QR Code (Ex: ORD-1234)..."
-              value={scannerInput}
-              onChange={(e) => setScannerInput(e.target.value)}
-              className="input-field pl-9 text-xs font-mono font-bold bg-slate-950 border-amber-500/50 text-white placeholder-slate-500 py-2.5 w-full focus:ring-2 focus:ring-amber-500"
-            />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto z-10">
+          {/* Toggles: Áudio e Modo Despacho Rápido */}
+          <div className="flex items-center gap-2 text-xs bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-700/80">
+            <button
+              type="button"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 font-bold ${
+                soundEnabled ? 'text-amber-400 hover:text-amber-300' : 'text-slate-500'
+              }`}
+              title={soundEnabled ? 'Som do leitor ativado' : 'Som desativado'}
+            >
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              <span className="text-[10px]">{soundEnabled ? 'BIP ON' : 'MUDO'}</span>
+            </button>
+
+            <div className="w-px h-4 bg-slate-700" />
+
+            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-slate-300 hover:text-white select-none">
+              <input
+                type="checkbox"
+                checked={fastDispatchMode}
+                onChange={(e) => setFastDispatchMode(e.target.checked)}
+                className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
+              />
+              <span className={fastDispatchMode ? 'text-emerald-400 font-bold' : ''}>
+                Despacho Imediato
+              </span>
+            </label>
           </div>
-          <button type="submit" className="btn-gold py-2.5 px-5 text-xs font-black shrink-0 shadow-md">
-            Bipar
-          </button>
-        </form>
+
+          {/* Form de Bipagem */}
+          <form onSubmit={handleScanSubmit} className="flex items-center gap-2">
+            <div className="relative w-full sm:w-64">
+              <Barcode size={16} className="absolute left-3 top-3 text-amber-400" />
+              <input
+                ref={scannerInputRef}
+                type="text"
+                placeholder="Bipar código de barras..."
+                value={scannerInput}
+                onChange={(e) => setScannerInput(e.target.value)}
+                className="input-field pl-9 text-xs font-mono font-bold bg-slate-950 border-amber-500/60 text-white placeholder-slate-500 py-2.5 w-full focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <button type="submit" className="btn-gold py-2.5 px-4 text-xs font-black shrink-0 shadow-lg flex items-center gap-1">
+              <Zap size={14} /> Bipar
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* Tabs por Estágio Canônico (7 Fases) */}
@@ -386,6 +485,26 @@ export const FulfillmentCenter = ({ onClose }) => {
                       title="Ficha Técnica de Ordem de Produção (OP) para Operador de Laser"
                     >
                       <Scissors size={14} className="text-amber-500" /> OP Laser
+                    </button>
+
+                    {/* Direct WhatsApp Notification Button */}
+                    <button
+                      onClick={() => {
+                        const norm = normalizeProductionStatus(order.status);
+                        let evt = NOTIFICATION_EVENTS.ORDER_CREATED;
+                        if (norm === 'corte_laser' || norm === 'em_producao') evt = NOTIFICATION_EVENTS.PRODUCTION_STARTED;
+                        else if (norm === 'enviado') evt = NOTIFICATION_EVENTS.ORDER_SHIPPED;
+                        else if (norm === 'embalagem_etiquetagem' || norm === 'conferencia_qualidade') evt = NOTIFICATION_EVENTS.ORDER_READY;
+
+                        const phone = order.customerData?.phone || order.phone || order.resellerPhone;
+                        const msg = generateWhatsAppMessage(order, evt);
+                        openWhatsAppNotification(phone, msg);
+                        showNotification(`WhatsApp gerado para o pedido #${order.id}!`, 'success');
+                      }}
+                      className="btn-secondary text-xs font-bold py-2 px-3 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1.5 shadow-sm"
+                      title="Enviar notificação personalizada do pedido no WhatsApp do revendedor"
+                    >
+                      <MessageSquare size={14} className="text-emerald-500" /> WhatsApp
                     </button>
 
                     {/* Postal Declaration Button */}

@@ -5,8 +5,20 @@ import {
   getSupabaseCredentials, 
   saveSupabaseCredentials, 
   testSupabaseConnection, 
-  syncToSupabase 
+  syncToSupabase,
+  signUpWithSupabase,
+  signInWithSupabase,
+  signOutWithSupabase,
+  getCurrentSupabaseUser,
+  subscribeToRealtimeOrders
 } from '../lib/supabase';
+import {
+  notifyResellerViaWhatsApp,
+  openWhatsAppNotification,
+  buildWhatsAppLink,
+  generateWhatsAppMessage,
+  NOTIFICATION_EVENTS
+} from '../services/whatsappNotification';
 import { normalizeCategoryName, normalizeCategoryList } from '../lib/categoryTranslations';
 import { 
   getAllActiveFonts, 
@@ -775,12 +787,98 @@ export const StoreProvider = ({ children }) => {
     }
   };
 
-  const loginAsReseller = (email, name) => {
+  // Baixa Automática de Matéria-Prima (Chapas de Acrílico / MDF / ACM) na Linha de Produção
+  const deductRawMaterialsForOrder = (order) => {
+    if (!order || !order.items || order.items.length === 0) return;
+
+    let hasCriticalStock = false;
+    let criticalMaterialName = '';
+
+    setMaterialsState((prevMaterials) => {
+      const updatedMaterials = prevMaterials.map((mat) => {
+        let deductedM2 = 0;
+
+        order.items.forEach((item) => {
+          const itemName = (item.title || item.name || '').toLowerCase();
+          const itemMat = (item.material || item.category || '').toLowerCase();
+          const matName = (mat.name || '').toLowerCase();
+
+          const matches =
+            itemMat.includes(mat.style?.toLowerCase() || '') ||
+            itemMat.includes(matName) ||
+            itemName.includes(matName) ||
+            (mat.style && itemName.includes(mat.style.toLowerCase()));
+
+          if (matches) {
+            let areaM2 = 0.12;
+            if (item.width && item.height) {
+              areaM2 = (Number(item.width) / 100) * (Number(item.height) / 100);
+            } else if (item.dimensions) {
+              const dimMatch = String(item.dimensions).match(/(\d+)\s*[xX]\s*(\d+)/);
+              if (dimMatch) {
+                areaM2 = (Number(dimMatch[1]) / 100) * (Number(dimMatch[2]) / 100);
+              }
+            }
+            const qty = Number(item.qty || item.quantity || 1);
+            deductedM2 += areaM2 * qty;
+          }
+        });
+
+        if (deductedM2 > 0) {
+          const currentStock = Number(mat.stockM2 ?? 20);
+          const newStock = Math.max(0, Math.round((currentStock - deductedM2) * 100) / 100);
+          const minStock = Number(mat.minStockM2 ?? 4);
+
+          if (newStock <= minStock) {
+            hasCriticalStock = true;
+            criticalMaterialName = mat.name;
+          }
+
+          return {
+            ...mat,
+            stockM2: newStock,
+            lastDeductionAt: new Date().toISOString()
+          };
+        }
+
+        return mat;
+      });
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smd_materials', JSON.stringify(updatedMaterials));
+      }
+
+      return updatedMaterials;
+    });
+
+    if (hasCriticalStock) {
+      showNotification(`⚠️ Alerta de Estoque: Chapa "${criticalMaterialName}" atingiu o estoque mínimo de reposição!`, 'warning');
+    }
+  };
+
+  const loginAsReseller = async (email, passwordOrName) => {
+    const isPassword = typeof passwordOrName === 'string' && passwordOrName.length >= 6;
+    let authUser = null;
+
+    if (isPassword) {
+      try {
+        const res = await signInWithSupabase({ email, password: passwordOrName });
+        if (res.success && res.user) {
+          authUser = res.user;
+        } else if (res.error && !res.error.includes('Failed to fetch')) {
+          showNotification(res.error === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : res.error, 'error');
+          return false;
+        }
+      } catch (e) {
+        console.warn('[Supabase Auth Fallback]', e);
+      }
+    }
+
     const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
-    const resellerUser = {
+    const resellerUser = authUser || {
       id: isAdmin ? 'admin-geovan' : 'user-' + Date.now(),
       email,
-      name: name || (isAdmin ? 'Geovan Calado (Admin Fábrica)' : 'Revendedor Autorizado'),
+      name: (typeof passwordOrName === 'string' && !isPassword ? passwordOrName : (isAdmin ? 'Geovan Calado (Admin Fábrica)' : email.split('@')[0])),
       cnpj: '45.109.892/0001-99',
       phone: '(11) 99999-8888',
       pixKey: email,
@@ -789,6 +887,7 @@ export const StoreProvider = ({ children }) => {
       tier: isAdmin ? 'VIP Gold' : 'Bronze',
       discountPercent: isAdmin ? 100 : 0
     };
+
     setCurrentUser(resellerUser);
     setViewMode(isAdmin ? 'factory' : 'reseller');
     showNotification(isAdmin ? '👑 Autenticado como Administrador da Fábrica!' : `Bem-vindo, ${resellerUser.name}!`);
@@ -804,16 +903,40 @@ export const StoreProvider = ({ children }) => {
       status: resellerUser.status,
       tier: resellerUser.tier
     });
+
+    return true;
   };
 
-  const registerReseller = (userData) => {
-    // Security Helper: Sanitize inputs to prevent XSS script injection
+  const registerReseller = async (userData) => {
     const sanitize = (str) => (typeof str === 'string' ? str.replace(/<[^>]*>?/gm, '').trim() : '');
 
     const userEmail = sanitize(userData.email).toLowerCase();
     const isAdmin = userEmail === adminEmail.toLowerCase();
+    const password = userData.password;
 
-    const newResellerUser = {
+    let authUser = null;
+    if (password && password.length >= 6) {
+      try {
+        const res = await signUpWithSupabase({
+          email: userEmail,
+          password,
+          metadata: {
+            storeName: sanitize(userData.storeName),
+            phone: sanitize(userData.phone),
+            cnpj: sanitize(userData.cnpj),
+            role: isAdmin ? 'admin' : 'reseller',
+            tier: isAdmin ? 'VIP Gold' : 'Bronze'
+          }
+        });
+        if (res.success && res.user) {
+          authUser = res.user;
+        }
+      } catch (e) {
+        console.warn('[Supabase Sign Up Exception]', e);
+      }
+    }
+
+    const newResellerUser = authUser || {
       id: isAdmin ? 'admin-geovan' : 'user-' + Date.now(),
       name: sanitize(userData.storeName) || (isAdmin ? 'Geovan Calado (Admin Fábrica)' : 'Nova Loja Revendedora'),
       email: userEmail,
@@ -854,13 +977,14 @@ export const StoreProvider = ({ children }) => {
   };
 
   const logout = () => {
-    setCurrentUser(defaultResellerUser);
+    signOutWithSupabase().catch(() => {});
+    setCurrentUser(null);
     setViewMode('reseller');
     if (typeof window !== 'undefined') {
       localStorage.removeItem('smd_current_user');
       localStorage.setItem('smd_view_mode', 'reseller');
     }
-    showNotification('Sessão encerrada.');
+    showNotification('Sessão encerrada com sucesso.');
   };
 
   // User Management Functions
@@ -1130,6 +1254,12 @@ export const StoreProvider = ({ children }) => {
           }
         }
 
+        // 3.5. Checar sessão ativa e perfil autenticado no Supabase
+        const cloudUser = await getCurrentSupabaseUser();
+        if (cloudUser) {
+          setCurrentUserState(cloudUser);
+        }
+
         // 4. Fetch Company Settings & Layout preferences from Supabase
         const { data: dbSettings, error: setErr } = await client.from('company_settings').select('*').limit(1);
         if (!setErr && dbSettings && dbSettings.length > 0) {
@@ -1264,6 +1394,22 @@ export const StoreProvider = ({ children }) => {
 
     fetchSupabaseData();
 
+    let unsubscribeRealtime = null;
+    try {
+      unsubscribeRealtime = subscribeToRealtimeOrders((payload) => {
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          setOrdersState((prev) =>
+            prev.map((o) => (o.id === payload.new.id ? { ...o, ...payload.new } : o))
+          );
+        } else if (payload.eventType === 'INSERT' && payload.new) {
+          setOrdersState((prev) => {
+            if (prev.some((o) => o.id === payload.new.id)) return prev;
+            return [payload.new, ...prev];
+          });
+        }
+      });
+    } catch (e) {}
+
     if (typeof window !== 'undefined') {
       const handleWindowFocus = () => fetchSupabaseData();
       window.addEventListener('focus', handleWindowFocus);
@@ -1271,6 +1417,7 @@ export const StoreProvider = ({ children }) => {
       return () => {
         window.removeEventListener('focus', handleWindowFocus);
         clearInterval(syncInterval);
+        if (typeof unsubscribeRealtime === 'function') unsubscribeRealtime();
       };
     }
   }, []);
@@ -1595,6 +1742,12 @@ export const StoreProvider = ({ children }) => {
       ...orderData
     });
 
+    // Notificar automaticamente o revendedor via WhatsApp
+    notifyResellerViaWhatsApp({
+      order: { ...newOrder, ...orderData },
+      eventType: NOTIFICATION_EVENTS.ORDER_CREATED
+    });
+
     return newOrder;
   };
 
@@ -1635,6 +1788,14 @@ export const StoreProvider = ({ children }) => {
       })
     );
     showNotification(`Status do Pedido ${orderId}: ${stageInfo.shortLabel}!`);
+
+    // Baixa automática de matéria-prima ao iniciar corte a laser / produção
+    if (canonicalStatus === 'corte_laser' || canonicalStatus === 'em_producao') {
+      deductRawMaterialsForOrder(targetOrder);
+      notifyResellerViaWhatsApp({ order: targetOrder, eventType: NOTIFICATION_EVENTS.PRODUCTION_STARTED });
+    } else if (canonicalStatus === 'enviado') {
+      notifyResellerViaWhatsApp({ order: targetOrder, eventType: NOTIFICATION_EVENTS.ORDER_SHIPPED });
+    }
 
     syncToSupabase('orders', {
       id: orderId,
@@ -2308,7 +2469,13 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         syncAllToSupabase,
         getSupabaseCredentials,
         saveSupabaseCredentials,
-        testSupabaseConnection
+        testSupabaseConnection,
+        deductRawMaterialsForOrder,
+        notifyResellerViaWhatsApp,
+        openWhatsAppNotification,
+        buildWhatsAppLink,
+        generateWhatsAppMessage,
+        NOTIFICATION_EVENTS
       }}
     >
       {children}

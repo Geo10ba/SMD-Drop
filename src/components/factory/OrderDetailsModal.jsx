@@ -19,8 +19,14 @@ import {
   Unlock,
   ShieldCheck,
   Building2,
-  Barcode
+  Barcode,
+  MessageSquare
 } from 'lucide-react';
+import { 
+  openWhatsAppNotification, 
+  generateWhatsAppMessage, 
+  NOTIFICATION_EVENTS 
+} from '../../services/whatsappNotification';
 import { useStore } from '../../context/StoreContext';
 import { PostalDeclarationModal } from './PostalDeclarationModal';
 import { ProductionOrderModal } from './ProductionOrderModal';
@@ -371,6 +377,26 @@ export const OrderDetailsModal = ({ order, onClose }) => {
                 title="Visualizar Etiqueta Térmica 10x15cm e Envelope Canguru"
               >
                 <Barcode size={14} /> Etiqueta 10x15 (Cega)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const normStage = normalizeProductionStatus(status);
+                  let evt = NOTIFICATION_EVENTS.ORDER_CREATED;
+                  if (normStage === 'corte_laser' || normStage === 'em_producao') evt = NOTIFICATION_EVENTS.PRODUCTION_STARTED;
+                  else if (normStage === 'enviado' || normStage === 'despachado') evt = NOTIFICATION_EVENTS.ORDER_SHIPPED;
+                  else if (normStage === 'embalagem_etiquetagem' || normStage === 'conferencia_qualidade') evt = NOTIFICATION_EVENTS.ORDER_READY;
+
+                  const phone = order.customerData?.phone || order.phone || order.resellerPhone;
+                  const msg = generateWhatsAppMessage({ ...order, trackingCode, status }, evt);
+                  openWhatsAppNotification(phone, msg);
+                  showNotification(`Link do WhatsApp gerado para o pedido #${order.id}!`, 'success');
+                }}
+                className="btn-secondary text-xs font-bold py-2 px-3 flex items-center gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 shadow-sm"
+                title="Disparar notificação no WhatsApp do Revendedor"
+              >
+                <MessageSquare size={14} className="text-emerald-500" /> Avisar no WhatsApp
               </button>
             </div>
 
