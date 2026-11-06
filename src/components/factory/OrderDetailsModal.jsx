@@ -20,13 +20,18 @@ import {
   ShieldCheck,
   Building2,
   Barcode,
-  MessageSquare
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import { 
   openWhatsAppNotification, 
   generateWhatsAppMessage, 
   NOTIFICATION_EVENTS 
 } from '../../services/whatsappNotification';
+import {
+  generateTelegramMessage,
+  openTelegramShare
+} from '../../services/telegramNotification';
 import { useStore } from '../../context/StoreContext';
 import { PostalDeclarationModal } from './PostalDeclarationModal';
 import { ProductionOrderModal } from './ProductionOrderModal';
@@ -397,6 +402,24 @@ export const OrderDetailsModal = ({ order, onClose }) => {
                 title="Disparar notificação no WhatsApp do Revendedor"
               >
                 <MessageSquare size={14} className="text-emerald-500" /> Avisar no WhatsApp
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const normStage = normalizeProductionStatus(status);
+                  let evt = 'order_created';
+                  if (normStage === 'corte_laser' || normStage === 'em_producao') evt = 'production_started';
+                  else if (normStage === 'enviado' || normStage === 'despachado') evt = 'order_shipped';
+
+                  const msg = generateTelegramMessage({ ...order, trackingCode, status }, evt);
+                  openTelegramShare(msg);
+                  showNotification(`Link do Telegram (Grátis) gerado para o pedido #${order.id}!`, 'success');
+                }}
+                className="btn-secondary text-xs font-bold py-2 px-3 flex items-center gap-1.5 border-sky-500/40 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 shadow-sm"
+                title="Disparar notificação gratuita no Telegram"
+              >
+                <Send size={14} className="text-sky-500" /> Avisar no Telegram
               </button>
             </div>
 

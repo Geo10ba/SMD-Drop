@@ -1,11 +1,14 @@
 /**
- * Serviço Seguro de Notificações via Telegram
- * Dispara requisições para a API Serverless (/api/telegram/notify),
- * garantindo que nenhum token ou segredo seja exposto no navegador.
+ * Serviço de Notificações via Telegram para Revendedores e Fábrica da SMD Drop
+ * Dispara requisições para a API Serverless (/api/telegram/notify) sem expor segredos,
+ * e gera links diretos para compartilhamento e rastreamento via Telegram Web/App (100% GRÁTIS).
  */
 
+export const TELEGRAM_BOT_USERNAME = 'smddropbot';
+export const TELEGRAM_BOT_URL = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
+
 /**
- * Notifica sobre um novo pedido realizado
+ * Normaliza dados para envio de pedido criado
  */
 export async function notifyOrderToTelegram(orderData) {
   try {
@@ -14,6 +17,7 @@ export async function notifyOrderToTelegram(orderData) {
       orderId: orderData.id || orderData.orderId,
       resellerName: orderData.resellerName,
       resellerEmail: orderData.resellerEmail,
+      resellerChatId: orderData.resellerTelegramChatId || orderData.telegramChatId || null,
       customerName: orderData.customerName || orderData.customerData?.name,
       customerCity: orderData.customerCity || orderData.customerData?.city,
       customerState: orderData.customerState || orderData.customerData?.state,
@@ -43,21 +47,64 @@ export async function notifyOrderToTelegram(orderData) {
     if (!res.ok) {
       console.warn('[Telegram Notify Warning]: Falha na resposta da API', res.status);
     }
+    return true;
   } catch (err) {
-    // Não quebra o checkout do revendedor se houver falha de rede
     console.warn('[Telegram Notify Exception]:', err.message);
+    return false;
+  }
+}
+
+/**
+ * Notifica sobre avanço de estágio ou despacho do pedido (Corte Laser, Pronto, Expedido)
+ */
+export async function notifyOrderStatusToTelegram(orderData, newStatus, trackingCode = null, note = '') {
+  try {
+    const payload = {
+      type: newStatus === 'enviado' ? 'order_shipped' : (newStatus === 'corte_laser' || newStatus === 'em_producao' ? 'production_started' : 'order_status_updated'),
+      orderId: orderData.id || orderData.orderId,
+      newStatus,
+      statusLabel: note,
+      resellerName: orderData.resellerName,
+      resellerEmail: orderData.resellerEmail,
+      resellerChatId: orderData.resellerTelegramChatId || orderData.telegramChatId || null,
+      customerName: orderData.customerName || orderData.customerData?.name,
+      customerCity: orderData.customerCity || orderData.customerData?.city,
+      customerState: orderData.customerState || orderData.customerData?.state,
+      trackingCode: trackingCode || orderData.trackingCode || null,
+      marketplace: orderData.marketplace || 'Marketplace',
+      total: orderData.wholesaleTotal || orderData.total,
+      items: (orderData.items || []).map(it => ({
+        title: it.title || it.name,
+        qty: it.qty || it.quantity || 1
+      }))
+    };
+
+    const res = await fetch('/api/telegram/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      console.warn('[Telegram Status Warning]: Falha na resposta da API', res.status);
+    }
+    return true;
+  } catch (err) {
+    console.warn('[Telegram Status Exception]:', err.message);
+    return false;
   }
 }
 
 /**
  * Notifica sobre uma recarga de saldo na carteira
  */
-export async function notifyWalletRechargeToTelegram({ resellerName, resellerEmail, amount, method, paymentId }) {
+export async function notifyWalletRechargeToTelegram({ resellerName, resellerEmail, amount, method, paymentId, resellerChatId }) {
   try {
     const payload = {
       type: 'wallet_recharge',
       resellerName,
       resellerEmail,
+      resellerChatId: resellerChatId || null,
       amount,
       method: method || 'PIX Automático Mercado Pago',
       paymentId
@@ -72,7 +119,71 @@ export async function notifyWalletRechargeToTelegram({ resellerName, resellerEma
     if (!res.ok) {
       console.warn('[Telegram Wallet Warning]: Falha na resposta da API', res.status);
     }
+    return true;
   } catch (err) {
     console.warn('[Telegram Wallet Exception]:', err.message);
+    return false;
   }
+}
+
+/**
+ * Gera texto formatado para envio direto ou compartilhamento via Telegram
+ */
+export function generateTelegramMessage(order, eventType = 'order_created') {
+  const orderId = order.id || order.orderId || 'S/N';
+  const resellerName = order.resellerName || 'Parceiro';
+  const tracking = order.trackingCode || 'Gerando...';
+  const total = Number(order.wholesaleTotal || order.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  if (eventType === 'order_shipped') {
+    return (
+      `🚚 *PEDIDO DESPACHADO - SMD DROP*\n\n` +
+      `Olá, *${resellerName}*!\n` +
+      `Seu pedido *#${orderId}* já foi despachado com etiqueta cega.\n` +
+      `📍 *Código de Rastreio:* ${tracking}\n` +
+      `💰 *Total:* ${total}\n\n` +
+      `Acompanhe as atualizações pelo bot @${TELEGRAM_BOT_USERNAME}!`
+    );
+  }
+
+  if (eventType === 'production_started') {
+    return (
+      `⚡ *EM PRODUÇÃO & CORTE LASER - SMD DROP*\n\n` +
+      `Olá, *${resellerName}*!\n` +
+      `O pedido *#${orderId}* entrou na linha de corte a laser da fábrica.\n` +
+      `Despacho ágil garantido em até 24h úteis!`
+    );
+  }
+
+  return (
+    `🎉 *NOVO PEDIDO CONFIRMADO - SMD DROP*\n\n` +
+    `Olá, *${resellerName}*!\n` +
+    `Pedido *#${orderId}* recebido com sucesso!\n` +
+    `💰 *Valor Atacado:* ${total}\n` +
+    `Status: Em Fila de Fabricação.\n\n` +
+    `Atualizações em tempo real pelo bot @${TELEGRAM_BOT_USERNAME}!`
+  );
+}
+
+/**
+ * Constrói link direto para compartilhar no Telegram (t.me/share)
+ */
+export function buildTelegramShareLink(text, url = '') {
+  const encodedText = encodeURIComponent(text);
+  const encodedUrl = url ? encodeURIComponent(url) : '';
+  if (encodedUrl) {
+    return `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`;
+  }
+  return `https://t.me/share/url?text=${encodedText}`;
+}
+
+/**
+ * Abre o Telegram diretamente com a mensagem formatada
+ */
+export function openTelegramShare(text, url = '') {
+  const link = buildTelegramShareLink(text, url);
+  if (typeof window !== 'undefined') {
+    window.open(link, '_blank', 'noopener,noreferrer');
+  }
+  return link;
 }

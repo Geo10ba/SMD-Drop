@@ -14,13 +14,18 @@ import {
   Eye,
   User,
   ShoppingBag,
-  MessageSquare
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import { 
   openWhatsAppNotification, 
   generateWhatsAppMessage, 
   NOTIFICATION_EVENTS 
 } from '../../services/whatsappNotification';
+import {
+  generateTelegramMessage,
+  openTelegramShare
+} from '../../services/telegramNotification';
 import { TrackingModal } from '../TrackingModal';
 import { Breadcrumb } from '../common/Breadcrumb';
 import { ProductionTimeline } from '../common/ProductionTimeline';
@@ -261,6 +266,22 @@ export const ResellerOrdersModal = ({ isOpen, onClose, onOpenCatalog }) => {
                           title="Abrir detalhes e rastreio deste pedido no WhatsApp"
                         >
                           <MessageSquare size={14} className="text-emerald-500" /> WhatsApp
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const norm = normalizeProductionStatus(order.status);
+                            let evt = 'order_created';
+                            if (norm === 'corte_laser' || norm === 'em_producao') evt = 'production_started';
+                            else if (norm === 'enviado') evt = 'order_shipped';
+
+                            const msg = generateTelegramMessage(order, evt);
+                            openTelegramShare(msg);
+                          }}
+                          className="btn-secondary text-xs font-bold py-2 px-3 border border-sky-500/40 text-sky-400 hover:bg-sky-500/10 flex items-center gap-1.5"
+                          title="Acompanhar atualizações deste pedido no Telegram (100% Grátis)"
+                        >
+                          <Send size={14} className="text-sky-400" /> Telegram
                         </button>
 
                         <button

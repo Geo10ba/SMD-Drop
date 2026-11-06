@@ -4,6 +4,10 @@ import {
   generateWhatsAppMessage, 
   NOTIFICATION_EVENTS 
 } from '../../services/whatsappNotification';
+import {
+  generateTelegramMessage,
+  openTelegramShare
+} from '../../services/telegramNotification';
 import { useStore } from '../../context/StoreContext';
 import { PostalDeclarationModal } from './PostalDeclarationModal';
 import { ProductionOrderModal } from './ProductionOrderModal';
@@ -42,7 +46,8 @@ import {
   MessageSquare,
   Volume2,
   VolumeX,
-  Zap
+  Zap,
+  Send
 } from 'lucide-react';
 
 function playScanBeep(isSuccess = true) {
@@ -505,6 +510,23 @@ export const FulfillmentCenter = ({ onClose }) => {
                       title="Enviar notificação personalizada do pedido no WhatsApp do revendedor"
                     >
                       <MessageSquare size={14} className="text-emerald-500" /> WhatsApp
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const norm = normalizeProductionStatus(order.status);
+                        let evt = 'order_created';
+                        if (norm === 'corte_laser' || norm === 'em_producao') evt = 'production_started';
+                        else if (norm === 'enviado') evt = 'order_shipped';
+
+                        const msg = generateTelegramMessage(order, evt);
+                        openTelegramShare(msg);
+                        showNotification(`Link do Telegram (Grátis) gerado para o pedido #${order.id}!`, 'success');
+                      }}
+                      className="btn-secondary text-xs font-bold py-2 px-3 border border-sky-500/40 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 flex items-center gap-1.5 shadow-sm"
+                      title="Enviar notificação direta no Telegram (100% Grátis)"
+                    >
+                      <Send size={14} className="text-sky-500" /> Telegram
                     </button>
 
                     {/* Postal Declaration Button */}

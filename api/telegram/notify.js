@@ -71,6 +71,35 @@ ${paymentId ? `🔖 <b>ID Pagamento:</b> <code>${escapeHtml(paymentId)}</code>\n
 🕒 <b>Horário:</b> ${nowStr}
 ✨ <i>Saldo disponível na carteira para produção imediata!</i>
       `.trim();
+    } else if (type === 'production_started') {
+      const { orderId, resellerName, resellerEmail, total } = payload;
+      messageHtml = `
+⚡ <b>PEDIDO EM PRODUÇÃO & CORTE A LASER!</b> ⚡
+
+📦 <b>Pedido:</b> <code>#${escapeHtml(orderId || 'ORD-NOVO')}</code>
+👤 <b>Revendedor:</b> <b>${escapeHtml(resellerName || 'Revendedor')}</b>
+📧 <b>E-mail:</b> ${escapeHtml(resellerEmail || '-')}
+${total ? `💰 <b>Valor Atacado:</b> ${formatCurrency(total)}\n` : ''}
+🏭 <b>Status:</b> Peças na linha de corte a laser CNC e montagem
+🕒 <b>Horário:</b> ${nowStr}
+
+✨ <i>A fábrica SMD Drop já está preparando o pacote com etiqueta cega e embalagem neutra!</i>
+      `.trim();
+    } else if (type === 'order_shipped') {
+      const { orderId, resellerName, resellerEmail, trackingCode, marketplace, customerName, customerCity, customerState } = payload;
+      messageHtml = `
+🚚 <b>SEU PEDIDO FOI DESPACHADO COM SUCESSO!</b> 🚚
+
+📦 <b>Pedido:</b> <code>#${escapeHtml(orderId || 'ORD-NOVO')}</code>
+👤 <b>Revendedor:</b> <b>${escapeHtml(resellerName || 'Revendedor')}</b>
+📧 <b>E-mail:</b> ${escapeHtml(resellerEmail || '-')}
+📍 <b>Código de Rastreamento:</b> <code>${escapeHtml(trackingCode || 'Consulte no painel')}</code>
+🏷️ <b>Canal:</b> ${escapeHtml(marketplace || 'Marketplace / Direto')}
+${customerName ? `👤 <b>Destinatário:</b> ${escapeHtml(customerName)} (${escapeHtml(customerCity || '-')}/${escapeHtml(customerState || '-')})\n` : ''}
+🕒 <b>Data de Despacho:</b> ${nowStr}
+
+📦 <i>Pacote entregue à transportadora com remetente cego (sua marca na etiqueta)!</i>
+      `.trim();
     } else {
       // Pedido Criado / Compra
       const {
@@ -130,17 +159,32 @@ ${itemsListText}
       `.trim();
     }
 
-    // Disparar para a API do Telegram
-    const telegramRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: messageHtml,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true
-      })
-    });
+    // Lista de destinatários: Notifica a Fábrica e também o Revendedor se ele informou o chat ID
+    const targetChatIds = [chatId];
+    if (payload.resellerChatId && payload.resellerChatId !== chatId && !targetChatIds.includes(payload.resellerChatId)) {
+      targetChatIds.push(payload.resellerChatId);
+    }
+    if (payload.targetChatId && !targetChatIds.includes(payload.targetChatId)) {
+      targetChatIds.push(payload.targetChatId);
+    }
+
+    // Disparar para a API do Telegram para cada destinatário
+    for (const cId of targetChatIds) {
+      try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: cId,
+            text: messageHtml,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+          })
+        });
+      } catch (sendErr) {
+        console.warn(`[Telegram send to ${cId} Warning]:`, sendErr.message);
+      }
+    }
 
     const telegramData = await telegramRes.json();
 

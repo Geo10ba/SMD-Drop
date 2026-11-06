@@ -36,7 +36,11 @@ import {
 } from '../utils/productionCycle';
 import { 
   notifyOrderToTelegram, 
-  notifyWalletRechargeToTelegram 
+  notifyOrderStatusToTelegram,
+  notifyWalletRechargeToTelegram,
+  openTelegramShare,
+  buildTelegramShareLink,
+  TELEGRAM_BOT_URL
 } from '../services/telegramNotification';
 
 const StoreContext = createContext();
@@ -1793,8 +1797,10 @@ export const StoreProvider = ({ children }) => {
     if (canonicalStatus === 'corte_laser' || canonicalStatus === 'em_producao') {
       deductRawMaterialsForOrder(targetOrder);
       notifyResellerViaWhatsApp({ order: targetOrder, eventType: NOTIFICATION_EVENTS.PRODUCTION_STARTED });
+      notifyOrderStatusToTelegram(targetOrder, canonicalStatus, null, stageInfo.label);
     } else if (canonicalStatus === 'enviado') {
       notifyResellerViaWhatsApp({ order: targetOrder, eventType: NOTIFICATION_EVENTS.ORDER_SHIPPED });
+      notifyOrderStatusToTelegram(targetOrder, 'enviado', trackingCode || targetOrder.trackingCode, stageInfo.label);
     }
 
     syncToSupabase('orders', {
@@ -2475,7 +2481,11 @@ Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, en
         openWhatsAppNotification,
         buildWhatsAppLink,
         generateWhatsAppMessage,
-        NOTIFICATION_EVENTS
+        NOTIFICATION_EVENTS,
+        notifyOrderStatusToTelegram,
+        openTelegramShare,
+        buildTelegramShareLink,
+        TELEGRAM_BOT_URL
       }}
     >
       {children}
