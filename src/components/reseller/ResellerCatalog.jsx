@@ -34,9 +34,11 @@ import {
   UserPlus,
   Volume2,
   VolumeX,
-  Maximize2
+  Maximize2,
+  ShieldCheck
 } from 'lucide-react';
 import { ImageLightboxModal } from '../common/ImageLightboxModal';
+import { BlindShippingTrustModal } from '../common/BlindShippingTrustModal';
 
 /**
  * Componente de Mídia do Card de Produto com Reprodução Automática de Vídeo ao passar o Mouse
@@ -234,6 +236,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
   const [variationProduct, setVariationProduct] = useState(null);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [customPrices, setCustomPrices] = useState({});
+  const [isTrustModalOpen, setIsTrustModalOpen] = useState(false);
 
   const handleCustomPriceChange = (productId, val) => {
     setCustomPrices((prev) => ({ ...prev, [productId]: val }));
@@ -358,6 +361,15 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
                 <span className="text-[11px] text-slate-400 text-center sm:text-left flex items-center justify-center sm:justify-start gap-1">
                   <Check size={14} className="text-emerald-400" /> Cadastro 100% gratuito e instantâneo
                 </span>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTrustModalOpen(true)}
+                  className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center justify-center sm:justify-start gap-1 transition underline cursor-pointer"
+                >
+                  <ShieldCheck size={14} /> Garantia Anti-Quebra & Envio Cego
+                </button>
+
               </div>
             </div>
 

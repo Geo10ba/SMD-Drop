@@ -22,6 +22,7 @@ import {
   FileText,
   FileCheck
 } from 'lucide-react';
+import { BlindShippingTrustModal } from '../common/BlindShippingTrustModal';
 import { calculateMelhorEnvioShipping } from '../../lib/melhorenvio';
 import { createMercadoPagoPixPayment, createMercadoPagoPreference } from '../../lib/mercadopago';
 import { 
@@ -40,6 +41,9 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
   const [marketplace, setMarketplace] = useState('Mercado Livre');
   const [labelPdfFile, setLabelPdfFile] = useState(null);
   const [labelFileBase64, setLabelFileBase64] = useState(null);
+  const [pixReceiptFile, setPixReceiptFile] = useState(null);
+  const [pixReceiptBase64, setPixReceiptBase64] = useState(null);
+  const [isTrustModalOpen, setIsTrustModalOpen] = useState(false);
 
   // Fiscal Tripartite Configuration (Art. 40 Convênio S/N 1970)
   const [fiscalRegime, setFiscalRegime] = useState('mei'); // 'mei' | 'simples'
@@ -127,6 +131,20 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
   // 5% Mercado Pago Fee Surcharge when Mercado Pago is selected
   const mercadoPagoFee = paymentMethod === 'mercadopago' ? baseTotal * 0.05 : 0;
   const finalTotal = Math.max(0, Number(baseTotal + mercadoPagoFee) || 0);
+
+  
+  const handlePixReceiptUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      setPixReceiptFile(file.name);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPixReceiptBase64(reader.result);
+        showNotification('📎 Comprovante do PIX anexado com sucesso!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleLabelUpload = (e) => {
     const file = e.target.files && e.target.files[0];
@@ -593,7 +611,7 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
               )}
 
               {/* Garantia de Logística Cega & Embalagem Neutra */}
-              <div className="bg-slate-900 border border-slate-700 p-3.5 rounded-2xl flex items-center justify-between gap-3 text-xs text-slate-300 shadow-sm">
+              <div onClick={() => setIsTrustModalOpen(true)} className="bg-slate-900 hover:bg-slate-850 border border-slate-700 hover:border-amber-500/50 p-3.5 rounded-2xl flex items-center justify-between gap-3 text-xs text-slate-300 shadow-sm cursor-pointer transition-all">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
                     <ShieldCheck size={18} />
@@ -827,6 +845,35 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
                 </div>
               )}
 
+                        {/* Upload do Comprovante PIX */}
+                        <div className="bg-slate-950/90 p-3.5 rounded-xl border border-dashed border-emerald-500/40 text-xs text-left max-w-md mx-auto space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-white flex items-center gap-1.5 text-xs">
+                              <FileCheck size={14} className="text-emerald-400" />
+                              Comprovante do PIX (Opcional):
+                            </span>
+                            {pixReceiptFile && (
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                Anexado ✓
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            Anexar a foto ou PDF do comprovante agiliza a liberação imediata do pedido na esteira de produção!
+                          </p>
+                          <label className="btn-secondary text-[11px] font-bold py-2 px-3 flex items-center justify-center gap-2 cursor-pointer hover:border-emerald-500 transition w-full">
+                            <FileUp size={14} className="text-emerald-400" />
+                            <span className="truncate">{pixReceiptFile ? pixReceiptFile : 'Selecionar Foto / PDF do Comprovante'}</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={handlePixReceiptUpload}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+
+
               {paymentMethod === 'mercadopago' && (
                 <div className="bg-gradient-to-br from-slate-900 via-sky-950/40 to-slate-900 border border-sky-500/40 text-white rounded-2xl p-6 text-center space-y-4 shadow-xl">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 text-sky-400 text-xs font-black border border-sky-500/40">
@@ -1001,5 +1048,15 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
       </div>
     </div>,
     document.body
+  );
+
+  return (
+    <>
+      {modalContent}
+      <BlindShippingTrustModal
+        isOpen={isTrustModalOpen}
+        onClose={() => setIsTrustModalOpen(false)}
+      />
+    </>
   );
 };

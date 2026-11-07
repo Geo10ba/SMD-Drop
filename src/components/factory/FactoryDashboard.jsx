@@ -1248,11 +1248,18 @@ export const FactoryDashboard = ({ onOpenFulfillment, onOpenNewProduct, activeTa
                         <td className="p-3 font-mono font-extrabold text-amber-600 dark:text-amber-400">{o.id}</td>
                         <td className="p-3 font-semibold">{o.resellerName || 'Revendedor'}</td>
                         <td className="p-3">
-                          {o.dispatchMode === 'marketplace_label' ? (
-                            <span className="badge-ml text-[10px] whitespace-nowrap">{o.marketplace || 'Marketplace'}</span>
-                          ) : (
-                            <span className="badge-gold text-[10px] whitespace-nowrap">Envio Direto Cego</span>
-                          )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {o.dispatchMode === 'marketplace_label' ? (
+                              <span className="badge-ml text-[10px] whitespace-nowrap">{o.marketplace || 'Marketplace'}</span>
+                            ) : (
+                              <span className="badge-gold text-[10px] whitespace-nowrap">Envio Direto Cego</span>
+                            )}
+                            {(o.pixReceiptBase64 || o.pixReceiptFile) && (
+                              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[9px] font-black px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5" title="Comprovante do PIX Anexado">
+                                📎 PIX
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3">
                           {o.dispatchMode === 'marketplace_label' ? (

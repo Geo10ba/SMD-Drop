@@ -149,7 +149,7 @@ ${labelBadge}
 
 📍 <b>Destinatário Final:</b> ${escapeHtml(customerName || 'Cliente Final')} (${escapeHtml(customerCity || '-')}/${escapeHtml(customerState || '-')})
 💳 <b>Forma de Pagamento:</b> <b>${escapeHtml(paymentMethod || 'PIX')}</b>
-💰 <b>Valor Total:</b> <b>${formatCurrency(total || wholesaleTotal)}</b>${feeText}
+${payload.hasPixReceipt ? `📎 <b>Comprovante PIX:</b> Anexado pelo revendedor (Pronto para conferência!) ✅\n` : ''}💰 <b>Valor Total:</b> <b>${formatCurrency(total || wholesaleTotal)}</b>${feeText}
 ${Number(shippingTotal) > 0 ? `🚚 <b>Frete:</b> ${formatCurrency(shippingTotal)}\n` : ''}
 🛒 <b>Itens do Pedido:</b>
 ${itemsListText}

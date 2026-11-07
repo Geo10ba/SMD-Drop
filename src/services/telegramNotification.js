@@ -28,8 +28,10 @@ export async function notifyOrderToTelegram(orderData) {
       dispatchMode: orderData.dispatchMode,
       marketplace: orderData.marketplace,
       hasLabel: Boolean(orderData.labelPdf || orderData.label_pdf_url),
+      hasPixReceipt: Boolean(orderData.pixReceiptFile || orderData.pixReceiptBase64),
       labelFileBase64: orderData.labelFileBase64 || null,
       labelFileName: orderData.labelFileName || orderData.labelPdf || null,
+      pixReceiptFile: orderData.pixReceiptFile || null,
       mercadoPagoFee: orderData.mercadoPagoFee || 0,
       items: (orderData.items || []).map(it => ({
         title: it.title || it.name,
