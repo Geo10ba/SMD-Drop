@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2, FileSpreadsheet, ShoppingBag, Upload, Maximize2 } from 'lucide-react';
+import { Download, Copy, Check, Image as ImageIcon, FileText, Tag, Barcode, ShieldCheck, Video, Layers, Package, FileCheck, ExternalLink, Plus, Sparkles, Megaphone, Film, Share2, FileSpreadsheet, ShoppingBag, Upload, Maximize2, Lock, UserPlus, LogIn, AlertCircle } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 import { ResellerProductImagesModal } from './ResellerProductImagesModal';
 import { ImageLightboxModal } from '../common/ImageLightboxModal';
 import { generateMarketingContent } from '../../lib/smdAssistIa';
 import { downloadShopeeMassCreationCSV, saveCustomShopeeTemplate, getCustomShopeeTemplateMeta, clearCustomShopeeTemplate } from '../../lib/shopeeExporter';
 
-export const MediaKitModal = ({ product, onClose }) => {
-  const { showNotification } = useStore();
+export const MediaKitModal = ({ product, onClose, onOpenRegister }) => {
+  const { showNotification, currentUser } = useStore();
+  const isAuthenticated = Boolean(currentUser);
+  const [authGateNotice, setAuthGateNotice] = useState(null);
 
   // Trava a rolagem de fundo enquanto o modal estiver aberto
   useEffect(() => {
@@ -39,6 +41,10 @@ export const MediaKitModal = ({ product, onClose }) => {
   const dims = product.dimensions || { length: 30, width: 30, height: 10 };
 
   const handleGenerateMarketing = async () => {
+    if (!isAuthenticated) {
+      handleProtectedAction('usar a Inteligência Artificial para gerar roteiros e copies');
+      return;
+    }
     setLoadingMarketing(true);
     try {
       const res = await generateMarketingContent({ product });
@@ -62,7 +68,23 @@ export const MediaKitModal = ({ product, onClose }) => {
     showNotification(`${label} copiado!`);
   };
 
+  
+  const handleProtectedAction = (reason, callback) => {
+    if (!isAuthenticated) {
+      setAuthGateNotice(reason);
+      if (showNotification) {
+        showNotification(`🔒 Cadastre-se grátis para ${reason}!`, 'error');
+      }
+      return;
+    }
+    if (callback) callback();
+  };
+
   const copyToClipboard = (text, type) => {
+    if (!isAuthenticated) {
+      handleProtectedAction(type === 'title' ? 'copiar o título otimizado para SEO' : 'copiar a descrição comercial completa');
+      return;
+    }
     navigator.clipboard.writeText(text);
     if (type === 'title') {
       setCopiedTitle(true);
@@ -239,6 +261,10 @@ export const MediaKitModal = ({ product, onClose }) => {
                 <div className="space-y-1.5">
                   <button
                     onClick={async () => {
+                      if (!isAuthenticated) {
+                        handleProtectedAction('baixar a planilha de cadastro em massa da Shopee');
+                        return;
+                      }
                       const ok = await downloadShopeeMassCreationCSV([product], 2.2);
                       if (ok) showNotification(`Planilha Shopee (Excel .xlsx) de "${product.title}" baixada com sucesso!`);
                     }}
@@ -295,7 +321,13 @@ export const MediaKitModal = ({ product, onClose }) => {
                 </div>
 
                 <button
-                  onClick={() => showNotification('Download de fotos em HD iniciado em ZIP!')}
+                  onClick={() => {
+                  if (!isAuthenticated) {
+                    handleProtectedAction('baixar o pacote de fotos em alta resolução sem marca d\'água');
+                    return;
+                  }
+                  showNotification('Download de fotos em HD iniciado em ZIP!');
+                }}
                   className="w-full btn-secondary justify-center text-xs font-bold py-2"
                 >
                   <Download size={14} /> Baixar Fotos ({images.length} fotos)
@@ -400,6 +432,29 @@ export const MediaKitModal = ({ product, onClose }) => {
 
           {/* TAB MARKETING MULTICANAL IA */}
           {activeTab === 'marketing' && (
+            !isAuthenticated ? (
+              <div className="bg-gradient-to-br from-purple-950/30 to-slate-900 border-2 border-dashed border-purple-500/30 rounded-2xl p-8 text-center space-y-4 my-4 max-w-lg mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center mx-auto border border-purple-500/40">
+                  <Sparkles size={28} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-extrabold text-white">Marketing com IA Exclusivo para Parceiros</h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    O assistente Lumen IA gera automaticamente ganchos virais, títulos magnéticos de 60 caracteres e roteiros para TikTok/Reels deste produto.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose?.();
+                    onOpenRegister?.('register');
+                  }}
+                  className="btn-gold py-2.5 px-6 text-xs font-black inline-flex items-center gap-2 shadow-lg"
+                >
+                  <UserPlus size={15} /> Cadastre-se Grátis para Desbloquear a IA
+                </button>
+              </div>
+            ) : (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-purple-900/30 via-slate-900 to-indigo-900/30 p-5 rounded-2xl border border-purple-500/30 flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="space-y-1 text-center md:text-left">
@@ -559,7 +614,8 @@ export const MediaKitModal = ({ product, onClose }) => {
                 </div>
               )}
             </div>
-          )}
+          )
+        )}
 
           {/* TAB 2: VARIAÇÕES SHOPEE */}
           {activeTab === 'variations' && (
@@ -656,8 +712,31 @@ export const MediaKitModal = ({ product, onClose }) => {
             </div>
           )}
 
-          {/* TAB 4: DADOS FISCAIS */}
+                    {/* TAB 4: DADOS FISCAIS */}
           {activeTab === 'fiscal' && (
+            !isAuthenticated ? (
+              <div className="bg-gradient-to-br from-amber-950/30 to-slate-900 border-2 border-dashed border-amber-500/30 rounded-2xl p-8 text-center space-y-4 my-4 max-w-lg mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/40">
+                  <FileCheck size={28} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-extrabold text-white">Dados Fiscais & Tributários de Fábrica</h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Parâmetros oficiais de NCM, CFOP de Venda à Ordem e EAN/GTIN homologados são disponibilizados apenas para revendedores credenciados.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose?.();
+                    onOpenRegister?.('register');
+                  }}
+                  className="btn-gold py-2.5 px-6 text-xs font-black inline-flex items-center gap-2 shadow-lg"
+                >
+                  <UserPlus size={15} /> Liberar Dados Fiscais com Cadastro Grátis
+                </button>
+              </div>
+            ) : (
             <div className="space-y-4">
               <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
                 <FileCheck size={14} className="text-amber-500" /> Parâmetros Fiscais e Tributários para Emissão de Nota Fiscal
@@ -695,7 +774,8 @@ export const MediaKitModal = ({ product, onClose }) => {
                 </div>
               </div>
             </div>
-          )}
+          )
+        )}
 
           {/* TAB 5: FOTOS HD */}
           {activeTab === 'photos' && (

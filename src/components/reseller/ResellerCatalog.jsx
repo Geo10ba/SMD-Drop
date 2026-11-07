@@ -875,6 +875,7 @@ export const ResellerCatalog = ({ onOpenCart, onOpenRegister }) => {
         <MediaKitModal
           product={mediaKitProduct}
           onClose={() => setMediaKitProduct(null)}
+          onOpenRegister={onOpenRegister}
         />
       )}
 
