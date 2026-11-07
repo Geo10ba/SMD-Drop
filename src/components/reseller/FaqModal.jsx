@@ -13,6 +13,10 @@ export const FaqModal = ({ isOpen, onClose }) => {
       answer: "Quando você realiza uma venda no Mercado Livre ou Shopee, a própria plataforma gera o PDF/ZPL da etiqueta de envio. No momento de fazer o pedido em nosso portal, selecione a opção 'Venda em Marketplace' e anexe a etiqueta. Nossa fábrica cuidará de imprimir, colar na caixa neutra e entregar no ponto de coleta dos Correios/Marketplace sem cobrar frete de você!"
     },
     {
+      question: "E se o produto quebrar durante o transporte da Shopee ou Mercado Livre? Quem se responsabiliza?",
+      answer: "A responsabilidade por avarias ocorridas durante o transporte é do próprio Marketplace (Shopee Envios ou Mercado Envios). Todas as etiquetas oficiais de envio possuem Seguro de Carga Integrado. Quando o cliente final recebe a encomenda danificada pelos Correios ou transportadora, ele abre a solicitação de reembolso no marketplace anexando as fotos da caixa e da peça avariada. A Shopee ou Mercado Livre devolve o dinheiro ao comprador e libera o valor integral da venda para a conta do revendedor através do seguro de envio, sem que o lojista tenha prejuízo! A fábrica SMD Drop assegura a embalagem em padrão industrial homologado (plástico bolha triplo, cantoneiras rígidas e caixa onda dupla) para que a cobertura do seguro do marketplace seja sempre 100% aprovada."
+    },
+    {
       question: "Como funciona o Orçamento de Produtos Sob Medida (Logomarcas e Letreiros CNC Laser)?",
       answer: "Para produtos sob medida (como Logomarcas 3D em Acrílico Espelhado, Letreiros e Placas), você informa o texto ou modelo desejado, dimensões estimadas, material preferido e anexa o arquivo/vetor com suas observações. Nossa fábrica analisa a complexidade do projeto e envia o orçamento oficial com preço de atacado para você aprovar e faturar diretamente pelo painel!"
     },

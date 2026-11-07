@@ -9,15 +9,16 @@ import {
   CheckCircle2, 
   X,
   Sparkles,
-  RefreshCw,
-  Building2
+  HelpCircle,
+  Building2,
+  ExternalLink
 } from 'lucide-react';
 
 export const BlindShippingTrustModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+    <div className="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
       <div className="bg-slate-900 border border-amber-500/30 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative my-auto text-white space-y-6">
         {/* Close Button */}
         <button
@@ -34,77 +35,90 @@ export const BlindShippingTrustModal = ({ isOpen, onClose }) => {
           </div>
           <div>
             <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 block">
-              POLÍTICA OFICIAL SMD DROP • PADRÃO INDUSTRIAL B2B
+              POLÍTICA OFICIAL SMD DROP • PADRÃO MARKETPLACE (SHOPEE & MERCADO LIVRE)
             </span>
             <h2 className="text-xl sm:text-2xl font-black font-['Outfit'] text-white">
-              Garantia Anti-Quebra & Envio 100% Cego
+              Política de Avarias de Transporte, Devoluções & Garantia
             </h2>
           </div>
         </div>
 
-        {/* 3 Pilares Principais */}
+        {/* Corpo Explicativo */}
         <div className="space-y-4">
-          {/* Pilar 1: Anti-Quebra */}
-          <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-2">
+          {/* Pilar 1: Seguro do Marketplace (Quem resolve avaria) */}
+          <div className="bg-slate-950/90 border border-amber-500/30 p-4 rounded-2xl space-y-2.5">
             <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
-              <Package size={18} />
-              <span>1. Embalagem Anti-Impacto com Cantoneiras & Refabricação Prioritária</span>
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Sabemos que acrílico espelhado e neon LED são peças nobres. Por isso, cada pedido é embalado com <strong>película protetora anti-risco</strong>, <strong>plástico bolha triplo de alta gramatura</strong> e <strong>cantoneiras rígidas de proteção</strong> em caixas de onda dupla.
-            </p>
-            <div className="bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl text-[11px] text-amber-300 flex items-center gap-2">
-              <CheckCircle2 size={16} className="shrink-0 text-amber-400" />
-              <span><strong>Compromisso SMD:</strong> Se a transportadora quebrar a peça no trajeto, basta o revendedor enviar foto da caixa e a fábrica refabrica a peça com <strong>prioridade máxima</strong> sem custo adicional de corte!</span>
-            </div>
-          </div>
-
-          {/* Pilar 2: Envio Cego (Blind Shipping) */}
-          <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-2">
-            <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm">
               <Truck size={18} />
-              <span>2. Envio 100% Cego e Neutro (Blind Shipping)</span>
+              <span>1. Item Quebrado no Transporte: Cobertura pelo Seguro do Marketplace</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Sua marca é o seu maior patrimônio. Despachamos em caixas 100% neutras sem logotipo, fita personalizada ou menção à fábrica SMD Drop.
+              Nas vendas com etiqueta da <strong>Shopee Envios</strong> ou <strong>Mercado Envios</strong>, quem contrata e gerencia a logística é o próprio marketplace. Todas as etiquetas possuem <strong>Seguro de Transporte Integrado</strong> contra danos e avarias dos Correios/transportadoras.
             </p>
-            <ul className="text-xs text-slate-300 space-y-1 list-disc list-inside">
-              <li>O remetente na etiqueta de envio é <strong>sempre o nome da sua loja</strong>.</li>
-              <li>A nota fiscal ou declaração de conteúdo vai dobrada no envelope plástico canguru externo.</li>
-              <li>O seu cliente final nunca saberá que o produto foi despachado direto da fábrica.</li>
-            </ul>
+
+            <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-2 text-xs">
+              <span className="font-extrabold text-amber-300 block text-xs">📋 Como o revendedor procede se o cliente final reclamar de peça danificada:</span>
+              <ol className="text-[11px] text-slate-300 space-y-1 list-decimal list-inside leading-relaxed">
+                <li>O cliente final abre a solicitação de devolução/reembolso no marketplace anexando fotos da caixa amassada e da peça quebrada (motivo: <em>"Item danificado durante o transporte"</em>).</li>
+                <li>A <strong>Shopee ou Mercado Livre</strong> analisa as imagens e constata a avaria ocorrida durante o trajeto logístico.</li>
+                <li>O marketplace <strong>reembolsa o comprador</strong> e, ao mesmo tempo, <strong>libera o dinheiro integral da venda para o lojista/revendedor</strong> através do Seguro de Envio.</li>
+                <li>O revendedor <strong>não tem prejuízo financeiro</strong> nem é penalizado na reputação pelo dano da transportadora.</li>
+              </ol>
+            </div>
           </div>
 
-          {/* Pilar 3: Segurança Fiscal */}
-          <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-2">
-            <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-              <FileCheck size={18} />
-              <span>3. Enquadramento Fiscal Legítimo (Venda à Ordem)</span>
+          {/* Pilar 2: Padrão Fabril de Embalagem Homologado */}
+          <div className="bg-slate-950/90 border border-slate-800 p-4 rounded-2xl space-y-2">
+            <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm">
+              <Package size={18} />
+              <span>2. O Papel da Fábrica: Embalagem Anti-Impacto Homologada</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Operação amparada pelo <strong>Art. 40 do Convênio SINIEF S/N 1970</strong> (Remessa por Conta e Ordem de Terceiros).
+              Para garantir que a Shopee e o Mercado Livre <strong>sempre aprovem o sinistro de avaria</strong> e nunca aleguem mau acondicionamento, a SMD Drop adota embalagem técnica reforçada:
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400">
-              <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
-                <strong className="text-white block mb-0.5">Revendedores MEI:</strong>
-                Isentos de emissão de NF-e para pessoa física. Acompanha Declaração de Conteúdo em seu nome.
-              </div>
-              <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
-                <strong className="text-white block mb-0.5">Simples / ME / EPP:</strong>
-                Basta anexar a chave de 44 dígitos da NF-e emitida pela sua empresa para o consumidor final.
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-center font-bold text-slate-200">
+              <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">Película protetora no acrílico</div>
+              <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">Plástico bolha triplo de alta densidade</div>
+              <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">Cantoneiras de absorção de choque</div>
+              <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">Caixa de papelão onda dupla reforçada</div>
             </div>
+          </div>
+
+          {/* Pilar 3: Defeito de Fabricação (Garantia SMD Drop) */}
+          <div className="bg-slate-950/90 border border-slate-800 p-4 rounded-2xl space-y-2">
+            <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+              <CheckCircle2 size={18} />
+              <span>3. Defeito Técnico de Fabricação (Garantia de Fábrica SMD Drop)</span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Se o problema for de fabricação (ex: fita LED que não acende, fonte 12V com defeito de fábrica ou corte divergente da arte aprovada), a responsabilidade é <strong>100% da fábrica SMD Drop</strong>. Nesses casos, basta acionar nosso suporte e providenciaremos a substituição da peça sem custos de corte para você.
+            </p>
+          </div>
+
+          {/* Pilar 4: Envio 100% Cego */}
+          <div className="bg-slate-950/90 border border-slate-800 p-3.5 rounded-2xl flex items-center justify-between gap-3 text-xs text-slate-300">
+            <div>
+              <strong className="text-white block text-xs">Garantia de Logística Cega (Blind Shipping):</strong>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Embalagem neutra sem logotipo fabril. Remetente na etiqueta sempre com os dados da sua loja lojista. Zero contato da fábrica com seu cliente final.
+              </p>
+            </div>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">
+              100% CEGO
+            </span>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+        <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
+          <span className="text-[11px] text-slate-400">
+            Dúvidas operacionais? Consulte o <strong>Lumen</strong> no painel.
+          </span>
           <button
             type="button"
             onClick={onClose}
             className="btn-gold text-xs font-black py-2.5 px-6 rounded-xl shadow-lg"
           >
-            Entendido, Fechar Garantia
+            Entendido, Fechar Política
           </button>
         </div>
       </div>
