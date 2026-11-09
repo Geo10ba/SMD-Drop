@@ -137,6 +137,7 @@ export function parseHashRoute(hashString) {
     isRegisterOpen: clean === 'cadastro' || clean === 'login',
     authMode: clean === 'login' ? 'login' : 'register',
     isM2Calc: clean === 'calculadora-m2',
+    legalModalType: (clean === 'termos' || clean === 'termos-de-uso') ? 'terms' : ((clean === 'privacidade' || clean === 'lgpd') ? 'privacy' : null),
     currentPath: clean || 'catalogo'
   };
 }

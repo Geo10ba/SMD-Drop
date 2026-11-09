@@ -56,6 +56,7 @@ import {
   safeSyncProductsBatchToSupabase
 } from '../utils/productSerialization';
 import { validateOrder } from '../validators/schemas';
+import { DEFAULT_TERMS_OF_SERVICE, DEFAULT_PRIVACY_POLICY } from '../data/legalDocuments';
 
 // Re-exportações modulares para manter compatibilidade integral
 export {
@@ -2273,18 +2274,7 @@ export const StoreProvider = ({ children }) => {
 
   // Company Settings & Legal Shielding (Configurable by Admin)
   const [companySettings, setCompanySettingsState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('smd_company_settings');
-      if (saved) {
-        try { 
-          const parsed = JSON.parse(saved); 
-          if (parsed && parsed.name && !parsed.name.includes('Apex')) {
-            return parsed;
-          }
-        } catch (e) {}
-      }
-    }
-    return {
+    const defaultSettings = {
       name: "SMD Drop",
       subtitle: "Plataforma Fabril de Dropshipping & Produtos sob Medida",
       cnpj: "45.109.892/0001-99",
@@ -2317,57 +2307,41 @@ export const StoreProvider = ({ children }) => {
       ],
       monthlyFixedCost: 15000,
       taxRatePct: 5,
-      machineHourlyRate: 46.85, // Custo Máquina Laser R$ 46,85/h (Padrão Gestor Pro CNC)
-      laborHourlyRate: 12.50, // Custo Acabamento Manual R$ 12,50/h (Padrão Gestor Pro CNC)
-      retailMarginPct: 150, // Margem de Lucro 150% do Gestor Pro CNC
-      factoryWholesaleMarginPct: 60, // Margem de Atacado da Fábrica (B2B)
+      machineHourlyRate: 46.85,
+      laborHourlyRate: 12.50,
+      retailMarginPct: 150,
+      factoryWholesaleMarginPct: 60,
       defaultPackagingCost: 4.5,
-      maxWallHeightCm: 25, // Limite de altura máxima decorativa de parede (em cm)
-      isMaxHeightLockedDefault: true, // Trava inteligente anti-desperdício de chapa ativa por padrão
-      minSheetM2: 0.20, // Área mínima fabril de chapa cobrada (em m²)
+      maxWallHeightCm: 25,
+      isMaxHeightLockedDefault: true,
+      minSheetM2: 0.20,
       enabledProjectTypes: {
         logo_parede: true,
         placa_fundo: true,
         texto_simples: true
       },
       disabledFontIds: [],
-      termsContent: `1. ACEITAÇÃO DOS TERMOS E CONDIÇÕES
-Ao utilizar a plataforma SMD Drop, o contratante (Revendedor) declara ter lido, compreendido e aceito integralmente estes Termos de Uso. A SMD Drop atua como parceira fabril e prestadora de serviços de fabricação, processamento e postagem de pedidos em modalidade de logística cega (Blind Shipping).
-
-2. DA MODALIDADE DE ENVIO CEGO (BLIND SHIPPING) E RESPONSABILIDADE DAS ETIQUETAS
-2.1. A SMD Drop compromete-se a efetuar o despacho de mercadorias utilizando as etiquetas de envio fornecidas pelo contratante (provenientes de plataformas parceiras como Mercado Livre, Shopee, Amazon, Magalu, Nuvemshop ou Shopify).
-2.2. A embalagem utilizada pela fábrica é 100% neutra, isenta de marcas, logotipos ou materiais publicitários da SMD Drop, preservando o anonimato da operação perante o cliente final do revendedor.
-2.3. O revendedor é o único responsável pela veracidade, conformidade fiscal e validade das etiquetas de frete e declarações de conteúdo cadastradas no sistema.
-
-3. PRODUTOS PERSONALIZADOS SOB MEDIDA (CÁLCULO POR M²) E DIREITO DE ARREPENDIMENTO
-3.1. Em estrita conformidade com a jurisprudência brasileira e exceções ao Artigo 49 do Código de Defesa do Consumidor (Lei nº 8.078/1990), produtos fabricados sob medida, personalizados com logomarcas específicas do cliente ou cortados a laser sob demandas customizadas NÃO estão sujeitos a cancelamento injustificado ou devolução por simples arrependimento após a iniciação do processo fabril.
-3.2. A SMD Drop garante a substituição ou refabricação sem custos adicionais de qualquer produto que apresente comprovado defeito de fabricação ou divergência em relação ao arquivo vetorial/medidas contratadas.
-
-4. PROPRIEDADE INTELECTUAL E MARCAS REGISTRADAS
-4.1. O revendedor declara possuir todos os direitos de uso, autorizações de imagem e licenças de marcas registradas sobre quaisquer logomarcas, arquivos vetoriais ou designs enviados para produção na fábrica.
-4.2. A SMD Drop atua estritamente como executora técnica de corte e montagem, ficando isenta de qualquer responsabilidade civil ou criminal por violação de propriedade intelectual cometida pelo contratante.
-
-5. PRAZOS FABRIS E FORÇA MAIOR
-5.1. O prazo padrão de fabricação e despacho é de 24h a 72h úteis após a confirmação do pagamento e validação do arquivo vetorial.
-5.2. Eventuais atrasos decorrentes de greves de transportadoras, indisponibilidade de serviços de correios ou eventos de força maior não ensejarão multa ou penalidades à contratada.`,
-      privacyContent: `1. DECLARAÇÃO DE CONFORMIDADE COM A LGPD (LEI Nº 13.709/2018)
-A SMD Drop reafirma seu compromisso inegociável com a segurança, privacidade e proteção dos dados pessoais de seus revendedores e dos clientes finais cujos dados são processados para fins de etiquetação e despacho.
-
-2. DADOS COLETADOS E FINALIDADE DO PROCESSAMENTO
-2.1. Coletamos dados do revendedor (Nome/Razão Social, CNPJ/CPF, Email, WhatsApp, Chave PIX) exclusivamente para gestão de cadastro, emissão de cobranças de atacado e suporte operacional.
-2.2. Os dados de destinatários contidos nas etiquetas de envio anexadas pelo revendedor são utilizados ESTRITAMENTE para a impressão da etiqueta e colagem no pacote de despacho.
-2.3. A SMD Drop NÃO comercializa, compartilha ou utiliza os dados dos clientes finais dos revendedores para fins de marketing ou prospecção própria em nenhuma hipótese.
-
-3. ARMAZENAMENTO E SEGURANÇA DA INFORMAÇÃO
-3.1. Todos os dados são armazenados em servidores seguros equipados com criptografia de ponta a ponta e controle de acesso restrito.
-3.2. Os arquivos de etiquetas de envio em formato PDF são mantidos no sistema durante o período de garantia legal e descartados/arquivados com segurança após o cumprimento do despacho.
-
-4. DIREITOS DO TITULAR DE DADOS
-Nos termos do Artigo 18 da LGPD, o titular dos dados possui o direito de solicitar a confirmação do tratamento, acesso aos dados, correção de informações incompletas ou eliminação de dados pessoais desnecessários.
-
-5. CONTATO DO ENCARREGADO DE DADOS (DPO)
-Para exercer seus direitos de privacidade ou esclarecer dúvidas contratuais, entre em contato com nosso Encarregado de Proteção de Dados pelo email: privacidade@smddrop.com.br.`
+      termsContent: DEFAULT_TERMS_OF_SERVICE.trim(),
+      privacyContent: DEFAULT_PRIVACY_POLICY.trim()
     };
+
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smd_company_settings');
+      if (saved) {
+        try { 
+          const parsed = JSON.parse(saved); 
+          if (parsed && parsed.name && !parsed.name.includes('Apex')) {
+            return {
+              ...defaultSettings,
+              ...parsed,
+              termsContent: (parsed.termsContent && parsed.termsContent.trim().length > 50) ? parsed.termsContent : defaultSettings.termsContent,
+              privacyContent: (parsed.privacyContent && parsed.privacyContent.trim().length > 50) ? parsed.privacyContent : defaultSettings.privacyContent
+            };
+          }
+        } catch (e) {}
+      }
+    }
+    return defaultSettings;
   });
 
   const recalculateMaterialPrices = () => {

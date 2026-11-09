@@ -46,7 +46,7 @@ function MainApp() {
   const [m2CalculatorProduct, setM2CalculatorProduct] = useState(() => initialRoute.isM2Calc ? sampleM2CalculatorProduct : null);
   const [isRegisterOpen, setIsRegisterOpen] = useState(() => initialRoute.isRegisterOpen);
   const [authMode, setAuthMode] = useState(() => initialRoute.authMode);
-  const [legalModalType, setLegalModalType] = useState(null);
+  const [legalModalType, setLegalModalType] = useState(() => initialRoute.legalModalType || null);
   const [isCartOpen, setIsCartOpen] = useState(() => initialRoute.isCartOpen);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(() => initialRoute.isCheckoutOpen);
   const [isResellerOrdersOpen, setIsResellerOrdersOpen] = useState(() => initialRoute.isResellerOrdersOpen);
@@ -114,6 +114,13 @@ function MainApp() {
         setIsRegisterOpen(true);
       } else {
         setIsRegisterOpen(false);
+      }
+      if (path === 'termos' || path === 'termos-de-uso') {
+        setLegalModalType('terms');
+      } else if (path === 'privacidade' || path === 'lgpd') {
+        setLegalModalType('privacy');
+      } else {
+        setLegalModalType(null);
       }
       setIsAdminLoginOpen(path === 'admin-login');
       if (path === 'calculadora-m2') {
@@ -346,8 +353,14 @@ function MainApp() {
       />
 
       <LegalModal
-        type={legalModalType}
-        onClose={() => setLegalModalType(null)}
+        isOpen={Boolean(legalModalType)}
+        mode={legalModalType || 'terms'}
+        onClose={() => {
+          setLegalModalType(null);
+          if (window.location.hash === '#termos' || window.location.hash === '#privacidade' || window.location.hash === '#termos-de-uso' || window.location.hash === '#lgpd') {
+            window.location.hash = '#catalogo';
+          }
+        }}
       />
 
       {m2CalculatorProduct && (
