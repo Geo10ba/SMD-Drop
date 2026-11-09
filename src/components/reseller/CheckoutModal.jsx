@@ -60,13 +60,13 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
 
   // Customer delivery details for direct shipping
   const [customerData, setCustomerData] = useState({
-    name: 'Carlos Alberto Santos',
-    cpf: '341.982.109-88',
-    phone: '(11) 98765-4321',
-    address: 'Rua Bela Cintra, 890, Apto 102',
-    city: 'São Paulo',
-    state: 'SP',
-    zip: '01415-000'
+    name: '',
+    cpf: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: ''
   });
 
   const [shippingMethod, setShippingMethod] = useState('sedex'); // 'pac', 'sedex', 'jadlog'
@@ -209,13 +209,13 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
       labelFileBase64,
       labelFileName: labelPdfFile,
       customerData: dispatchMode === 'direct_blind_shipping' ? customerData : { 
-        name: customerData.name || ("Cliente " + marketplace), 
-        cpf: customerData.cpf || "",
-        phone: customerData.phone || "",
-        city: customerData.city || "Marketplace Fulfillment",
-        address: customerData.address || "Conforme Etiqueta Marketplace",
-        state: customerData.state || "SP",
-        zip: customerData.zip || "01000-000"
+        name: `Conforme Etiqueta (${marketplace})`, 
+        cpf: "Na Etiqueta / Chave NF-e",
+        phone: "",
+        city: "Destino da Etiqueta",
+        address: "Conforme Etiqueta Marketplace Anexada",
+        state: "BR",
+        zip: "00000-000"
       },
       items: cart,
       wholesaleTotal: wholesaleSubtotal,

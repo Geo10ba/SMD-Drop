@@ -15,13 +15,6 @@ function apiDevMiddleware() {
               if (!process.env[k]) process.env[k] = env[k];
             });
 
-            // Mapeia /api/xyz/abc para ./api/xyz/abc.js
-            const relativePath = urlPath.replace(/^\/api\//, '');
-            const filePath = `./api/${relativePath}.js`;
-
-            const module = await import(/* @vite-ignore */ filePath);
-            const handler = module.default || module;
-
             let body = {};
             if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
               const buffers = [];
@@ -32,6 +25,32 @@ function apiDevMiddleware() {
               body = raw ? JSON.parse(raw) : {};
             }
             req.body = body;
+
+            // Se for endpoint do telegram em dev, repassa para a cloud Vercel para evitar bloqueios de rede local
+            if (urlPath.startsWith('/api/telegram/')) {
+              try {
+                const cloudRes = await fetch(`https://smd-drop.vercel.app${urlPath}`, {
+                  method: req.method,
+                  headers: { 'Content-Type': 'application/json' },
+                  body: req.method !== 'GET' ? JSON.stringify(body) : undefined
+                });
+                const cloudData = await cloudRes.json().catch(() => ({}));
+                res.statusCode = cloudRes.status;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(cloudData));
+                return;
+              } catch (cloudErr) {
+                console.warn('[Telegram Dev Proxy Fallback to Local]:', cloudErr.message);
+              }
+            }
+
+            const path = await import('node:path');
+            const { pathToFileURL } = await import('node:url');
+            const relativePath = urlPath.replace(/^\/api\//, '');
+            const absolutePath = path.resolve(process.cwd(), 'api', `${relativePath}.js`);
+
+            const module = await import(pathToFileURL(absolutePath).href);
+            const handler = module.default || module;
 
             res.status = (code) => {
               res.statusCode = code;

@@ -205,13 +205,13 @@ export const OrderDetailsModal = ({ order, onClose }) => {
                     3. Consumidor (Destinatário)
                   </span>
                   <p className="font-bold text-white text-xs truncate">
-                    {fiscal.customer?.name || order.customerData?.name || "Cliente Final"}
+                    {isMarketplace ? `Conforme Etiqueta (${order.marketplace || 'Marketplace'})` : (fiscal.customer?.name || order.customerData?.name || "Cliente Final")}
                   </p>
                   <p className="text-slate-400 font-mono text-[10px]">
-                    CPF: <strong className="text-white">{fiscal.customer?.cpf || order.customerData?.cpf || "Pendente"}</strong>
+                    CPF: <strong className="text-white">{isMarketplace ? 'Na Etiqueta / Chave NF-e' : (fiscal.customer?.cpf || order.customerData?.cpf || "Não informado")}</strong>
                   </p>
                   <p className="text-slate-400 truncate">
-                    {fiscal.customer?.city || order.customerData?.city || "São Paulo"} - {fiscal.customer?.state || order.customerData?.state || "SP"}
+                    {isMarketplace ? 'Impresso na etiqueta do envio' : `${fiscal.customer?.city || order.customerData?.city || "Destino"} - ${fiscal.customer?.state || order.customerData?.state || "UF"}`}
                   </p>
                 </div>
               </div>

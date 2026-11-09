@@ -12,15 +12,19 @@ export const TELEGRAM_BOT_URL = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
  */
 export async function notifyOrderToTelegram(orderData) {
   try {
+    const isMkt = orderData.dispatchMode === 'marketplace_label' || Boolean(orderData.labelPdf || orderData.label_pdf_url);
+    const mktName = orderData.marketplace || 'Marketplace';
+    const fallbackCustomerName = isMkt ? `Conforme Etiqueta (${mktName})` : 'Cliente Final';
+
     const payload = {
       type: 'order_created',
       orderId: orderData.id || orderData.orderId,
       resellerName: orderData.resellerName,
       resellerEmail: orderData.resellerEmail,
       resellerChatId: orderData.resellerTelegramChatId || orderData.telegramChatId || null,
-      customerName: orderData.customerName || orderData.customerData?.name,
-      customerCity: orderData.customerCity || orderData.customerData?.city,
-      customerState: orderData.customerState || orderData.customerData?.state,
+      customerName: isMkt ? fallbackCustomerName : (orderData.customerName || orderData.customerData?.name || fallbackCustomerName),
+      customerCity: isMkt ? 'Destino da Etiqueta' : (orderData.customerCity || orderData.customerData?.city || '-'),
+      customerState: isMkt ? 'BR' : (orderData.customerState || orderData.customerData?.state || '-'),
       wholesaleTotal: orderData.wholesaleTotal,
       shippingTotal: orderData.shippingTotal,
       total: orderData.total ?? orderData.wholesaleTotal,
@@ -40,14 +44,21 @@ export async function notifyOrderToTelegram(orderData) {
       }))
     };
 
-    const res = await fetch('/api/telegram/notify', {
+    const endpoint = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+      ? 'https://smd-drop.vercel.app/api/telegram/notify'
+      : '/api/telegram/notify';
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) {
-      console.warn('[Telegram Notify Warning]: Falha na resposta da API', res.status);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || (data && !data.success)) {
+      console.warn('[Telegram Notify Warning]: Falha na resposta da API', res.status, data);
+    } else {
+      console.log('[Telegram Notify Success]: Notificação entregue ao Telegram!', data);
     }
     return true;
   } catch (err) {
@@ -61,6 +72,10 @@ export async function notifyOrderToTelegram(orderData) {
  */
 export async function notifyOrderStatusToTelegram(orderData, newStatus, trackingCode = null, note = '') {
   try {
+    const isMkt = orderData.dispatchMode === 'marketplace_label' || Boolean(orderData.labelPdf || orderData.label_pdf_url);
+    const mktName = orderData.marketplace || 'Marketplace';
+    const fallbackCustomerName = isMkt ? `Conforme Etiqueta (${mktName})` : 'Cliente Final';
+
     const payload = {
       type: newStatus === 'enviado' ? 'order_shipped' : (newStatus === 'corte_laser' || newStatus === 'em_producao' ? 'production_started' : 'order_status_updated'),
       orderId: orderData.id || orderData.orderId,
@@ -69,9 +84,9 @@ export async function notifyOrderStatusToTelegram(orderData, newStatus, tracking
       resellerName: orderData.resellerName,
       resellerEmail: orderData.resellerEmail,
       resellerChatId: orderData.resellerTelegramChatId || orderData.telegramChatId || null,
-      customerName: orderData.customerName || orderData.customerData?.name,
-      customerCity: orderData.customerCity || orderData.customerData?.city,
-      customerState: orderData.customerState || orderData.customerData?.state,
+      customerName: isMkt ? fallbackCustomerName : (orderData.customerName || orderData.customerData?.name || fallbackCustomerName),
+      customerCity: isMkt ? 'Destino da Etiqueta' : (orderData.customerCity || orderData.customerData?.city || '-'),
+      customerState: isMkt ? 'BR' : (orderData.customerState || orderData.customerData?.state || '-'),
       trackingCode: trackingCode || orderData.trackingCode || null,
       marketplace: orderData.marketplace || 'Marketplace',
       total: orderData.wholesaleTotal || orderData.total,
@@ -81,14 +96,19 @@ export async function notifyOrderStatusToTelegram(orderData, newStatus, tracking
       }))
     };
 
-    const res = await fetch('/api/telegram/notify', {
+    const endpoint = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+      ? 'https://smd-drop.vercel.app/api/telegram/notify'
+      : '/api/telegram/notify';
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) {
-      console.warn('[Telegram Status Warning]: Falha na resposta da API', res.status);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || (data && !data.success)) {
+      console.warn('[Telegram Status Warning]: Falha na resposta da API', res.status, data);
     }
     return true;
   } catch (err) {

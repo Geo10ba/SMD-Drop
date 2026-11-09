@@ -226,10 +226,14 @@ export const ResellerOrdersModal = ({ isOpen, onClose, onOpenCatalog }) => {
                           Destinatário Final (Seu Cliente)
                         </span>
                         <p className="font-bold text-white text-xs truncate">
-                          {order.customerData?.name || order.customerName || 'Cliente Final'}
+                          {order.dispatchMode === 'marketplace_label'
+                            ? `Conforme Etiqueta (${order.marketplace || 'Marketplace'})`
+                            : (order.customerData?.name || order.customerName || 'Cliente Final')}
                         </p>
                         <p className="text-[11px] text-slate-400 truncate">
-                          {order.customerData?.city ? `${order.customerData.city} - ${order.customerData.state}` : 'Envio via etiqueta anexada'}
+                          {order.dispatchMode === 'marketplace_label'
+                            ? 'Destino e dados impressos na etiqueta do marketplace'
+                            : (order.customerData?.city ? `${order.customerData.city} - ${order.customerData.state}` : 'Envio via etiqueta anexada')}
                         </p>
                         <div className="pt-1.5 border-t border-slate-800 flex justify-between items-center text-[11px]">
                           <span className="text-slate-400">Embalagem & Remetente:</span>

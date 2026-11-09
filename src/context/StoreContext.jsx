@@ -661,7 +661,23 @@ export const StoreProvider = ({ children }) => {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            return parsed.map((o) => ({
+            return parsed.map((o) => {
+              const dMode = o.dispatchMode || o.dispatch_mode || 'marketplace_label';
+              const isMkt = dMode === 'marketplace_label' || Boolean(o.labelPdf || o.label_pdf_url);
+              let custData = o.customerData;
+              let custName = o.customerName || (custData && custData.name);
+
+              if (isMkt && (!custName || custName === 'Carlos Alberto Santos' || custName === 'Cliente Final')) {
+                custName = `Conforme Etiqueta (${o.marketplace || 'Marketplace'})`;
+                custData = {
+                  ...custData,
+                  name: custName,
+                  city: 'Destino da Etiqueta',
+                  state: 'BR'
+                };
+              }
+
+              return {
               ...o,
               wholesaleTotal: Number(o.wholesaleTotal ?? o.wholesale_total ?? o.total ?? 0) || 0,
               total: Number(o.total ?? o.wholesaleTotal ?? o.wholesale_total ?? 0) || 0,
@@ -673,7 +689,8 @@ export const StoreProvider = ({ children }) => {
                 ...it,
                 unitWholesalePrice: Number(it.unitWholesalePrice ?? it.price ?? 0) || 0
               })) : []
-            }));
+            };
+          });
           }
         } catch (e) {}
       }
@@ -1739,7 +1756,7 @@ export const StoreProvider = ({ children }) => {
       payment_method: newOrder.paymentMethod || 'pix',
       mercado_pago_fee: Number(newOrder.mercadoPagoFee) || 0,
       items: newOrder.items || [],
-      customer_name: orderData.customerName || (newOrder.customerData && newOrder.customerData.name) || 'Cliente Final',
+      customer_name: (orderData.dispatchMode === 'marketplace_label' ? `Conforme Etiqueta (${orderData.marketplace || 'Marketplace'})` : (orderData.customerName || (newOrder.customerData && newOrder.customerData.name) || 'Cliente Final')),
       customer_cpf: (newOrder.customerData && newOrder.customerData.cpf) || null,
       customer_address: orderData.customerAddress || (newOrder.customerData && newOrder.customerData.address) || 'Endereço',
       customer_city: orderData.customerCity || (newOrder.customerData && newOrder.customerData.city) || 'São Paulo',
