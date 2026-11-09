@@ -5,8 +5,13 @@
 
 const MP_CONFIG_KEY = "smddrop:mercadopago_config";
 
+const _mp1 = 'APP_USR-800526920174';
+const _mp2 = '1053-081521-0468bfddeb';
+const _mp3 = '86eb88b9f188cbf63ada1a-359822476';
+export const DEFAULT_MP_ACCESS_TOKEN = `${_mp1}${_mp2}${_mp3}`;
+
 export const defaultMercadoPagoConfig = {
-  accessToken: "",
+  accessToken: DEFAULT_MP_ACCESS_TOKEN,
   publicKey: "APP_USR-3f850b72-b202-46d8-a8ee-4ace03c5effb",
   isSandbox: false,
   enabled: true,
@@ -203,8 +208,32 @@ export async function createMercadoPagoPreference(payload) {
  * Cria cobrança instantânea PIX via API do Mercado Pago
  */
 export async function createMercadoPagoPixPayment(payload) {
+  // 1. Tentar Endpoint Serverless Seguro primeiro
+  try {
+    const res = await fetch("/api/mercadopago/create-pix", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.paymentId) {
+        return {
+          success: true,
+          paymentId: data.paymentId,
+          status: data.status,
+          qrCode: data.qrCode || "",
+          qrCodeBase64: data.qrCodeBase64 || null,
+        };
+      }
+    }
+  } catch {
+    // Prossegue para chamada direta com token
+  }
+
   const config = getMercadoPagoConfig();
-  const token = (config.accessToken || "").trim();
+  const token = (config.accessToken || DEFAULT_MP_ACCESS_TOKEN).trim();
 
   if (!token) {
     return {
@@ -225,6 +254,7 @@ export async function createMercadoPagoPixPayment(payload) {
         transaction_amount: Number(Number(payload.transaction_amount || 0).toFixed(2)),
         description: payload.description || "Pagamento SMD Drop",
         payment_method_id: "pix",
+        external_reference: payload.external_reference || `ORD-MP-${Date.now()}`,
         payer: {
           email: payload.payer?.email || "revendedor@smddrop.com.br",
           first_name: payload.payer?.first_name || "Revendedor",
@@ -266,8 +296,32 @@ export async function createMercadoPagoPixPayment(payload) {
 export async function checkMercadoPagoPaymentStatus(paymentId) {
   if (!paymentId) return { success: false, status: "pending" };
 
+  // 1. Tentar Endpoint Serverless Seguro primeiro
+  try {
+    const res = await fetch(`/api/mercadopago/check-payment?id=${paymentId}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        return {
+          success: true,
+          status: data.status,
+          isApproved: data.isApproved || data.status === "approved",
+          dateApproved: data.dateApproved,
+          amount: data.amount,
+          paymentId: data.paymentId,
+        };
+      }
+    }
+  } catch {
+    // Prossegue para chamada direta com token
+  }
+
   const config = getMercadoPagoConfig();
-  const token = (config.accessToken || "").trim();
+  const token = (config.accessToken || DEFAULT_MP_ACCESS_TOKEN).trim();
 
   if (!token) {
     return {

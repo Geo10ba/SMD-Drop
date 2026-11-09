@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../../context/StoreContext';
 import confetti from 'canvas-confetti';
@@ -20,11 +20,18 @@ import {
   Zap,
   Plus,
   FileText,
-  FileCheck
+  FileCheck,
+  RefreshCw,
+  Clock,
+  Check
 } from 'lucide-react';
 import { BlindShippingTrustModal } from '../common/BlindShippingTrustModal';
 import { calculateMelhorEnvioShipping } from '../../lib/melhorenvio';
-import { createMercadoPagoPixPayment, createMercadoPagoPreference } from '../../lib/mercadopago';
+import { 
+  createMercadoPagoPixPayment, 
+  createMercadoPagoPreference,
+  checkMercadoPagoPaymentStatus 
+} from '../../lib/mercadopago';
 import { 
   generatePixPayload, 
   getQrCodeImageUrl, 
@@ -71,6 +78,12 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
 
   const [shippingMethod, setShippingMethod] = useState('sedex'); // 'pac', 'sedex', 'jadlog'
   const [loadingCep, setLoadingCep] = useState(false);
+
+  // Live Mercado Pago PIX Generation & Polling State
+  const [mpPixData, setMpPixData] = useState(null);
+  const [loadingMpPix, setLoadingMpPix] = useState(false);
+  const [isMpApproved, setIsMpApproved] = useState(false);
+  const [copiedMpPix, setCopiedMpPix] = useState(false);
 
   // Auto-fetch address from ViaCEP API & calculate Mercado Envios shipping
   const handleCepChange = async (newZip) => {
@@ -194,7 +207,79 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
     setStep(2);
   };
 
-  const handleFinalizeOrder = () => {
+  // Gerar PIX oficial Mercado Pago ao entrar no Step 2 se este método for o selecionado
+  useEffect(() => {
+    if (!isOpen) {
+      setMpPixData(null);
+      setIsMpApproved(false);
+      return;
+    }
+
+    if (step === 2 && paymentMethod === 'mercadopago' && !mpPixData && !loadingMpPix && !isMpApproved) {
+      let isMounted = true;
+      setLoadingMpPix(true);
+
+      const itemsDesc = cart.map(i => `${i.quantity || 1}x ${i.title || i.name}`).slice(0, 2).join(', ');
+
+      createMercadoPagoPixPayment({
+        transaction_amount: finalTotal,
+        description: `Pedido SMD Drop: ${itemsDesc || 'Produtos atacado'}`,
+        external_reference: `ORD-MP-${Date.now()}`,
+        payer: {
+          email: currentUser?.email || 'revendedor@smddrop.com.br',
+          first_name: currentUser?.name ? currentUser.name.split(' ')[0] : 'Revendedor',
+          last_name: currentUser?.name && currentUser.name.split(' ').length > 1 ? currentUser.name.split(' ').slice(1).join(' ') : 'SMD'
+        }
+      }).then((res) => {
+        if (!isMounted) return;
+        if (res && res.success && res.paymentId) {
+          setMpPixData(res);
+          showNotification('⚡ QR Code PIX oficial Mercado Pago gerado com baixa automática!', 'success');
+        }
+      }).catch((err) => {
+        console.warn('Falha na geração PIX MP:', err);
+      }).finally(() => {
+        if (isMounted) setLoadingMpPix(false);
+      });
+
+      return () => { isMounted = false; };
+    }
+  }, [step, paymentMethod, isOpen, finalTotal, mpPixData, loadingMpPix, isMpApproved, cart, currentUser]);
+
+  // Monitoramento Automático de Confirmação PIX no Mercado Pago (Baixa Automática a cada 3s)
+  useEffect(() => {
+    if (!isOpen || step !== 2 || paymentMethod !== 'mercadopago' || !mpPixData?.paymentId || isMpApproved) {
+      return;
+    }
+
+    let isSubscribed = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await checkMercadoPagoPaymentStatus(mpPixData.paymentId);
+        if (res && res.isApproved && isSubscribed) {
+          clearInterval(interval);
+          setIsMpApproved(true);
+          try { confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } }); } catch (e) {}
+          showNotification('🎉 Pagamento PIX Mercado Pago CONFIRMADO AUTOMATICAMENTE!', 'success');
+          
+          setTimeout(() => {
+            if (isSubscribed) {
+              handleFinalizeOrder({ mpPaymentId: mpPixData.paymentId, autoApproved: true });
+            }
+          }, 1500);
+        }
+      } catch (err) {
+        console.warn('[Mercado Pago Polling]:', err.message);
+      }
+    }, 3000);
+
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, [isOpen, step, paymentMethod, mpPixData, isMpApproved]);
+
+  const handleFinalizeOrder = (extra = {}) => {
     submitOrder({
       resellerName: currentUser?.name || "Sua Loja / Revendedor Autorizado",
       resellerEmail: currentUser?.email || "revendedor@smddrop.com.br",
@@ -208,6 +293,8 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
       labelPdf: labelPdfFile || (dispatchMode === 'marketplace_label' ? `Etiqueta_${marketplace.replace(' ', '')}_${Date.now()}.pdf` : null),
       labelFileBase64,
       labelFileName: labelPdfFile,
+      pixReceiptFile,
+      pixReceiptBase64,
       customerData: dispatchMode === 'direct_blind_shipping' ? customerData : { 
         name: `Conforme Etiqueta (${marketplace})`, 
         cpf: "Na Etiqueta / Chave NF-e",
@@ -221,6 +308,8 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
       wholesaleTotal: wholesaleSubtotal,
       shippingTotal: factoryShippingCost,
       mercadoPagoFee: mercadoPagoFee,
+      mercadoPagoPaymentId: extra?.mpPaymentId || mpPixData?.paymentId || null,
+      autoApproved: Boolean(extra?.autoApproved || isMpApproved),
       total: finalTotal,
       trackingCode: dispatchMode === 'marketplace_label' ? `ML-BR${Math.floor(100000 + Math.random() * 900000)}` : `SS${Math.floor(100000000 + Math.random() * 900000000)}BR`
     });
@@ -896,75 +985,96 @@ export const CheckoutModal = ({ isOpen, onClose, onOpenWallet }) => {
                     </div>
                   </div>
 
-                  {(() => {
-                    const mpPixCode = generatePixPayload({
-                      key: SMD_DROP_CNPJ,
-                      beneficiary: "MERCADO PAGO SMD DROP",
-                      amount: finalTotal,
-                      txid: 'MP' + Date.now().toString().slice(-8)
-                    });
-                    const qrUrl = getQrCodeImageUrl(mpPixCode, 240);
-
-                    return (
-                      <div className="space-y-4">
-                        {/* Real Scannable QR Code */}
-                        <div className="w-52 h-52 mx-auto bg-white p-3 rounded-2xl shadow-2xl border-4 border-sky-500 flex flex-col items-center justify-center">
-                          <img
-                            src={qrUrl}
-                            alt="QR Code PIX Mercado Pago"
-                            className="w-44 h-44 object-contain rounded-lg"
-                          />
-                          <span className="text-[9px] font-mono text-sky-950 font-black mt-0.5">
-                            PIX MERCADO PAGO
-                          </span>
-                        </div>
-
-                        <div>
-                          <span className="text-xs text-slate-400 block font-medium">Valor Total PIX com Taxa (+5%):</span>
-                          <span className="text-3xl font-black text-sky-400 font-['Outfit']">
-                            R$ {finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-
-                        {/* CNPJ Key Box */}
-                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs flex items-center justify-between font-mono max-w-md mx-auto">
-                          <div className="text-left">
-                            <span className="text-[10px] text-slate-500 block uppercase font-sans font-bold">Chave PIX (Fábrica / MP)</span>
-                            <span className="text-sky-400 font-black">{SMD_DROP_CNPJ_FORMATTED}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(SMD_DROP_CNPJ);
-                              showNotification(`Chave CNPJ ${SMD_DROP_CNPJ_FORMATTED} copiada!`);
-                            }}
-                            className="btn-gold text-[10px] font-black py-1 px-2.5 rounded shrink-0 shadow bg-gradient-to-r from-sky-500 to-amber-500 text-slate-950"
-                          >
-                            COPIAR CHAVE
-                          </button>
-                        </div>
-
-                        {/* Full EMVCo Payload Box */}
-                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center justify-between font-mono max-w-md mx-auto">
-                          <span className="truncate pr-2 text-[11px] text-slate-400">{mpPixCode}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(mpPixCode);
-                              showNotification('Código PIX Mercado Pago Copia e Cola copiado com sucesso!');
-                            }}
-                            className="btn-gold text-[10px] font-black py-1 px-2.5 rounded shrink-0 shadow bg-gradient-to-r from-sky-500 to-amber-500 text-slate-950"
-                          >
-                            COPIAR CÓDIGO PIX MP
-                          </button>
-                        </div>
-
-                        <p className="text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed">
-                          ⚡ Escaneie o QR Code ou copie o código acima no app do seu banco ou Mercado Pago. Após realizar a transferência, clique no botão abaixo para confirmar e despachar seu pedido!
-                        </p>
+                  {isMpApproved ? (
+                    <div className="bg-emerald-950/90 border-2 border-emerald-500 rounded-2xl p-6 text-center space-y-3 shadow-2xl animate-fade-in">
+                      <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-lg">
+                        <CheckCircle2 size={36} />
                       </div>
-                    );
-                  })()}
+                      <h3 className="text-xl font-black text-emerald-400 font-['Outfit']">
+                        PAGAMENTO PIX CONFIRMADO AUTOMATICAMENTE!
+                      </h3>
+                      <p className="text-xs text-emerald-200 max-w-md mx-auto">
+                        O Mercado Pago identificou o recebimento da transação #{mpPixData?.paymentId}. Seu pedido está sendo encaminhado diretamente para a esteira fabril!
+                      </p>
+                    </div>
+                  ) : loadingMpPix ? (
+                    <div className="bg-slate-950/80 p-8 rounded-2xl border border-sky-500/30 text-center space-y-3">
+                      <RefreshCw size={32} className="animate-spin text-sky-400 mx-auto" />
+                      <p className="text-sm font-bold text-sky-300">
+                        Gerando QR Code PIX oficial Mercado Pago com baixa automática...
+                      </p>
+                      <span className="text-[11px] text-slate-400 block">
+                        Conectando com o gateway e reservando ID da transação.
+                      </span>
+                    </div>
+                  ) : (
+                    (() => {
+                      const effectivePixCode = mpPixData?.qrCode || generatePixPayload({
+                        key: SMD_DROP_CNPJ,
+                        beneficiary: "MERCADO PAGO SMD DROP",
+                        amount: finalTotal,
+                        txid: 'MP' + Date.now().toString().slice(-8)
+                      });
+
+                      const qrUrl = mpPixData?.qrCodeBase64
+                        ? `data:image/png;base64,${mpPixData.qrCodeBase64}`
+                        : getQrCodeImageUrl(effectivePixCode, 240);
+
+                      return (
+                        <div className="space-y-4">
+                          {/* Live Confirmation Polling Status */}
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/10 text-sky-300 text-xs font-bold border border-sky-500/30">
+                            <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping"></span>
+                            <Clock size={13} className="text-sky-400" /> Aguardando pagamento... Confirmação automática ativa
+                          </div>
+
+                          {/* Real Scannable QR Code */}
+                          <div className="w-52 h-52 mx-auto bg-white p-3 rounded-2xl shadow-2xl border-4 border-sky-500 flex flex-col items-center justify-center relative">
+                            <img
+                              src={qrUrl}
+                              alt="QR Code PIX Mercado Pago"
+                              className="w-44 h-44 object-contain rounded-lg"
+                            />
+                            <span className="text-[9px] font-mono text-sky-950 font-black mt-0.5">
+                              {mpPixData ? `MP #${mpPixData.paymentId}` : 'PIX MERCADO PAGO'}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-xs text-slate-400 block font-medium">Valor Total PIX com Taxa (+5%):</span>
+                            <span className="text-3xl font-black text-sky-400 font-['Outfit']">
+                              R$ {finalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+
+                          {/* Full EMVCo Payload Box (Copia e Cola) */}
+                          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center justify-between font-mono max-w-md mx-auto">
+                            <span className="truncate pr-2 text-[11px] text-slate-400">{effectivePixCode}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(effectivePixCode);
+                                setCopiedMpPix(true);
+                                setTimeout(() => setCopiedMpPix(false), 2500);
+                                showNotification('Código PIX Mercado Pago Copia e Cola copiado com sucesso!', 'success');
+                              }}
+                              className="btn-gold text-[10px] font-black py-1 px-2.5 rounded shrink-0 shadow bg-gradient-to-r from-sky-500 to-amber-500 text-slate-950 flex items-center gap-1"
+                            >
+                              {copiedMpPix ? <Check size={12} /> : <Copy size={12} />}
+                              {copiedMpPix ? 'COPIADO!' : 'COPIAR PIX'}
+                            </button>
+                          </div>
+
+                          <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed text-left flex items-start gap-2">
+                            <Sparkles size={16} className="text-sky-400 shrink-0 mt-0.5" />
+                            <span>
+                              <strong>Baixa Instantânea:</strong> Assim que você pagar no app de qualquer banco, o Mercado Pago confirma automaticamente e a tela avança em poucos segundos.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
                 </div>
               )}
             </div>

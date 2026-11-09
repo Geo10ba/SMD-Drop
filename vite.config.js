@@ -26,6 +26,13 @@ function apiDevMiddleware() {
             }
             req.body = body;
 
+            try {
+              const parsedUrl = new URL(req.url, 'http://localhost');
+              req.query = Object.fromEntries(parsedUrl.searchParams.entries());
+            } catch (e) {
+              req.query = {};
+            }
+
             // Se for endpoint do telegram em dev, repassa para a cloud Vercel para evitar bloqueios de rede local
             if (urlPath.startsWith('/api/telegram/')) {
               try {
